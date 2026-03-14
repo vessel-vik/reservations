@@ -19,6 +19,9 @@ export async function getTodayOrderAnalytics() {
             [
                 Query.greaterThanEqual('$createdAt', today.toISOString()),
                 Query.equal('status', 'paid'),
+                // Exclude settled/child orders to prevent double-counting revenue
+                // These are orders that were consolidated into a table_tab_master order
+                Query.notEqual('paymentStatus', 'settled'),
                 Query.orderDesc('$createdAt'),
                 Query.limit(1000)
             ]
@@ -63,6 +66,8 @@ export async function getRevenueByPeriod(days: number = 7) {
             [
                 Query.greaterThanEqual('$createdAt', startDate.toISOString()),
                 Query.equal('status', 'paid'),
+                // Exclude settled/child orders to prevent double-counting revenue
+                Query.notEqual('paymentStatus', 'settled'),
                 Query.orderDesc('$createdAt'),
                 Query.limit(10000)
             ]
@@ -242,6 +247,8 @@ export async function getServerPerformance() {
             [
                 Query.greaterThanEqual('$createdAt', today.toISOString()),
                 Query.equal('status', 'paid'),
+                // Exclude settled/child orders to prevent double-counting revenue
+                Query.notEqual('paymentStatus', 'settled'),
                 Query.limit(1000)
             ]
         );

@@ -52,12 +52,24 @@ export async function getServerStats(userId: string) {
     try {
         const { orders } = await getServerOrders(userId, 1000);
 
-        // Exclude consolidated table-tab master orders from revenue so we
-        // don't double-count. These have specialInstructions starting with
-        // "TAB SETTLEMENT - ..." and are used purely for receipt rendering.
+        // Exclude:
+        // 1. Consolidated table-tab master orders (settlementType === 'table_tab_master')
+        //    - These are used purely for receipt rendering
+        // 2. Child orders that were settled (paymentStatus === 'settled')
+        //    - These have been consolidated into a master order, so their amount
+        //      is already included in the master order's totalAmount
+        // This prevents the double-counting bug where both the consolidated order
+        // and the original orders get counted in revenue calculations.
         const effectiveOrders = orders.filter((order: any) => {
-            const note = (order as any).specialInstructions || "";
-            return typeof note !== "string" || !note.startsWith("TAB SETTLEMENT - ");
+            // Exclude master settlement orders
+            if (order.settlementType === 'table_tab_master') {
+                return false;
+            }
+            // Exclude child orders that have been settled
+            if (order.paymentStatus === 'settled') {
+                return false;
+            }
+            return true;
         });
 
         // Calculate stats

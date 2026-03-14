@@ -447,11 +447,16 @@ export const settleTableTabAndCreateOrder = async ({
         specialInstructions: `TAB SETTLEMENT - Table ${tableNumber} (${date}) | Orders: ${orderNumbers.join(
             ", "
         )} | Ref: ${paymentReference}`,
+        // Settlement metadata - marks this as a consolidated settlement order
+        settlementType: "table_tab_master",
+        settledOrderIds: summary.orders.map((o: any) => o.$id),
     };
 
     const consolidatedOrder = await createOrder(consolidatedOrderData);
 
-    // Now mark each original order as paid and link it to the consolidated one.
+    // Now mark each original order as "settled" (not "paid") to avoid double-counting revenue.
+    // The consolidated order captures the full payment, so individual orders should be
+    // marked as "settled" to exclude them from revenue calculations.
     const updatePromises = summary.orders.map((order: any) => {
         if (order.paymentStatus && order.paymentStatus !== "unpaid") {
             return Promise.resolve(null);
@@ -462,8 +467,13 @@ export const settleTableTabAndCreateOrder = async ({
             ORDERS_COLLECTION_ID!,
             order.$id,
             {
-                paymentStatus: "paid",
+                // Mark as "settled" instead of "paid" to exclude from revenue calculations
+                // This prevents the double-counting bug where both the consolidated order
+                // and the original orders get counted in analytics
+                paymentStatus: "settled",
                 status: "paid",
+                // Link to the consolidated order for audit trail
+                settlementParentOrderId: consolidatedOrder.$id,
             }
         );
     });
