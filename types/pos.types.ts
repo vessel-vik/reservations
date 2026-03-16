@@ -85,6 +85,133 @@ export interface Order {
     $updatedAt: string;
 }
 
+/**
+ * Expense Types for Input VAT Tracking
+ * Used to capture supplier invoices and purchases for input VAT recovery
+ */
+export interface Expense {
+  $id: string;
+  expenseNumber: string;
+  supplierName: string;
+  supplierTin?: string;  // Supplier's Tax Identification Number
+  category: ExpenseCategory;
+  description: string;
+  amount: number;  // Subtotal before VAT
+  vatAmount: number;  // Input VAT amount
+  totalAmount: number;  // Total including VAT
+  invoiceNumber: string;  // Supplier's invoice number
+  invoiceDate: string;
+  paymentStatus: 'pending' | 'paid' | 'cancelled';
+  paymentDate?: string;
+  // VAT categorization
+  vatCategory: 'standard' | 'zero-rated' | 'exempt';
+  vatRate: number;  // VAT rate on the expense
+  // Audit fields
+  $createdAt: string;
+  $updatedAt: string;
+}
+
+export type ExpenseCategory = 
+  | 'food_supplies'
+  | 'beverages'
+  | 'equipment'
+  | 'utilities'
+  | 'rent'
+  | 'marketing'
+  | 'professional_services'
+  | 'maintenance'
+  | 'transport'
+  | 'other';
+
+export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
+  'food_supplies': 'Food Supplies',
+  'beverages': 'Beverages',
+  'equipment': 'Equipment',
+  'utilities': 'Utilities',
+  'rent': 'Rent',
+  'marketing': 'Marketing & Advertising',
+  'professional_services': 'Professional Services',
+  'maintenance': 'Maintenance & Repairs',
+  'transport': 'Transport & Logistics',
+  'other': 'Other Expenses',
+};
+
+/**
+ * eTIMS API Types for KRA Integration
+ * Reference: https://api.developer.go.ke/etims-oscu/api/v1
+ */
+export interface ETIMSConfig {
+  apiUrl: string;        // eTIMS API base URL
+  cmcKey: string;       // Device registration key
+  deviceSerial: string; // OSCU/VSCU device serial number
+  certificate?: string; // SSL certificate for production
+  isProduction: boolean;
+}
+
+export interface ETIMSInvoicePayload {
+  // Header Information
+  invoiceType: 'EC' | 'EI' | 'EF' | 'EN';  // E-commerce, Import, Export, Normal
+  invoiceNo: string;
+  invoiceDate: string;
+  customerTin: string;
+  customerName: string;
+  customerMobile?: string;
+  customerAddress?: string;
+  
+  // Financial Details
+  subtotal: number;
+  totalDiscount?: number;
+  totalTax: number;
+  totalAmount: number;
+  
+  // VAT Breakdown (15 tax fields for KRA compliance)
+  taxDetails: {
+    taxType: 'A' | 'B' | 'C' | 'D' | 'E';  // A=Standard, B=Zero, C=Exempt, D=Excise, E=Withholding
+    taxTypeName: string;
+    taxblAmtA: number;  // Taxable amount
+    taxRtA: number;     // Tax rate
+    taxAmtA: number;   // Tax amount
+  }[];
+  
+  // Line Items
+  items: ETIMSLineItem[];
+  
+  // Payment Info
+  paymentInfo?: {
+    method: 'CASH' | 'CARD' | 'MPESA' | 'BANK' | 'OTHER';
+    amount: number;
+    reference?: string;
+  };
+  
+  // Metadata
+  branchId?: string;
+  cashierName?: string;
+  remarks?: string;
+}
+
+export interface ETIMSLineItem {
+  itemCode: string;
+  itemName: string;
+  quantity: number;
+  unitPrice: number;
+  discount?: number;
+  taxableAmount: number;
+  taxRate: number;
+  taxAmount: number;
+  taxType: 'A' | 'B' | 'C' | 'D' | 'E';
+  totalAmount: number;
+}
+
+export interface ETIMSResponse {
+  success: boolean;
+  invoiceNo?: string;
+  qrCode?: string;
+  signature?: string;
+  timestamp?: string;
+  error?: string;
+  errorCode?: string;
+}
+
 export interface Category {
   $id: string;
   name: string; // e.g., 'appetizers', 'mains', 'drinks'

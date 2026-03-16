@@ -4,6 +4,7 @@ import { databases, DATABASE_ID, ORDERS_COLLECTION_ID } from "@/lib/appwrite.con
 import { Query } from "node-appwrite";
 import { parseStringify } from "@/lib/utils";
 import { Order, VatCategory, VAT_RATES } from "@/types/pos.types";
+import { getInputVatSummary } from "./expense.actions";
 
 /**
  * Kenya VAT Report Types
@@ -179,12 +180,25 @@ export async function generateVatRemittanceReport(
       });
     }
 
-    // For now, input VAT is not tracked in orders (typically comes from expenses)
-    // This can be expanded when expense tracking is implemented
-    const inputVat = {
+    // Fetch input VAT from expenses (only paid expenses qualify)
+    let inputVat = {
       total: 0,
-      entries: [],
+      entries: [] as { supplier: string; amount: number; vat: number; invoiceRef: string; date: string }[],
     };
+
+    try {
+      const expenseResult = await getInputVatSummary({
+        startDate,
+        endDate,
+      });
+      
+      if (expenseResult.success && expenseResult.summary) {
+        inputVat.total = expenseResult.summary.totalInputVat;
+      }
+    } catch (expenseError) {
+      console.warn('Could not fetch expense data for VAT report:', expenseError);
+      // Continue without input VAT - this is not critical
+    }
 
     // Calculate net VAT payable (output VAT - input VAT)
     const netVatPayable = totalVatCollected - inputVat.total;
