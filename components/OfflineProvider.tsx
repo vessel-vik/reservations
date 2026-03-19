@@ -9,10 +9,16 @@ interface OfflineProviderProps {
 }
 
 export function OfflineProvider({ children }: OfflineProviderProps) {
+  // Don't pass appwrite client - works in offline/demo mode
   const offline = useOffline({
-    autoSync: true,
-    syncInterval: 45 * 60 * 1000 // 45 minutes
+    autoSync: false, // Disable auto-sync without Appwrite
+    syncInterval: 45 * 60 * 1000
   });
+
+  // Don't render indicator if not initialized yet
+  if (!offline.isInitialized) {
+    return <>{children}</>;
+  }
 
   return (
     <>

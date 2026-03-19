@@ -66,8 +66,13 @@ export function useOffline(options: UseOfflineOptions = {}): UseOfflineReturn {
       setError(null);
 
       // Initialize local database
-      await initializeLocalDB();
-      console.log('✅ Local database initialized');
+      try {
+        await initializeLocalDB();
+        console.log('✅ Local database initialized');
+      } catch (dbError) {
+        console.warn('⚠️ Local DB init warning:', dbError);
+        // Continue anyway - IndexedDB might not be available
+      }
 
       // Check if first run
       const firstRun = isFirstRun();
@@ -97,43 +102,59 @@ export function useOffline(options: UseOfflineOptions = {}): UseOfflineReturn {
           }
         } else {
           // No client provided, seed default data
-          await seedDefaultData();
-          setLastInitialSync(new Date().toISOString());
+          try {
+            await seedDefaultData();
+            setLastInitialSync(new Date().toISOString());
+          } catch (seedError) {
+            console.warn('⚠️ Seed data error:', seedError);
+          }
         }
       } else {
         const lastSync = localStorage.getItem('scan_n_serve_initial_sync_complete');
         setLastInitialSync(lastSync);
       }
 
-      // Initialize network monitor
-      initializeNetworkMonitor(
-        {
-          onOnline: () => setNetworkStatus('online'),
-          onOffline: () => setNetworkStatus('offline'),
-          onStatusChange: (status) => setNetworkStatus(status),
-          onSyncReady: (result) => {
-            setLastSyncResult(result);
-            getPendingSyncCount().then(setPendingSyncCount);
+      // Initialize network monitor (non-blocking)
+      try {
+        initializeNetworkMonitor(
+          {
+            onOnline: () => setNetworkStatus('online'),
+            onOffline: () => setNetworkStatus('offline'),
+            onStatusChange: (status) => setNetworkStatus(status),
+            onSyncReady: (result) => {
+              setLastSyncResult(result);
+              getPendingSyncCount().then(setPendingSyncCount);
+            }
+          },
+          appwriteClient as any,
+          databaseId
+        );
+      } catch (netError) {
+        console.warn('⚠️ Network monitor init warning:', netError);
+      }
+
+      // Initialize session manager (non-blocking)
+      try {
+        await initializeSessionManager({
+          onExpired: () => {
+            console.log('⚠️ Session expired');
+            endSession();
+          },
+          onWarning: (remainingTime) => {
+            console.log(`⚠️ Session expiring in ${remainingTime / 1000} seconds`);
           }
-        },
-        appwriteClient as any,
-        databaseId
-      );
+        });
+      } catch (sessError) {
+        console.warn('⚠️ Session manager init warning:', sessError);
+      }
 
-      // Initialize session manager
-      await initializeSessionManager({
-        onExpired: () => {
-          console.log('⚠️ Session expired');
-          endSession();
-        },
-        onWarning: (remainingTime) => {
-          console.log(`⚠️ Session expiring in ${remainingTime / 1000} seconds`);
-        }
-      });
-
-      // Update pending count
-      const count = await getPendingSyncCount();
-      setPendingSyncCount(count);
+      // Update pending count (non-blocking)
+      try {
+        const count = await getPendingSyncCount();
+        setPendingSyncCount(count);
+      } catch (countError) {
+        console.warn('⚠️ Get pending count warning:', countError);
+      }
 
       setIsInitialized(true);
       console.log('🎉 Offline system initialized');
@@ -141,6 +162,8 @@ export function useOffline(options: UseOfflineOptions = {}): UseOfflineReturn {
       const errorMessage = err instanceof Error ? err.message : 'Failed to initialize';
       setError(errorMessage);
       console.error('❌ Initialization failed:', err);
+      // Still mark as initialized to allow app to work
+      setIsInitialized(true);
     }
   }, [appwriteClient, databaseId]);
 
