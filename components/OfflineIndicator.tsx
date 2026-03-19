@@ -20,7 +20,7 @@ type SyncStatus = 'idle' | 'syncing' | 'error' | 'offline';
 // Component
 // ============================================================================
 
-export default function OfflineIndicator({ 
+function OfflineIndicatorComponent({ 
   position = 'top',
   showDetails = true,
   onSyncClick
@@ -234,3 +234,5 @@ export function CompactOfflineIndicator() {
     </div>
   );
 }
+
+export { OfflineIndicatorComponent as OfflineIndicator, CompactOfflineIndicator };
