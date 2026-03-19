@@ -263,6 +263,8 @@ export interface SyncMetadata {
 // Database Class
 // ============================================================================
 
+let localDbInstance: LocalDatabase | null = null;
+
 export class LocalDatabase extends Dexie {
   guests!: Table<LocalGuest, string>;
   reservations!: Table<LocalReservation, string>;
@@ -296,10 +298,84 @@ export class LocalDatabase extends Dexie {
 }
 
 // ============================================================================
-// Singleton Instance
+// Singleton Instance - Lazy loaded
 // ============================================================================
 
-export const localDb = new LocalDatabase();
+export const localDb = {
+  _db: null as LocalDatabase | null,
+  
+  get isOpen(): boolean {
+    if (typeof window === 'undefined') return false;
+    if (!this._db) return false;
+    try {
+      return this._db.isOpen();
+    } catch {
+      return false;
+    }
+  },
+  
+  get guests() {
+    if (typeof window === 'undefined') return { put: async () => 0, get: async () => null, toArray: async () => [], count: async () => 0, clear: async () => {}, delete: async () => {} };
+    if (!this._db) this._db = new LocalDatabase();
+    return this._db.guests;
+  },
+  get reservations() {
+    if (typeof window === 'undefined') return { put: async () => 0, get: async () => null, toArray: async () => [], count: async () => 0, clear: async () => {}, delete: async () => {} };
+    if (!this._db) this._db = new LocalDatabase();
+    return this._db.reservations;
+  },
+  get menuItems() {
+    if (typeof window === 'undefined') return { put: async () => 0, get: async () => null, toArray: async () => [], count: async () => 0, clear: async () => {}, delete: async () => {} };
+    if (!this._db) this._db = new LocalDatabase();
+    return this._db.menuItems;
+  },
+  get categories() {
+    if (typeof window === 'undefined') return { put: async () => 0, get: async () => null, toArray: async () => [], count: async () => 0, clear: async () => {}, delete: async () => {} };
+    if (!this._db) this._db = new LocalDatabase();
+    return this._db.categories;
+  },
+  get tables() {
+    if (typeof window === 'undefined') return { put: async () => 0, get: async () => null, toArray: async () => [], count: async () => 0, clear: async () => {}, delete: async () => {} };
+    if (!this._db) this._db = new LocalDatabase();
+    return this._db.tables;
+  },
+  get orders() {
+    if (typeof window === 'undefined') return { put: async () => 0, get: async () => null, toArray: async () => [], count: async () => 0, clear: async () => {}, delete: async () => {} };
+    if (!this._db) this._db = new LocalDatabase();
+    return this._db.orders;
+  },
+  get orderItems() {
+    if (typeof window === 'undefined') return { put: async () => 0, get: async () => null, toArray: async () => [], count: async () => 0, clear: async () => {}, delete: async () => {} };
+    if (!this._db) this._db = new LocalDatabase();
+    return this._db.orderItems;
+  },
+  get staff() {
+    if (typeof window === 'undefined') return { put: async () => 0, get: async () => null, toArray: async () => [], count: async () => 0, clear: async () => {}, delete: async () => {} };
+    if (!this._db) this._db = new LocalDatabase();
+    return this._db.staff;
+  },
+  get payments() {
+    if (typeof window === 'undefined') return { put: async () => 0, get: async () => null, toArray: async () => [], count: async () => 0, clear: async () => {}, delete: async () => {} };
+    if (!this._db) this._db = new LocalDatabase();
+    return this._db.payments;
+  },
+  get syncQueue() {
+    if (typeof window === 'undefined') return { put: async () => 0, get: async () => null, toArray: async () => [], count: async () => 0, clear: async () => {}, delete: async () => {} };
+    if (!this._db) this._db = new LocalDatabase();
+    return this._db.syncQueue;
+  },
+  get syncMetadata() {
+    if (typeof window === 'undefined') return { put: async () => 0, get: async () => null, toArray: async () => [], count: async () => 0, clear: async () => {}, delete: async () => {} };
+    if (!this._db) this._db = new LocalDatabase();
+    return this._db.syncMetadata;
+  },
+  
+  async open(): Promise<void> {
+    if (typeof window === 'undefined') return;
+    if (!this._db) this._db = new LocalDatabase();
+    await this._db.open();
+  }
+};
 
 // ============================================================================
 // Utility Functions

@@ -7,8 +7,7 @@ import { ClerkProvider } from '@clerk/nextjs';
 import { neobrutalism } from '@clerk/themes';
 
 import { cn } from "@/lib/utils";
-// Offline features temporarily disabled due to Dexie initialization issues
-// import { OfflineProvider } from "@/components/OfflineProvider";
+import { OfflineProvider } from "@/components/OfflineProvider";
 
 
 const fontSans = FontSans({
@@ -50,7 +49,9 @@ export default function RootLayout({
           )}
         >
           <ThemeProvider attribute="class" defaultTheme="dark">
-            {children}
+            <OfflineProvider>
+              {children}
+            </OfflineProvider>
             <Analytics />
           </ThemeProvider>
         </body>
