@@ -110,7 +110,7 @@ function generateESCPOSReceipt(order: Order): number[] {
     // Address
     commands.push(...encode('Northern Bypass, Thome\n'));
     commands.push(...encode('After Windsor, Nairobi\n'));
-    commands.push(...encode('Tel: +254 700-116-190\n'));
+    commands.push(...encode('Tel: +254 702-333-182\n'));
     commands.push(...encode('info@ampm.co.ke\n'));
 
     // Separator
@@ -136,16 +136,17 @@ function generateESCPOSReceipt(order: Order): number[] {
     commands.push(...encode('--------------------------------\n'));
 
     // Items header
-    commands.push(...encode('Qty  Item                  Price\n'));
+    commands.push(...encode('Qty  Item                         Total\n'));
     commands.push(...encode('--------------------------------\n'));
 
-    // Items
+    // Items - Format: "1 x Classic burger 350 = 700"
     const items = typeof order.items === 'string' ? JSON.parse(order.items) : order.items;
     items.forEach((item: any) => {
-        const qty = String(item.quantity).padEnd(5);
-        const name = item.name.substring(0, 15).padEnd(17);
-        const price = formatKES(item.price * item.quantity).padStart(8);
-        commands.push(...encode(`${qty}${name}${price}\n`));
+        const qty = String(item.quantity);
+        const name = item.name.substring(0, 18);
+        const unitPrice = formatKES(item.price);
+        const totalPrice = formatKES(item.price * item.quantity);
+        commands.push(...encode(`${qty} x ${name} ${unitPrice} = ${totalPrice}\n`));
     });
 
     commands.push(...encode('--------------------------------\n'));
@@ -158,7 +159,7 @@ function generateESCPOSReceipt(order: Order): number[] {
     // Total (Bold + Centered)
     commands.push(ESC, 0x61, 0x01); // Center align
     commands.push(ESC, 0x21, 0x30); // Double height + width
-    commands.push(...encode(`TOTAL: ${formatKES(order.totalAmount)}\n`));
+    commands.push(...encode(`GRAND TOTAL: ${formatKES(order.totalAmount)}\n`));
     commands.push(ESC, 0x21, 0x00); // Normal
 
     commands.push(...encode('================================\n'));
@@ -192,7 +193,7 @@ function generateESCPOSReceipt(order: Order): number[] {
 
     // Footer
     commands.push(...encode('\n'));
-    commands.push(...encode('Thank you for dining with us!\n'));
+    commands.push(...encode('Thank you for choosing AM | PM\n'));
     commands.push(...encode('We hope to see you again soon\n'));
 
     // Cut paper
@@ -237,13 +238,14 @@ function generateESCPOSReceiptForOrders(tableNumber: number | null, orders: Orde
         commands.push(...encode(`Order: ${order.orderNumber}\n`));
         commands.push(...encode(`Date: ${new Date(order.orderTime).toLocaleDateString('en-KE')} ${new Date(order.orderTime).toLocaleTimeString('en-KE')}\n`));
 
-        // Items
+        // Items - Format: "1 x Classic burger 350 = 700"
         const items = typeof order.items === 'string' ? JSON.parse(order.items) : order.items;
         items.forEach((item: any) => {
-            const qty = String(item.quantity).padEnd(3);
-            const name = item.name.substring(0, 15).padEnd(17);
-            const price = formatKES(item.price * item.quantity).padStart(8);
-            commands.push(...encode(`${qty}${name}${price}\n`));
+            const qty = String(item.quantity);
+            const name = item.name.substring(0, 18);
+            const unitPrice = formatKES(item.price);
+            const totalPrice = formatKES(item.price * item.quantity);
+            commands.push(...encode(`${qty} x ${name} ${unitPrice} = ${totalPrice}\n`));
         });
 
         commands.push(...encode(`Order Total: ${formatKES(orderTotal)}\n`));
@@ -258,7 +260,7 @@ function generateESCPOSReceiptForOrders(tableNumber: number | null, orders: Orde
 
     // Footer
     commands.push(...encode('\n'));
-    commands.push(...encode('Thank you for dining with us!\n'));
+    commands.push(...encode('Thank you for choosing AM | PM\n'));
     commands.push(...encode('Please settle your tab at the counter.\n'));
 
     commands.push(...encode('\n\n\n'));

@@ -129,7 +129,7 @@ export default function ReceiptPage({ params }: { params: Promise<{ orderId: str
                     <h2 className="text-lg font-semibold">LOUNGE</h2>
                     <p className="text-gray-600 text-xs">Northern Bypass, Thome</p>
                     <p className="text-gray-600 text-xs">After Windsor, Nairobi</p>
-                    <p className="text-gray-600 text-xs">Tel: +254 700-116-190</p>
+                    <p className="text-gray-600 text-xs">Tel: +254 702-333-182</p>
                     <p className="text-gray-600 text-xs">info@ampm.co.ke</p>
                 </div>
 
@@ -160,15 +160,15 @@ export default function ReceiptPage({ params }: { params: Promise<{ orderId: str
                             <tr className="text-left border-b border-gray-300">
                                 <th className="pb-2 w-12">Qty</th>
                                 <th className="pb-2">Item</th>
-                                <th className="pb-2 text-right">Price</th>
+                                <th className="pb-2 text-right">Total</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
                             {order.items.map((item, i) => (
                                 <tr key={i}>
-                                    <td className="py-2 pr-2">{item.quantity}</td>
-                                    <td className="py-2 pr-2">{item.name}</td>
-                                    <td className="py-2 text-right whitespace-nowrap">{formatCurrency(item.price * item.quantity)}</td>
+                                    <td className="py-2 pr-2">{item.quantity} x </td>
+                                    <td className="py-2 pr-2">{item.name} {formatCurrency(item.price)}</td>
+                                    <td className="py-2 text-right whitespace-nowrap">= {formatCurrency(item.price * item.quantity)}</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -185,7 +185,7 @@ export default function ReceiptPage({ params }: { params: Promise<{ orderId: str
                         *Prices include VAT
                     </div>
                     <div className="flex justify-between font-bold text-xl pt-3 border-t-2 border-gray-800 mt-3">
-                        <span>TOTAL</span>
+                        <span>GRAND TOTAL</span>
                         <span>{formatCurrency(order.totalAmount)}</span>
                     </div>
                 </div>
@@ -217,7 +217,7 @@ export default function ReceiptPage({ params }: { params: Promise<{ orderId: str
 
                 {/* Footer */}
                 <div className="text-center mt-8 pt-6 border-t border-dashed border-gray-300 text-xs text-gray-500 space-y-1">
-                    <p>Thank you for dining with us!</p>
+                    <p>Thank you for choosing AM | PM</p>
                     <p>We hope to see you again soon</p>
                 </div>
             </div>
