@@ -21,17 +21,26 @@ function generateOrderNumber(): string {
   return `ORD-${dateStr}-${timeStr}-${randomStr}`;
 }
 
-// Calculate pricing
-function calculatePricing(subtotal: number) {
-  const taxRate = 0.075; // 7.5% VAT
-  const serviceChargeRate = 0.10; // 10% service charge
+// Kenya VAT Configuration
+const VAT_RATE = 0.16; // 16% standard VAT rate (correct for Kenya)
+const SERVICE_CHARGE_RATE = 0.10; // 10% service charge
+
+// Calculate pricing with VAT
+function calculatePricing(subtotal: number, vatCategory: string = 'standard') {
+  // Determine VAT rate based on category
+  let effectiveVatRate = VAT_RATE;
+  if (vatCategory === 'zero-rated' || vatCategory === 'exempt') {
+    effectiveVatRate = 0;
+  }
   
-  const taxAmount = Math.round(subtotal * taxRate * 100) / 100;
-  const serviceCharge = Math.round(subtotal * serviceChargeRate * 100) / 100;
+  const taxAmount = Math.round(subtotal * effectiveVatRate * 100) / 100;
+  const serviceCharge = Math.round(subtotal * SERVICE_CHARGE_RATE * 100) / 100;
   const totalAmount = subtotal + taxAmount + serviceCharge;
   
   return {
-    taxAmount,
+    vatRate: effectiveVatRate * 100, // Store as percentage (e.g., 16)
+    vatCategory,
+    taxAmount,  // Output VAT collected
     serviceCharge,
     totalAmount
   };
