@@ -337,7 +337,14 @@ export const localDb = {
   get tables() {
     if (typeof window === 'undefined') return { put: async () => 0, get: async () => null, toArray: async () => [], count: async () => 0, clear: async () => {}, delete: async () => {} };
     if (!this._db) this._db = new LocalDatabase();
-    return this._db.tables;
+    try {
+      const db = this._db as any;
+      // Use table() method which is safer than .tables getter
+      const table = db.table ? db.table('tables') : null;
+      return table || { put: async () => 0, get: async () => null, toArray: async () => [], count: async () => 0, clear: async () => {}, delete: async () => {} };
+    } catch {
+      return { put: async () => 0, get: async () => null, toArray: async () => [], count: async () => 0, clear: async () => {}, delete: async () => {} };
+    }
   },
   get orders() {
     if (typeof window === 'undefined') return { put: async () => 0, get: async () => null, toArray: async () => [], count: async () => 0, clear: async () => {}, delete: async () => {} };
@@ -420,11 +427,14 @@ export async function initializeLocalDB(): Promise<boolean> {
       return true;
     }
     
-    // Open the database
+    // Open the database - this initializes _db via lazy loading
     await localDb.open();
     
     // Verify it's open by checking a table
-    await localDb.tables.count();
+    const db = localDb._db;
+    if (db && db.menuItems) {
+      await (db.menuItems as any).count();
+    }
     
     console.log('📦 Local database initialized');
     return true;
@@ -445,17 +455,24 @@ export function isDBReady(): boolean {
  * Clear all data from local database
  */
 export async function clearLocalDB(): Promise<void> {
-  await localDb.guests.clear();
-  await localDb.reservations.clear();
-  await localDb.menuItems.clear();
-  await localDb.categories.clear();
-  await localDb.tables.clear();
-  await localDb.orders.clear();
-  await localDb.orderItems.clear();
-  await localDb.staff.clear();
-  await localDb.payments.clear();
-  await localDb.syncQueue.clear();
-  await localDb.syncMetadata.clear();
+  const db = localDb._db;
+  if (db) {
+    try {
+      await (db.guests as any).clear();
+      await (db.reservations as any).clear();
+      await (db.menuItems as any).clear();
+      await (db.categories as any).clear();
+      await (db.tables as any).clear();
+      await (db.orders as any).clear();
+      await (db.orderItems as any).clear();
+      await (db.staff as any).clear();
+      await (db.payments as any).clear();
+      await (db.syncQueue as any).clear();
+      await (db.syncMetadata as any).clear();
+    } catch (e) {
+      console.warn('Some tables could not be cleared:', e);
+    }
+  }
   console.log('🗑️ Local database cleared');
 }
 
