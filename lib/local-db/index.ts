@@ -1,15 +1,9 @@
 /**
- * Local Database Schema using Dexie.js (IndexedDB wrapper)
- * Mirrors Appwrite collections for offline-first functionality
+ * Local Database Stub - Offline functionality disabled
+ * All operations return empty/null values to maintain API compatibility
  */
 
-import Dexie, { type Table } from 'dexie';
-import { v4 as uuidv4 } from 'uuid';
-
-// ============================================================================
-// Type Definitions
-// ============================================================================
-
+// Re-export types for backwards compatibility
 export interface LocalGuest {
   id: string;
   userId: string;
@@ -28,38 +22,26 @@ export interface LocalGuest {
   allergies?: string;
   favoriteItems?: string;
   diningHistory?: string;
-  pastVisits?: string;
-  identificationType?: string;
-  identificationNumber?: string;
-  privacyConsent: boolean;
-  marketingConsent: boolean;
-  newsletterConsent: boolean;
   createdAt: string;
   updatedAt: string;
-  syncStatus: 'synced' | 'pending' | 'conflict';
-  checksum?: string;
+  syncStatus: 'pending' | 'synced' | 'failed';
 }
 
 export interface LocalReservation {
   id: string;
   guestId: string;
-  guestName: string;
   guestEmail: string;
+  guestName: string;
   guestPhone: string;
   schedule: string;
-  status: 'pending' | 'confirmed' | 'seated' | 'completed' | 'cancelled' | 'no_show';
-  tablePreference: string;
-  occasion: string;
-  note: string;
   partySize: number;
-  userId: string;
-  cancellationReason?: string;
+  status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'no-show';
+  tableNumber?: string;
   specialRequests?: string;
-  welcomeDrink?: string;
+  dietaryRestrictions?: string;
   createdAt: string;
   updatedAt: string;
-  syncStatus: 'synced' | 'pending' | 'conflict';
-  checksum?: string;
+  syncStatus: 'pending' | 'synced' | 'failed';
 }
 
 export interface LocalMenuItem {
@@ -70,97 +52,67 @@ export interface LocalMenuItem {
   category: string;
   imageUrl?: string;
   isAvailable: boolean;
-  preparationTime: number;
-  ingredients: string[];
-  allergens: string[];
-  dietaryFlags: {
-    isVegetarian: boolean;
-    isVegan: boolean;
-    isGlutenFree: boolean;
-  };
-  variants?: Array<{ name: string; price: number }>;
-  customizations?: Array<{ name: string; price: number }>;
-  costPrice?: number;
-  inventoryItems: string[];
-  popularity: number;
   isActive: boolean;
+  preparationTime?: number;
+  popularity?: number;
+  ingredients?: string[];
+  allergens?: string[];
+  calories?: number;
+  isVegetarian?: boolean;
+  isVegan?: boolean;
+  isGlutenFree?: boolean;
   createdAt: string;
   updatedAt: string;
-  syncStatus: 'synced' | 'pending' | 'conflict';
-  checksum?: string;
+  syncStatus: 'pending' | 'synced' | 'failed';
 }
 
 export interface LocalCategory {
   id: string;
   name: string;
-  description?: string;
-  displayOrder: number;
+  label: string;
+  slug: string;
+  icon?: string;
+  displayOrder?: number;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
-  syncStatus: 'synced' | 'pending' | 'conflict';
-  checksum?: string;
+  syncStatus: 'pending' | 'synced' | 'failed';
 }
 
 export interface LocalTable {
   id: string;
-  number: number;
+  number: string;
   capacity: number;
-  location: 'indoor' | 'outdoor' | 'bar' | 'private_dining' | 'terrace';
-  status: 'available' | 'occupied' | 'reserved' | 'cleaning' | 'out_of_order';
-  currentOrderId?: string;
-  reservationId?: string;
-  waiterId?: string;
-  waiterName?: string;
+  status: 'available' | 'occupied' | 'reserved' | 'cleaning' | 'out-of-order';
+  location?: string;
   guestCount?: number;
+  currentOrderId?: string;
   occupiedAt?: string;
-  lastCleaned?: string;
-  estimatedAvailableAt?: string;
-  position: { x: number; y: number };
-  features: string[];
-  notes?: string;
-  isActive: boolean;
   createdAt: string;
   updatedAt: string;
-  syncStatus: 'synced' | 'pending' | 'conflict';
-  checksum?: string;
+  syncStatus: 'pending' | 'synced' | 'failed';
 }
 
 export interface LocalOrder {
   id: string;
   orderNumber: string;
-  type: 'dine_in' | 'takeaway' | 'delivery';
-  status: 'draft' | 'placed' | 'confirmed' | 'preparing' | 'ready' | 'served' | 'cancelled';
-  tableNumber?: number;
+  tableNumber: string;
   customerId?: string;
-  customerName: string;
-  customerPhone?: string;
-  customerEmail?: string;
-  guestCount: number;
-  reservationId?: string;
-  waiterId?: string;
-  waiterName: string;
-  cashierId?: string;
+  customerName?: string;
+  status: 'pending' | 'preparing' | 'ready' | 'served' | 'paid' | 'cancelled';
+  items: any[];
   subtotal: number;
-  taxAmount: number;
-  serviceCharge: number;
-  discountAmount: number;
-  tipAmount: number;
-  totalAmount: number;
+  tax: number;
+  total: number;
+  paymentMethod?: string;
+  amountPaid?: number;
+  change?: number;
   orderTime: string;
-  estimatedReadyTime?: string;
-  actualReadyTime?: string;
-  servedTime?: string;
-  completedTime?: string;
-  specialInstructions?: string;
-  kitchenNotes?: string;
-  priority: 'normal' | 'high' | 'urgent';
-  paymentStatus: 'pending' | 'partial' | 'paid' | 'refunded';
-  paymentMethods: Array<{ method: string; amount: number; reference?: string }>;
+  servedAt?: string;
+  paidAt?: string;
   createdAt: string;
   updatedAt: string;
-  syncStatus: 'synced' | 'pending' | 'conflict';
-  checksum?: string;
+  syncStatus: 'pending' | 'synced' | 'failed';
 }
 
 export interface LocalOrderItem {
@@ -171,315 +123,122 @@ export interface LocalOrderItem {
   quantity: number;
   unitPrice: number;
   totalPrice: number;
-  variant?: { name: string; price: number };
-  customizations: Array<{ name: string; price: number }>;
-  specialInstructions?: string;
-  kitchenStatus: 'waiting' | 'preparing' | 'ready' | 'served';
-  startedAt?: string;
-  completedAt?: string;
+  notes?: string;
+  kitchenStatus: 'pending' | 'preparing' | 'ready' | 'served';
   createdAt: string;
-  syncStatus: 'synced' | 'pending' | 'conflict';
-  checksum?: string;
+  updatedAt: string;
+  syncStatus: 'pending' | 'synced' | 'failed';
 }
 
 export interface LocalStaff {
   id: string;
   name: string;
   email: string;
-  phone: string;
-  role: 'admin' | 'manager' | 'waiter' | 'chef' | 'bartender' | 'cashier' | 'host';
-  passwordHash?: string;
+  role: string;
   pin?: string;
-  permissions: string[];
-  accessLevel: number;
   isActive: boolean;
-  employeeId: string;
-  department: 'front_of_house' | 'kitchen' | 'management';
-  shifts: Array<{ day: string; start: string; end: string }>;
-  hourlyRate?: number;
-  totalOrders: number;
-  totalRevenue: number;
-  averageRating: number;
-  startDate: string;
-  birthday?: string;
-  emergencyContact?: { name: string; phone: string; relationship: string };
   createdAt: string;
   updatedAt: string;
-  syncStatus: 'synced' | 'pending' | 'conflict';
-  checksum?: string;
+  syncStatus: 'pending' | 'synced' | 'failed';
 }
 
 export interface LocalPayment {
   id: string;
-  orderId?: string;
+  orderId: string;
   reservationId?: string;
   amount: number;
-  currency: string;
-  method: 'cash' | 'card' | 'mobile_money' | 'bank_transfer' | 'paystack';
-  status: 'pending' | 'processing' | 'completed' | 'failed' | 'refunded' | 'pending_offline';
-  paystackReference?: string;
-  transactionId: string;
-  receiptNumber: string;
-  customerName: string;
-  customerEmail?: string;
-  customerPhone?: string;
-  processedBy: string;
-  staffName: string;
-  subtotal: number;
-  taxAmount: number;
-  serviceCharge: number;
-  tipAmount: number;
-  discountAmount: number;
-  processedAt: string;
-  completedAt?: string;
-  metadata?: Record<string, unknown>;
-  notes?: string;
+  paymentMethod: string;
+  status: 'pending' | 'completed' | 'failed' | 'refunded';
+  processedAt?: string;
   createdAt: string;
-  syncStatus: 'synced' | 'pending' | 'conflict';
-  checksum?: string;
+  updatedAt: string;
+  syncStatus: 'pending' | 'synced' | 'failed';
 }
 
 export interface SyncQueueItem {
   id: string;
   collection: string;
-  operation: 'create' | 'update' | 'delete';
   recordId: string;
-  data: Record<string, unknown>;
+  operation: 'create' | 'update' | 'delete';
+  data: any;
   timestamp: string;
   retries: number;
   lastError?: string;
-  checksum: string;
 }
 
 export interface SyncMetadata {
   id: string;
   collection: string;
   lastSyncTimestamp: string;
-  lastSyncChecksum?: string;
-  recordCount: number;
 }
 
-// ============================================================================
-// Database Class
-// ============================================================================
-
-let localDbInstance: LocalDatabase | null = null;
-
-export class LocalDatabase extends Dexie {
-  guests!: Table<LocalGuest, string>;
-  reservations!: Table<LocalReservation, string>;
-  menuItems!: Table<LocalMenuItem, string>;
-  categories!: Table<LocalCategory, string>;
-  tables!: Table<LocalTable, string>;
-  orders!: Table<LocalOrder, string>;
-  orderItems!: Table<LocalOrderItem, string>;
-  staff!: Table<LocalStaff, string>;
-  payments!: Table<LocalPayment, string>;
-  syncQueue!: Table<SyncQueueItem, string>;
-  syncMetadata!: Table<SyncMetadata, string>;
-
-  constructor() {
-    super('ScanNServeLocalDB');
-
-    this.version(1).stores({
-      guests: 'id, userId, email, phone, syncStatus, createdAt',
-      reservations: 'id, guestId, guestEmail, schedule, status, syncStatus, createdAt',
-      menuItems: 'id, name, category, isAvailable, isActive, syncStatus, createdAt',
-      categories: 'id, name, displayOrder, isActive, syncStatus',
-      tables: 'id, number, status, location, syncStatus',
-      orders: 'id, orderNumber, tableNumber, status, customerId, syncStatus, createdAt',
-      orderItems: 'id, orderId, menuItemId, kitchenStatus, syncStatus',
-      staff: 'id, email, role, isActive, syncStatus',
-      payments: 'id, orderId, reservationId, status, syncStatus, createdAt',
-      syncQueue: 'id, collection, recordId, timestamp, retries',
-      syncMetadata: 'id, collection, lastSyncTimestamp'
-    });
-  }
-}
-
-// ============================================================================
-// Singleton Instance - Lazy loaded
-// ============================================================================
-
+// Stub implementations - all return empty/null values
 export const localDb = {
-  _db: null as LocalDatabase | null,
+  _db: null,
   
   get isOpen(): boolean {
-    if (typeof window === 'undefined') return false;
-    if (!this._db) return false;
-    try {
-      return this._db.isOpen();
-    } catch {
-      return false;
-    }
+    return false;
   },
   
   get guests() {
-    if (typeof window === 'undefined') return { put: async () => 0, get: async () => null, toArray: async () => [], count: async () => 0, clear: async () => {}, delete: async () => {} };
-    if (!this._db) this._db = new LocalDatabase();
-    return this._db.guests;
+    return { put: async () => {}, get: async () => null, toArray: async () => [], count: async () => 0, clear: async () => {}, delete: async () => {}, where: () => ({ equals: () => ({ first: async () => null }) }), orderBy: () => ({ toArray: async () => [] }) };
   },
   get reservations() {
-    if (typeof window === 'undefined') return { put: async () => 0, get: async () => null, toArray: async () => [], count: async () => 0, clear: async () => {}, delete: async () => {} };
-    if (!this._db) this._db = new LocalDatabase();
-    return this._db.reservations;
+    return { put: async () => {}, get: async () => null, toArray: async () => [], count: async () => 0, clear: async () => {}, delete: async () => {}, where: () => ({ equals: () => ({ first: async () => null }) }), orderBy: () => ({ toArray: async () => [] }) };
   },
   get menuItems() {
-    if (typeof window === 'undefined') return { put: async () => 0, get: async () => null, toArray: async () => [], count: async () => 0, clear: async () => {}, delete: async () => {} };
-    if (!this._db) this._db = new LocalDatabase();
-    return this._db.menuItems;
+    return { put: async () => {}, get: async () => null, toArray: async () => [], count: async () => 0, clear: async () => {}, delete: async () => {}, where: () => ({ equals: () => ({ first: async () => null }) }), orderBy: () => ({ toArray: async () => [] }) };
   },
   get categories() {
-    if (typeof window === 'undefined') return { put: async () => 0, get: async () => null, toArray: async () => [], count: async () => 0, clear: async () => {}, delete: async () => {} };
-    if (!this._db) this._db = new LocalDatabase();
-    return this._db.categories;
+    return { put: async () => {}, get: async () => null, toArray: async () => [], count: async () => 0, clear: async () => {}, delete: async () => {}, where: () => ({ equals: () => ({ first: async () => null }) }), orderBy: () => ({ toArray: async () => [] }) };
   },
   get tables() {
-    if (typeof window === 'undefined') return { put: async () => 0, get: async () => null, toArray: async () => [], count: async () => 0, clear: async () => {}, delete: async () => {} };
-    if (!this._db) this._db = new LocalDatabase();
-    try {
-      const db = this._db as any;
-      // Use table() method which is safer than .tables getter
-      const table = db.table ? db.table('tables') : null;
-      return table || { put: async () => 0, get: async () => null, toArray: async () => [], count: async () => 0, clear: async () => {}, delete: async () => {} };
-    } catch {
-      return { put: async () => 0, get: async () => null, toArray: async () => [], count: async () => 0, clear: async () => {}, delete: async () => {} };
-    }
+    return { put: async () => {}, get: async () => null, toArray: async () => [], count: async () => 0, clear: async () => {}, delete: async () => {}, where: () => ({ equals: () => ({ first: async () => null }) }), orderBy: () => ({ toArray: async () => [] }) };
   },
   get orders() {
-    if (typeof window === 'undefined') return { put: async () => 0, get: async () => null, toArray: async () => [], count: async () => 0, clear: async () => {}, delete: async () => {} };
-    if (!this._db) this._db = new LocalDatabase();
-    return this._db.orders;
+    return { put: async () => {}, get: async () => null, toArray: async () => [], count: async () => 0, clear: async () => {}, delete: async () => {}, where: () => ({ equals: () => ({ first: async () => null }) }), orderBy: () => ({ toArray: async () => [] }) };
   },
   get orderItems() {
-    if (typeof window === 'undefined') return { put: async () => 0, get: async () => null, toArray: async () => [], count: async () => 0, clear: async () => {}, delete: async () => {} };
-    if (!this._db) this._db = new LocalDatabase();
-    return this._db.orderItems;
+    return { put: async () => {}, get: async () => null, toArray: async () => [], count: async () => 0, clear: async () => {}, delete: async () => {}, where: () => ({ equals: () => ({ first: async () => null }) }), orderBy: () => ({ toArray: async () => [] }) };
   },
   get staff() {
-    if (typeof window === 'undefined') return { put: async () => 0, get: async () => null, toArray: async () => [], count: async () => 0, clear: async () => {}, delete: async () => {} };
-    if (!this._db) this._db = new LocalDatabase();
-    return this._db.staff;
+    return { put: async () => {}, get: async () => null, toArray: async () => [], count: async () => 0, clear: async () => {}, delete: async () => {}, where: () => ({ equals: () => ({ first: async () => null }) }), orderBy: () => ({ toArray: async () => [] }) };
   },
   get payments() {
-    if (typeof window === 'undefined') return { put: async () => 0, get: async () => null, toArray: async () => [], count: async () => 0, clear: async () => {}, delete: async () => {} };
-    if (!this._db) this._db = new LocalDatabase();
-    return this._db.payments;
+    return { put: async () => {}, get: async () => null, toArray: async () => [], count: async () => 0, clear: async () => {}, delete: async () => {}, where: () => ({ equals: () => ({ first: async () => null }) }), orderBy: () => ({ toArray: async () => [] }) };
   },
   get syncQueue() {
-    if (typeof window === 'undefined') return { put: async () => 0, get: async () => null, toArray: async () => [], count: async () => 0, clear: async () => {}, delete: async () => {} };
-    if (!this._db) this._db = new LocalDatabase();
-    return this._db.syncQueue;
+    return { put: async () => {}, get: async () => null, toArray: async () => [], count: async () => 0, clear: async () => {}, delete: async () => {}, where: () => ({ equals: () => ({ first: async () => null }) }), orderBy: () => ({ toArray: async () => [] }) };
   },
   get syncMetadata() {
-    if (typeof window === 'undefined') return { put: async () => 0, get: async () => null, toArray: async () => [], count: async () => 0, clear: async () => {}, delete: async () => {} };
-    if (!this._db) this._db = new LocalDatabase();
-    return this._db.syncMetadata;
+    return { put: async () => {}, get: async () => null, toArray: async () => [], count: async () => 0, clear: async () => {}, delete: async () => {}, where: () => ({ equals: () => ({ first: async () => null }) }), orderBy: () => ({ toArray: async () => [] }) };
   },
   
-  async open(): Promise<void> {
-    if (typeof window === 'undefined') return;
-    if (!this._db) this._db = new LocalDatabase();
-    await this._db.open();
-  }
+  async open(): Promise<void> {},
+  async close(): Promise<void> {}
 };
 
-// ============================================================================
-// Utility Functions
-// ============================================================================
-
-/**
- * Generate an offline ID with prefix
- */
-export function generateOfflineId(prefix: string = 'OFFLINE'): string {
-  return `${prefix}-${uuidv4()}`;
+export async function initializeLocalDB(): Promise<boolean> {
+  console.log('📦 Local database disabled - running in cloud-only mode');
+  return false;
 }
 
-/**
- * Generate a checksum for data integrity
- */
-export function generateChecksum(data: Record<string, unknown>): string {
-  const str = JSON.stringify(data, Object.keys(data).sort());
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
-  }
-  return Math.abs(hash).toString(16);
+export function isDBReady(): boolean {
+  return false;
 }
 
-/**
- * Get current timestamp in ISO format
- */
+export async function clearLocalDB(): Promise<void> {
+  console.log('🗑️ Local database cleared (no-op - offline disabled)');
+}
+
+export function generateOfflineId(): string {
+  return `offline_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
+export function generateChecksum(data: any): string {
+  return '';
+}
+
 export function getCurrentTimestamp(): string {
   return new Date().toISOString();
 }
-
-/**
- * Initialize the local database
- */
-export async function initializeLocalDB(): Promise<boolean> {
-  try {
-    // Check if already open
-    if (localDb.isOpen) {
-      console.log('📦 Local database already open');
-      return true;
-    }
-    
-    // Open the database - this initializes _db via lazy loading
-    await localDb.open();
-    
-    // Verify it's open by checking a table
-    const db = localDb._db;
-    if (db && db.menuItems) {
-      await (db.menuItems as any).count();
-    }
-    
-    console.log('📦 Local database initialized');
-    return true;
-  } catch (error) {
-    console.error('❌ Failed to initialize local database:', error);
-    return false;
-  }
-}
-
-/**
- * Check if database is ready
- */
-export function isDBReady(): boolean {
-  return localDb.isOpen;
-}
-
-/**
- * Clear all data from local database
- */
-export async function clearLocalDB(): Promise<void> {
-  const db = localDb._db;
-  if (db) {
-    try {
-      await (db.guests as any).clear();
-      await (db.reservations as any).clear();
-      await (db.menuItems as any).clear();
-      await (db.categories as any).clear();
-      await (db.tables as any).clear();
-      await (db.orders as any).clear();
-      await (db.orderItems as any).clear();
-      await (db.staff as any).clear();
-      await (db.payments as any).clear();
-      await (db.syncQueue as any).clear();
-      await (db.syncMetadata as any).clear();
-    } catch (e) {
-      console.warn('Some tables could not be cleared:', e);
-    }
-  }
-  console.log('🗑️ Local database cleared');
-}
-
-// ============================================================================
-// Export Types
-// ============================================================================
-
-export type {
-  Dexie
-};
