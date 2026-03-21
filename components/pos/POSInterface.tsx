@@ -125,16 +125,27 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
 
     const filteredProducts = useMemo(() => {
         return products.filter(product => {
-            // Handle category as object (relationship) or string (ID)
-            const productCategoryId = typeof product.category === 'string'
-                ? product.category
-                : product.category?.$id || product.category?.slug;
-            const matchesCategory = selectedCategory === "all" || productCategoryId === selectedCategory;
+            // Handle category - could be ID string or object
+            let productCategorySlug = "all";
+            
+            if (typeof product.category === 'string') {
+                // Category is an ID - look it up in categoryMap
+                const cat = Array.from(categoryMap.values()).find(c => c.$id === product.category);
+                productCategorySlug = cat?.slug || product.category;
+            } else if (product.category?.$id) {
+                // Category is an object with $id
+                productCategorySlug = product.category.slug;
+            } else if (product.category?.slug) {
+                // Category is an object with just slug
+                productCategorySlug = product.category.slug;
+            }
+            
+            const matchesCategory = selectedCategory === "all" || productCategorySlug === selectedCategory;
             const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 product.description.toLowerCase().includes(searchQuery.toLowerCase());
             return matchesCategory && matchesSearch;
         });
-    }, [products, selectedCategory, searchQuery]);
+    }, [products, selectedCategory, searchQuery, categoryMap]);
 
     const handleCheckout = () => {
         setPaymentModalOpen(true);
