@@ -6,13 +6,18 @@ import { Download, Filter, Calendar, ArrowUpDown } from 'lucide-react';
 interface Order {
   $id: string;
   orderNumber: string;
-  tableNumber: string;
-  total: number;
-  vatAmount: number;
+  tableNumber?: string;
+  // Financial fields - handle multiple possible field names
   subtotal: number;
+  totalAmount: number;
+  total?: number;
+  taxAmount?: number;
+  vatAmount?: number;
+  serviceCharge?: number;
   paymentStatus: string;
   paymentMethod?: string;
-  createdAt: string;
+  createdAt?: string;
+  $createdAt?: string;
   items?: any[];
 }
 
@@ -22,6 +27,21 @@ interface SalesSummary {
   orderCount: number;
   averageOrderValue: number;
 }
+
+// Helper functions to extract financial values from orders
+const getSubtotal = (order: Order): number => {
+  return order.subtotal ?? 0;
+};
+
+const getVatAmount = (order: Order): number => {
+  // Try vatAmount first, then taxAmount
+  return order.vatAmount ?? order.taxAmount ?? 0;
+};
+
+const getTotalAmount = (order: Order): number => {
+  // Try totalAmount first, then total, then grandTotal
+  return order.totalAmount ?? order.total ?? 0;
+};
 
 export default function SalesReport() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -63,9 +83,9 @@ export default function SalesReport() {
       order.tableNumber || 'N/A',
       order.createdAt ? new Date(order.createdAt).toLocaleDateString() : new Date(order.$createdAt).toLocaleDateString(),
       order.createdAt ? new Date(order.createdAt).toLocaleTimeString() : new Date(order.$createdAt).toLocaleTimeString(),
-      (order.subtotal || 0).toFixed(2),
-      (order.vatAmount || order.taxAmount || 0).toFixed(2),
-      (order.total || order.totalAmount || order.grandTotal || 0).toFixed(2),
+      getSubtotal(order).toFixed(2),
+      getVatAmount(order).toFixed(2),
+      getTotalAmount(order).toFixed(2),
       order.paymentStatus,
       order.paymentMethod || 'N/A'
     ]);
@@ -219,9 +239,9 @@ export default function SalesReport() {
                   <td className="px-4 py-3 text-sm text-gray-400">
                     {order.createdAt ? new Date(order.createdAt).toLocaleString() : order.$createdAt ? new Date(order.$createdAt).toLocaleString() : '-'}
                   </td>
-                  <td className="px-4 py-3 text-right">KSh {(order.subtotal || 0).toLocaleString()}</td>
-                  <td className="px-4 py-3 text-right text-amber-400">KSh {(order.vatAmount || order.taxAmount || 0).toLocaleString()}</td>
-                  <td className="px-4 py-3 text-right font-bold">KSh {(order.total || order.totalAmount || order.grandTotal || 0).toLocaleString()}</td>
+                  <td className="px-4 py-3 text-right">KSh {getSubtotal(order).toLocaleString()}</td>
+                  <td className="px-4 py-3 text-right text-amber-400">KSh {getVatAmount(order).toLocaleString()}</td>
+                  <td className="px-4 py-3 text-right font-bold">KSh {getTotalAmount(order).toLocaleString()}</td>
                   <td className="px-4 py-3 text-center">
                     <span className={`px-2 py-1 rounded text-xs ${
                       order.paymentStatus === 'paid' ? 'bg-emerald-900 text-emerald-300' :
