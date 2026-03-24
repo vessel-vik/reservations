@@ -89,9 +89,26 @@ export async function GET(request: NextRequest) {
     }
     
     // Calculate totals - check all possible field names
+    // Also handle legacy orders that only stored VAT-inclusive totals
     const totalIncome = orders.reduce((sum: number, order: any) => {
-      // Try various field names for order total
-      return sum + (order.total || order.totalAmount || order.grandTotal || 0);
+      const total = order.total || order.totalAmount || order.grandTotal || 0;
+      return sum + total;
+    }, 0);
+    
+    // Calculate output VAT with reverse-calculation for legacy orders
+    const outputVat = orders.reduce((sum: number, order: any) => {
+      const taxAmount = order.vatAmount || order.taxAmount || 0;
+      if (taxAmount > 0) {
+        // New orders with proper taxAmount
+        return sum + taxAmount;
+      }
+      // Legacy orders: reverse-calculate from totalAmount
+      const totalAmount = order.totalAmount || order.total || order.grandTotal || 0;
+      if (totalAmount > 0) {
+        const subtotal = totalAmount / 1.16;
+        return sum + (subtotal * 0.16);
+      }
+      return sum;
     }, 0);
     
     const totalExpenses = expenses.reduce((sum: number, exp: any) => {
@@ -99,10 +116,6 @@ export async function GET(request: NextRequest) {
     }, 0);
     const netProfit = totalIncome - totalExpenses;
     
-    // Calculate VAT - check both vatAmount and taxAmount
-    const outputVat = orders.reduce((sum: number, order: any) => {
-      return sum + (order.vatAmount || order.taxAmount || 0);
-    }, 0);
     const inputVat = expenses.reduce((sum: number, exp: any) => {
       return sum + (exp.vatAmount || 0);
     }, 0);
