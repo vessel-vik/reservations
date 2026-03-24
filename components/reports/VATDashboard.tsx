@@ -229,7 +229,7 @@ export default function VATDashboard() {
                   report.totalVatCollected ??
                   report.vatBreakdown?.standard?.vat ??
                   0
-                ).toLocaleString()}
+                ).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
               <div className="text-xs text-gray-500 mt-1">From sales</div>
             </div>
@@ -241,7 +241,7 @@ export default function VATDashboard() {
                   report.inputVat?.total ??
                   report.totalInputVat ??
                   0
-                ).toLocaleString()}
+                ).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
               <div className="text-xs text-gray-500 mt-1">From expenses</div>
             </div>
@@ -256,7 +256,7 @@ export default function VATDashboard() {
                   report.netVatPayable ?? 
                   report.vatPayable ?? 
                   0
-                ).toLocaleString()}
+                ).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
               <div className="text-xs text-gray-500 mt-1">
                 {(report.netVatPayable ?? report.vatPayable ?? 0) >= 0 ? 'Pay to KRA' : 'Claimable credit'}
@@ -270,7 +270,7 @@ export default function VATDashboard() {
                   report.salesSummary?.totalSales ??
                   report.totalSales ??
                   0
-                ).toLocaleString()}
+                ).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
               <div className="text-xs text-gray-500 mt-1">
                 {typeof report.period === 'string' 
@@ -287,19 +287,19 @@ export default function VATDashboard() {
             <div className="bg-gray-800 rounded-lg p-4">
               <div className="text-sm text-gray-400 mb-1">Standard Rated (16%)</div>
               <div className="text-xl font-bold">
-                KSh {(report.vatBreakdown?.standard?.sales ?? report.standardRatedSales ?? 0).toLocaleString()}
+                KSh {(report.vatBreakdown?.standard?.sales ?? report.standardRatedSales ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
             </div>
             <div className="bg-gray-800 rounded-lg p-4">
               <div className="text-sm text-gray-400 mb-1">Zero Rated (0%)</div>
               <div className="text-xl font-bold">
-                KSh {(report.vatBreakdown?.zeroRated?.sales ?? report.zeroRatedSales ?? 0).toLocaleString()}
+                KSh {(report.vatBreakdown?.zeroRated?.sales ?? report.zeroRatedSales ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
             </div>
             <div className="bg-gray-800 rounded-lg p-4">
               <div className="text-sm text-gray-400 mb-1">Exempt</div>
               <div className="text-xl font-bold">
-                KSh {(report.vatBreakdown?.exempt?.sales ?? report.exemptSales ?? 0).toLocaleString()}
+                KSh {(report.vatBreakdown?.exempt?.sales ?? report.exemptSales ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
             </div>
           </div>
@@ -335,8 +335,8 @@ export default function VATDashboard() {
                       <td className="px-4 py-2">{inv.supplierName}</td>
                       <td className="px-4 py-2 font-mono text-sm">{inv.invoiceNumber}</td>
                       <td className="px-4 py-2 text-sm text-gray-400">{inv.date}</td>
-                      <td className="px-4 py-2 text-right">KSh {inv.amount?.toLocaleString() ?? 0}</td>
-                      <td className="px-4 py-2 text-right text-blue-400">KSh {inv.vatAmount?.toLocaleString() ?? 0}</td>
+                      <td className="px-4 py-2 text-right">KSh {inv.amount?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '0.00'}</td>
+                      <td className="px-4 py-2 text-right text-blue-400">KSh {inv.vatAmount?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '0.00'}</td>
                     </tr>
                   ))}
                 </tbody>

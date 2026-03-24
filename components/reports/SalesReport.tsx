@@ -216,11 +216,11 @@ export default function SalesReport() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="bg-gray-800 rounded-lg p-4">
             <div className="text-sm text-gray-400">Total Sales</div>
-            <div className="text-2xl font-bold text-emerald-400">KSh {summary?.totalSales?.toLocaleString() ?? 0}</div>
+            <div className="text-2xl font-bold text-emerald-400">KSh {summary?.totalSales?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '0.00'}</div>
           </div>
           <div className="bg-gray-800 rounded-lg p-4">
             <div className="text-sm text-gray-400">Total VAT</div>
-            <div className="text-2xl font-bold text-amber-400">KSh {summary?.totalVat?.toLocaleString() ?? 0}</div>
+            <div className="text-2xl font-bold text-amber-400">KSh {summary?.totalVat?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '0.00'}</div>
           </div>
           <div className="bg-gray-800 rounded-lg p-4">
             <div className="text-sm text-gray-400">Orders</div>
@@ -228,7 +228,7 @@ export default function SalesReport() {
           </div>
           <div className="bg-gray-800 rounded-lg p-4">
             <div className="text-sm text-gray-400">Avg Order</div>
-            <div className="text-2xl font-bold">KSh {summary?.averageOrderValue?.toLocaleString() ?? 0}</div>
+            <div className="text-2xl font-bold">KSh {summary?.averageOrderValue?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '0.00'}</div>
           </div>
         </div>
       )}
@@ -265,9 +265,9 @@ export default function SalesReport() {
                   <td className="px-4 py-3 text-sm text-gray-400">
                     {order.createdAt ? new Date(order.createdAt).toLocaleString() : order.$createdAt ? new Date(order.$createdAt).toLocaleString() : '-'}
                   </td>
-                  <td className="px-4 py-3 text-right">KSh {subtotal.toLocaleString()}</td>
-                  <td className="px-4 py-3 text-right text-amber-400">KSh {vatAmount.toLocaleString()}</td>
-                  <td className="px-4 py-3 text-right font-bold">KSh {totalAmount.toLocaleString()}</td>
+                  <td className="px-4 py-3 text-right">KSh {subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td className="px-4 py-3 text-right text-amber-400">KSh {vatAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td className="px-4 py-3 text-right font-bold">KSh {totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                   <td className="px-4 py-3 text-center">
                     <span className={`px-2 py-1 rounded text-xs ${
                       order.paymentStatus === 'paid' ? 'bg-emerald-900 text-emerald-300' :

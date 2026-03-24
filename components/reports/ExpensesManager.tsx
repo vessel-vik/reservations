@@ -145,16 +145,16 @@ export default function ExpensesManager() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-gray-800 rounded-lg p-4">
             <div className="text-sm text-gray-400">Total Expenses</div>
-            <div className="text-2xl font-bold">KSh {summary?.totalAmount?.toLocaleString() ?? 0}</div>
+            <div className="text-2xl font-bold">KSh {summary?.totalAmount?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '0.00'}</div>
             <div className="text-xs text-gray-500">{summary.count} records</div>
           </div>
           <div className="bg-gray-800 rounded-lg p-4">
             <div className="text-sm text-gray-400">Total VAT</div>
-            <div className="text-2xl font-bold text-amber-400">KSh {summary?.totalVat?.toLocaleString() ?? 0}</div>
+            <div className="text-2xl font-bold text-amber-400">KSh {summary?.totalVat?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '0.00'}</div>
           </div>
           <div className="bg-gray-800 rounded-lg p-4">
             <div className="text-sm text-gray-400">Total with VAT</div>
-            <div className="text-2xl font-bold text-emerald-400">KSh {((summary?.totalAmount ?? 0) + (summary?.totalVat ?? 0)).toLocaleString()}</div>
+            <div className="text-2xl font-bold text-emerald-400">KSh {((summary?.totalAmount ?? 0) + (summary?.totalVat ?? 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
           </div>
         </div>
       )}
@@ -260,9 +260,9 @@ export default function ExpensesManager() {
                   <td className="px-4 py-3 text-sm text-gray-400 max-w-xs truncate">
                     {expense.description}
                   </td>
-                  <td className="px-4 py-3 text-right">KSh {expense?.amount?.toLocaleString() ?? 0}</td>
+                  <td className="px-4 py-3 text-right">KSh {expense?.amount?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '0.00'}</td>
                   <td className="px-4 py-3 text-right text-amber-400">
-                    KSh {((expense?.vatAmount ?? 0) || 0).toLocaleString()}
+                    KSh {((expense?.vatAmount ?? 0) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
                   <td className="px-4 py-3 text-center">
                     <span className={`px-2 py-1 rounded text-xs ${
