@@ -27,8 +27,8 @@ export async function GET(request: NextRequest) {
     }
 
     const ordersQueries: any[] = [
-      Query.equal('status', 'paid'),
-      Query.notEqual('paymentStatus', 'settled'),
+      // Only filter by paymentStatus=paid to include all paid orders
+      Query.equal('paymentStatus', 'paid'),
       Query.limit(500)
     ];
     
@@ -39,8 +39,12 @@ export async function GET(request: NextRequest) {
     
     // Date filters
     if (startDate && endDate) {
-      ordersQueries.push(Query.greaterThanEqual('$createdAt', startDate));
-      ordersQueries.push(Query.lessThanEqual('$createdAt', endDate));
+      // Use start of startDate and end of endDate for proper range filtering
+      const startDateTime = new Date(startDate).toISOString();
+      const endDateTime = new Date(endDate + 'T23:59:59.999').toISOString();
+      
+      ordersQueries.push(Query.greaterThanEqual('$createdAt', startDateTime));
+      ordersQueries.push(Query.lessThanEqual('$createdAt', endDateTime));
       expensesQueries.push(Query.greaterThanEqual('invoiceDate', startDate));
       expensesQueries.push(Query.lessThanEqual('invoiceDate', endDate));
     }
