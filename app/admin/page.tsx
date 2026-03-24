@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Users,
   Clock,
@@ -103,6 +103,44 @@ const AdminPage = () => {
     loadInitialData();
   }, []);
 
+  // Keyboard shortcuts for tab navigation (1-5)
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    // Only handle if not typing in an input
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+      return;
+    }
+
+    switch (e.key) {
+      case '1':
+        setActiveTab('dashboard');
+        break;
+      case '2':
+        setActiveTab('sales');
+        break;
+      case '3':
+        setActiveTab('accounting');
+        break;
+      case '4':
+        setActiveTab('vat');
+        break;
+      case '5':
+        setActiveTab('expenses');
+        break;
+      // Ctrl+R to refresh data
+      case 'r':
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          window.location.reload();
+        }
+        break;
+    }
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
+
   // Merge live data with combined analytics
   const currentAnalytics = combinedAnalytics ? {
     ...combinedAnalytics,
@@ -185,9 +223,11 @@ const AdminPage = () => {
                     ? 'border-amber-500 text-amber-500'
                     : 'border-transparent text-gray-400 hover:text-white'
                 }`}
+                title="Press 1"
               >
                 <Activity className="w-4 h-4" />
                 Dashboard
+                <span className="text-xs text-gray-500 ml-1">1</span>
               </button>
               <button
                 onClick={() => setActiveTab('sales')}
@@ -196,9 +236,11 @@ const AdminPage = () => {
                     ? 'border-amber-500 text-amber-500'
                     : 'border-transparent text-gray-400 hover:text-white'
                 }`}
+                title="Press 2"
               >
                 <Receipt className="w-4 h-4" />
                 Sales Reports
+                <span className="text-xs text-gray-500 ml-1">2</span>
               </button>
               <button
                 onClick={() => setActiveTab('accounting')}
@@ -210,6 +252,7 @@ const AdminPage = () => {
               >
                 <DollarSign className="w-4 h-4" />
                 Accounting
+                <span className="text-xs text-gray-500 ml-1">3</span>
               </button>
               <button
                 onClick={() => setActiveTab('vat')}
@@ -218,9 +261,11 @@ const AdminPage = () => {
                     ? 'border-amber-500 text-amber-500'
                     : 'border-transparent text-gray-400 hover:text-white'
                 }`}
+                title="Press 4"
               >
                 <Calculator className="w-4 h-4" />
                 VAT
+                <span className="text-xs text-gray-500 ml-1">4</span>
               </button>
               <button
                 onClick={() => setActiveTab('expenses')}
@@ -229,9 +274,11 @@ const AdminPage = () => {
                     ? 'border-amber-500 text-amber-500'
                     : 'border-transparent text-gray-400 hover:text-white'
                 }`}
+                title="Press 5"
               >
                 <ShoppingCart className="w-4 h-4" />
                 Expenses
+                <span className="text-xs text-gray-500 ml-1">5</span>
               </button>
             </nav>
           </div>
