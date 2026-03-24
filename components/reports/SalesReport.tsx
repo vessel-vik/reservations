@@ -29,17 +29,39 @@ interface SalesSummary {
 }
 
 // Helper functions to extract financial values from orders
+// Handles both new orders (with proper taxAmount) and legacy orders (taxAmount=0)
 const getSubtotal = (order: Order): number => {
+  // If taxAmount exists and is non-zero, use it directly
+  const taxAmount = order.vatAmount ?? order.taxAmount ?? 0;
+  if (taxAmount > 0) {
+    return order.subtotal ?? 0;
+  }
+  // Legacy orders: reverse-calculate from VAT-inclusive total
+  // If totalAmount is stored as VAT-inclusive, calculate ex-VAT
+  const totalAmount = order.totalAmount ?? order.total ?? 0;
+  if (totalAmount > 0) {
+    // Assume VAT was included in the total
+    return totalAmount / 1.16;
+  }
   return order.subtotal ?? 0;
 };
 
 const getVatAmount = (order: Order): number => {
-  // Try vatAmount first, then taxAmount
-  return order.vatAmount ?? order.taxAmount ?? 0;
+  // If taxAmount exists and is non-zero, use it directly
+  const taxAmount = order.vatAmount ?? order.taxAmount ?? 0;
+  if (taxAmount > 0) {
+    return taxAmount;
+  }
+  // Legacy orders: reverse-calculate VAT from total
+  const totalAmount = order.totalAmount ?? order.total ?? 0;
+  if (totalAmount > 0) {
+    const subtotal = totalAmount / 1.16;
+    return subtotal * 0.16;
+  }
+  return 0;
 };
 
 const getTotalAmount = (order: Order): number => {
-  // Try totalAmount first, then total, then grandTotal
   return order.totalAmount ?? order.total ?? 0;
 };
 
@@ -232,16 +254,20 @@ export default function SalesReport() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-700">
-              {orders.map((order) => (
+              {orders.map((order) => {
+                const subtotal = getSubtotal(order);
+                const vatAmount = getVatAmount(order);
+                const totalAmount = getTotalAmount(order);
+                return (
                 <tr key={order.$id} className="hover:bg-gray-750">
                   <td className="px-4 py-3 font-mono text-sm">{order.orderNumber}</td>
                   <td className="px-4 py-3">{order.tableNumber || '-'}</td>
                   <td className="px-4 py-3 text-sm text-gray-400">
                     {order.createdAt ? new Date(order.createdAt).toLocaleString() : order.$createdAt ? new Date(order.$createdAt).toLocaleString() : '-'}
                   </td>
-                  <td className="px-4 py-3 text-right">KSh {getSubtotal(order).toLocaleString()}</td>
-                  <td className="px-4 py-3 text-right text-amber-400">KSh {getVatAmount(order).toLocaleString()}</td>
-                  <td className="px-4 py-3 text-right font-bold">KSh {getTotalAmount(order).toLocaleString()}</td>
+                  <td className="px-4 py-3 text-right">KSh {subtotal.toLocaleString()}</td>
+                  <td className="px-4 py-3 text-right text-amber-400">KSh {vatAmount.toLocaleString()}</td>
+                  <td className="px-4 py-3 text-right font-bold">KSh {totalAmount.toLocaleString()}</td>
                   <td className="px-4 py-3 text-center">
                     <span className={`px-2 py-1 rounded text-xs ${
                       order.paymentStatus === 'paid' ? 'bg-emerald-900 text-emerald-300' :
@@ -253,7 +279,7 @@ export default function SalesReport() {
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-400">{order.paymentMethod || '-'}</td>
                 </tr>
-              ))}
+              )})}
             </tbody>
           </table>
         )}
