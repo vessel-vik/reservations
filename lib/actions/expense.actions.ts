@@ -106,7 +106,10 @@ export async function getExpenses(options?: {
   limit?: number;
 }): Promise<{ success: boolean; expenses?: Expense[]; error?: string }> {
   try {
+    console.log('[getExpenses] Fetching expenses with options:', options);
+    
     if (!DATABASE_ID || !EXPENSES_COLLECTION_ID) {
+      console.error('[getExpenses] Missing config:', { DATABASE_ID, EXPENSES_COLLECTION_ID });
       return { success: false, error: 'Database configuration missing' };
     }
 

@@ -35,10 +35,18 @@ export async function GET(request: NextRequest) {
     );
 
     const orders = parseStringify(result.documents);
+    console.log('[Sales API] Found orders:', orders.length);
+    if (orders.length > 0) {
+      console.log('[Sales API] First order keys:', Object.keys(orders[0]));
+    }
     
-    // Calculate summary
-    const totalSales = orders.reduce((sum: number, order: any) => sum + (order.total || 0), 0);
-    const totalVat = orders.reduce((sum: number, order: any) => sum + (order.vatAmount || 0), 0);
+    // Calculate summary - handle multiple field name variants
+    const totalSales = orders.reduce((sum: number, order: any) => {
+      return sum + (order.total || order.totalAmount || order.grandTotal || 0);
+    }, 0);
+    const totalVat = orders.reduce((sum: number, order: any) => {
+      return sum + (order.vatAmount || order.taxAmount || 0);
+    }, 0);
     const orderCount = orders.length;
     
     return NextResponse.json({

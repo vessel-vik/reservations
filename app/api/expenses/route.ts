@@ -25,7 +25,12 @@ export async function GET(request: NextRequest) {
     
     // Calculate summary
     const expenses = result.expenses || [];
-    const totalAmount = expenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
+    console.log('[Expenses API] Found expenses:', expenses.length);
+    if (expenses.length > 0) {
+      console.log('[Expenses API] First expense keys:', Object.keys(expenses[0]));
+    }
+    
+    const totalAmount = expenses.reduce((sum, exp) => sum + (exp.amount || exp.totalAmount || 0), 0);
     const totalVat = expenses.reduce((sum, exp) => sum + (exp.vatAmount || 0), 0);
     
     return NextResponse.json({

@@ -220,8 +220,8 @@ export default function SalesReport() {
                     {order.createdAt ? new Date(order.createdAt).toLocaleString() : order.$createdAt ? new Date(order.$createdAt).toLocaleString() : '-'}
                   </td>
                   <td className="px-4 py-3 text-right">KSh {(order.subtotal || 0).toLocaleString()}</td>
-                  <td className="px-4 py-3 text-right text-amber-400">KSh {(order.vatAmount || 0).toLocaleString()}</td>
-                  <td className="px-4 py-3 text-right font-bold">KSh {(order.total || 0).toLocaleString()}</td>
+                  <td className="px-4 py-3 text-right text-amber-400">KSh {(order.vatAmount || order.taxAmount || 0).toLocaleString()}</td>
+                  <td className="px-4 py-3 text-right font-bold">KSh {(order.total || order.totalAmount || order.grandTotal || 0).toLocaleString()}</td>
                   <td className="px-4 py-3 text-center">
                     <span className={`px-2 py-1 rounded text-xs ${
                       order.paymentStatus === 'paid' ? 'bg-emerald-900 text-emerald-300' :
