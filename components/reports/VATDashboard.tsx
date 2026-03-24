@@ -102,7 +102,7 @@ export default function VATDashboard() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `itax-vat-${report.period}.json`;
+    a.download = `itax-vat-${report.period ?? "N/A"}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -188,7 +188,7 @@ export default function VATDashboard() {
             <div className="bg-gray-800 rounded-lg p-4">
               <div className="text-sm text-gray-400 mb-1">Output VAT (Collected)</div>
               <div className="text-2xl font-bold text-emerald-400">
-                KSh {report.totalVatCollected.toLocaleString()}
+                KSh {report.totalVatCollected?.toLocaleString() ?? '0'}
               </div>
               <div className="text-xs text-gray-500 mt-1">From sales</div>
             </div>
@@ -196,27 +196,27 @@ export default function VATDashboard() {
             <div className="bg-gray-800 rounded-lg p-4">
               <div className="text-sm text-gray-400 mb-1">Input VAT (Paid)</div>
               <div className="text-2xl font-bold text-blue-400">
-                KSh {report.totalInputVat.toLocaleString()}
+                KSh {report.totalInputVat?.toLocaleString() ?? '0'}
               </div>
               <div className="text-xs text-gray-500 mt-1">From expenses</div>
             </div>
 
             <div className="bg-gray-800 rounded-lg p-4">
               <div className="text-sm text-gray-400 mb-1">Net VAT Payable</div>
-              <div className={`text-2xl font-bold ${report.vatPayable >= 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                KSh {report.vatPayable.toLocaleString()}
+              <div className={`text-2xl font-bold ${(report.vatPayable ?? 0) >= 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                KSh {(report.vatPayable ?? 0).toLocaleString()}
               </div>
               <div className="text-xs text-gray-500 mt-1">
-                {report.vatPayable >= 0 ? 'Pay to KRA' : 'Claimable credit'}
+                {(report.vatPayable ?? 0) >= 0 ? 'Pay to KRA' : 'Claimable credit'}
               </div>
             </div>
 
             <div className="bg-gray-800 rounded-lg p-4">
               <div className="text-sm text-gray-400 mb-1">Total Sales</div>
               <div className="text-2xl font-bold">
-                KSh {report.totalSales.toLocaleString()}
+                KSh {report.totalSales?.toLocaleString() ?? 0}
               </div>
-              <div className="text-xs text-gray-500 mt-1">{report.period}</div>
+              <div className="text-xs text-gray-500 mt-1">{report.period ?? "N/A"}</div>
             </div>
           </div>
 
@@ -225,19 +225,19 @@ export default function VATDashboard() {
             <div className="bg-gray-800 rounded-lg p-4">
               <div className="text-sm text-gray-400 mb-1">Standard Rated (16%)</div>
               <div className="text-xl font-bold">
-                KSh {report.standardRatedSales.toLocaleString()}
+                KSh {report.standardRatedSales?.toLocaleString() ?? 0}
               </div>
             </div>
             <div className="bg-gray-800 rounded-lg p-4">
               <div className="text-sm text-gray-400 mb-1">Zero Rated (0%)</div>
               <div className="text-xl font-bold">
-                KSh {report.zeroRatedSales.toLocaleString()}
+                KSh {report.zeroRatedSales?.toLocaleString() ?? 0}
               </div>
             </div>
             <div className="bg-gray-800 rounded-lg p-4">
               <div className="text-sm text-gray-400 mb-1">Exempt</div>
               <div className="text-xl font-bold">
-                KSh {report.exemptSales.toLocaleString()}
+                KSh {report.exemptSales?.toLocaleString() ?? 0}
               </div>
             </div>
           </div>
@@ -273,8 +273,8 @@ export default function VATDashboard() {
                       <td className="px-4 py-2">{inv.supplierName}</td>
                       <td className="px-4 py-2 font-mono text-sm">{inv.invoiceNumber}</td>
                       <td className="px-4 py-2 text-sm text-gray-400">{inv.date}</td>
-                      <td className="px-4 py-2 text-right">KSh {inv.amount.toLocaleString()}</td>
-                      <td className="px-4 py-2 text-right text-blue-400">KSh {inv.vatAmount.toLocaleString()}</td>
+                      <td className="px-4 py-2 text-right">KSh {inv.amount?.toLocaleString() ?? 0}</td>
+                      <td className="px-4 py-2 text-right text-blue-400">KSh {inv.vatAmount?.toLocaleString() ?? 0}</td>
                     </tr>
                   ))}
                 </tbody>

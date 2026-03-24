@@ -23,8 +23,8 @@ export async function GET(request: NextRequest) {
       endDate
     });
     
-    if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: 500 });
+    if (!result.success || !result.report) {
+      return NextResponse.json({ error: result.error || 'Failed to generate report' }, { status: 500 });
     }
     
     return NextResponse.json(result.report);

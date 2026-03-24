@@ -134,7 +134,7 @@ export default function AccountingDashboard() {
             <span className="text-sm">Total Income</span>
           </div>
           <div className="text-2xl font-bold text-emerald-400">
-            KSh {summary.totalIncome.toLocaleString()}
+            KSh {summary.totalIncome?.toLocaleString() ?? 0}
           </div>
           <div className="text-xs text-gray-500 mt-1">{summary.orderCount} orders</div>
         </div>
@@ -146,7 +146,7 @@ export default function AccountingDashboard() {
             <span className="text-sm">Total Expenses</span>
           </div>
           <div className="text-2xl font-bold text-red-400">
-            KSh {summary.totalExpenses.toLocaleString()}
+            KSh {summary.totalExpenses?.toLocaleString() ?? 0}
           </div>
           <div className="text-xs text-gray-500 mt-1">{summary.expenseCount} expenses</div>
         </div>
@@ -158,7 +158,7 @@ export default function AccountingDashboard() {
             <span className="text-sm">Net Profit</span>
           </div>
           <div className={`text-2xl font-bold ${isProfitable ? 'text-emerald-400' : 'text-red-400'}`}>
-            KSh {summary.netProfit.toLocaleString()}
+            KSh {summary.netProfit?.toLocaleString() ?? 0}
           </div>
           <div className="text-xs text-gray-500 mt-1">
             {isProfitable ? '✓ Profitable' : '✗ Loss'}
@@ -185,19 +185,19 @@ export default function AccountingDashboard() {
         <div className="bg-gray-800 rounded-lg p-4">
           <div className="text-sm text-gray-400 mb-1">Output VAT (Sales)</div>
           <div className="text-xl font-bold text-amber-400">
-            KSh {summary.outputVat.toLocaleString()}
+            KSh {summary.outputVat?.toLocaleString() ?? 0}
           </div>
         </div>
         <div className="bg-gray-800 rounded-lg p-4">
           <div className="text-sm text-gray-400 mb-1">Input VAT (Expenses)</div>
           <div className="text-xl font-bold text-blue-400">
-            KSh {summary.inputVat.toLocaleString()}
+            KSh {summary.inputVat?.toLocaleString() ?? 0}
           </div>
         </div>
         <div className="bg-gray-800 rounded-lg p-4">
           <div className="text-sm text-gray-400 mb-1">Net VAT Payable</div>
           <div className={`text-xl font-bold ${summary.netVat >= 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
-            KSh {summary.netVat.toLocaleString()}
+            KSh {summary.netVat?.toLocaleString() ?? 0}
           </div>
         </div>
       </div>
@@ -227,7 +227,7 @@ export default function AccountingDashboard() {
                     />
                   </div>
                   <div className="w-24 text-right text-sm">
-                    <span className="text-gray-300">KSh {amount.toLocaleString()}</span>
+                    <span className="text-gray-300">KSh {amount?.toLocaleString() ?? 0}</span>
                     <span className="text-gray-500 ml-2">({percentage}%)</span>
                   </div>
                 </div>

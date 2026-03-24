@@ -63,7 +63,12 @@ export async function GET(request: NextRequest) {
     }
 
     const orders = parseStringify(ordersResult.documents);
-    const expenses = parseStringify(expensesResult.documents);
+    
+    // Initialize expenses as empty array if collection not configured
+    let expenses: any[] = [];
+    if (hasExpensesCollection && expensesResult) {
+      expenses = parseStringify(expensesResult.documents);
+    }
     
     // Calculate totals
     const totalIncome = orders.reduce((sum: number, order: any) => sum + (order.total || 0), 0);

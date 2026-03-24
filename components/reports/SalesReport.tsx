@@ -177,11 +177,11 @@ export default function SalesReport() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="bg-gray-800 rounded-lg p-4">
             <div className="text-sm text-gray-400">Total Sales</div>
-            <div className="text-2xl font-bold text-emerald-400">KSh {summary.totalSales.toLocaleString()}</div>
+            <div className="text-2xl font-bold text-emerald-400">KSh {summary?.totalSales?.toLocaleString() ?? 0}</div>
           </div>
           <div className="bg-gray-800 rounded-lg p-4">
             <div className="text-sm text-gray-400">Total VAT</div>
-            <div className="text-2xl font-bold text-amber-400">KSh {summary.totalVat.toLocaleString()}</div>
+            <div className="text-2xl font-bold text-amber-400">KSh {summary?.totalVat?.toLocaleString() ?? 0}</div>
           </div>
           <div className="bg-gray-800 rounded-lg p-4">
             <div className="text-sm text-gray-400">Orders</div>
@@ -189,7 +189,7 @@ export default function SalesReport() {
           </div>
           <div className="bg-gray-800 rounded-lg p-4">
             <div className="text-sm text-gray-400">Avg Order</div>
-            <div className="text-2xl font-bold">KSh {summary.averageOrderValue.toLocaleString()}</div>
+            <div className="text-2xl font-bold">KSh {summary?.averageOrderValue?.toLocaleString() ?? 0}</div>
           </div>
         </div>
       )}
