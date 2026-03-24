@@ -14,12 +14,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Database configuration missing' }, { status: 500 });
     }
 
-    const queries: any[] = [];
-    
-    // Filter by payment status
-    if (paymentStatus && paymentStatus !== 'all') {
-      queries.push(Query.equal('paymentStatus', [paymentStatus]));
-    }
+    const queries: any[] = [
+      Query.equal('status', 'paid'),
+      Query.notEqual('paymentStatus', 'settled'),
+    ];
     
     // Filter by date range
     if (startDate && endDate) {

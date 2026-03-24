@@ -25,7 +25,8 @@ export async function GET(request: NextRequest) {
     }
 
     const ordersQueries: any[] = [
-      Query.equal('paymentStatus', 'paid'),
+      Query.equal('status', 'paid'),
+      Query.notEqual('paymentStatus', 'settled'),
       Query.limit(500)
     ];
     

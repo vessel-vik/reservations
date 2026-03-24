@@ -29,7 +29,6 @@ export default function SalesReport() {
   const [loading, setLoading] = useState(true);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [paymentStatus, setPaymentStatus] = useState('paid');
 
   const fetchSales = useCallback(async () => {
     setLoading(true);
@@ -37,7 +36,7 @@ export default function SalesReport() {
       const params = new URLSearchParams();
       if (startDate) params.set('startDate', startDate);
       if (endDate) params.set('endDate', endDate);
-      params.set('paymentStatus', paymentStatus);
+      // API now only returns paid, non-settled orders for accounting compliance
 
       const res = await fetch(`/api/reports/sales?${params}`);
       const data = await res.json();
@@ -51,7 +50,7 @@ export default function SalesReport() {
     } finally {
       setLoading(false);
     }
-  }, [startDate, endDate, paymentStatus]);
+  }, [startDate, endDate]);
 
   useEffect(() => {
     fetchSales();
@@ -146,20 +145,9 @@ export default function SalesReport() {
         </div>
 
         <div className="flex flex-wrap items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-gray-400" />
-            <span className="text-sm text-gray-400">Status:</span>
+          <div className="flex items-center gap-2 px-3 py-2 bg-emerald-500/20 border border-emerald-500/30 rounded-lg">
+            <span className="text-sm text-emerald-400">Showing: Paid Orders Only</span>
           </div>
-          
-          <select
-            value={paymentStatus}
-            onChange={(e) => setPaymentStatus(e.target.value)}
-            className="bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm"
-          >
-            <option value="paid">Paid Only</option>
-            <option value="pending">Pending</option>
-            <option value="all">All Statuses</option>
-          </select>
 
           <button
             onClick={exportToCSV}
