@@ -63,12 +63,12 @@ const Home = ({ searchParams }: SearchParamProps) => {
         ))}
       </div>
 
-      <section className="remove-scrollbar container my-auto relative z-10 py-8 lg:py-12">
+      <section className="remove-scrollbar container my-auto relative z-10 py-4 sm:py-8 lg:py-12">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
-          className="sub-container max-w-[580px] backdrop-blur-2xl bg-slate-900/50 border border-slate-700/40 rounded-3xl p-8 lg:p-10 shadow-2xl shadow-black/20 ring-1 ring-white/5"
+          className="sub-container max-w-[580px] backdrop-blur-2xl bg-slate-900/50 border border-slate-700/40 rounded-2xl sm:rounded-3xl p-5 sm:p-8 lg:p-10 shadow-2xl shadow-black/20 ring-1 ring-white/5"
         >
           {/* Logo and Branding */}
           <motion.div
@@ -77,10 +77,10 @@ const Home = ({ searchParams }: SearchParamProps) => {
             transition={{ delay: 0.15, duration: 0.4 }}
             className="text-center mb-8"
           >
-            <div className="inline-flex items-center justify-center mb-5">
+            <div className="inline-flex items-center justify-center mb-4 sm:mb-5">
               <div className="relative">
                 <div className="absolute inset-0 bg-gradient-to-r from-amber-400/40 to-amber-600/40 blur-2xl" />
-                <h1 className="relative text-3xl lg:text-4xl font-bold tracking-tight">
+                <h1 className="relative text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight">
                   <span className="bg-gradient-to-r from-amber-300 via-amber-400 to-amber-500 bg-clip-text text-transparent">
                     AM | PM
                   </span>
@@ -88,7 +88,7 @@ const Home = ({ searchParams }: SearchParamProps) => {
                 </h1>
               </div>
             </div>
-            <p className="text-slate-400 text-sm tracking-wide uppercase">
+            <p className="text-slate-400 text-xs sm:text-sm tracking-wide uppercase">
               Fine Dining Excellence
             </p>
           </motion.div>
@@ -111,8 +111,8 @@ const Home = ({ searchParams }: SearchParamProps) => {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3, duration: 0.4 }}
           >
-            <div className="mb-6">
-              <h2 className="text-xl lg:text-2xl font-semibold text-white mb-2 tracking-tight">
+            <div className="mb-5 sm:mb-6">
+              <h2 className="text-lg sm:text-xl lg:text-2xl font-semibold text-white mb-1.5 sm:mb-2 tracking-tight">
                 Reserve Your Table
               </h2>
               <p className="text-slate-400 text-sm leading-relaxed">

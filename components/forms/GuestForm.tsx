@@ -126,27 +126,27 @@ export const GuestForm = () => {
           transition={{ duration: 0.3 }}
         >
           {/* Progress Steps */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-4">
-              <motion.div 
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors ${
-                  currentStep === 'email' ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' : 
-                  emailVerified ? 'bg-green-500/10 border-green-500/30 text-green-400' : 
+          <div className="flex items-center justify-between mb-6 gap-2">
+            <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
+              <motion.div
+                className={`flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 rounded-lg border transition-colors ${
+                  currentStep === 'email' ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' :
+                  emailVerified ? 'bg-green-500/10 border-green-500/30 text-green-400' :
                   'bg-gray-500/10 border-gray-500/30 text-gray-400'
                 }`}
                 whileHover={{ scale: 1.02 }}
               >
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                  emailVerified ? 'bg-green-500 text-white' : 
+                <div className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                  emailVerified ? 'bg-green-500 text-white' :
                   currentStep === 'email' ? 'bg-amber-500 text-white' : 'bg-gray-500 text-white'
                 }`}>
                   {emailVerified ? <CheckCircle2 className="w-3 h-3" /> : '1'}
                 </div>
-                <span className="text-sm font-medium">Email</span>
+                <span className="text-xs sm:text-sm font-medium">Email</span>
               </motion.div>
 
-              <div className="w-8 h-0.5 bg-gray-600 rounded-full">
-                <motion.div 
+              <div className="w-6 sm:w-8 h-0.5 bg-gray-600 rounded-full flex-shrink-0">
+                <motion.div
                   className="h-full bg-amber-500 rounded-full"
                   initial={{ width: '0%' }}
                   animate={{ width: emailVerified ? '100%' : '0%' }}
@@ -154,35 +154,35 @@ export const GuestForm = () => {
                 />
               </div>
 
-              <motion.div 
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors ${
-                  currentStep === 'details' ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' : 
+              <motion.div
+                className={`flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 rounded-lg border transition-colors ${
+                  currentStep === 'details' ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' :
                   'bg-gray-500/10 border-gray-500/30 text-gray-400'
                 }`}
                 whileHover={{ scale: emailVerified ? 1.02 : 1 }}
               >
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                <div className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
                   currentStep === 'details' ? 'bg-amber-500 text-white' : 'bg-gray-500 text-white'
                 }`}>
                   2
                 </div>
-                <span className="text-sm font-medium">Details</span>
+                <span className="text-xs sm:text-sm font-medium">Details</span>
               </motion.div>
             </div>
 
-            {/* Live Stats */}
-            <div className="flex items-center gap-3">
+            {/* Live Stats - hidden on very small screens */}
+            <div className="hidden xs:flex sm:flex items-center gap-2 sm:gap-3 flex-shrink-0">
               <div className="flex items-center gap-1">
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                <span className="text-xs text-gray-300">Live</span>
+                <span className="hidden sm:inline text-xs text-gray-300">Live</span>
               </div>
               <div className="flex items-center gap-1">
                 <Clock className="w-3 h-3 text-amber-500" />
                 <span className="text-xs text-amber-400 font-medium">
-                  {currentTime.toLocaleTimeString('en-US', { 
-                    hour: '2-digit', 
+                  {currentTime.toLocaleTimeString('en-US', {
+                    hour: '2-digit',
                     minute: '2-digit',
-                    hour12: true 
+                    hour12: true
                   })}
                 </span>
               </div>
@@ -327,6 +327,8 @@ export const GuestForm = () => {
                   placeholder="John Doe"
                   iconSrc="/assets/icons/user.svg"
                   iconAlt="user"
+                  autoComplete="name"
+                  inputMode="text"
                 />
               </motion.div>
 

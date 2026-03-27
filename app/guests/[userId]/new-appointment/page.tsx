@@ -27,27 +27,27 @@ const NewReservation = async ({ params }: SearchParamProps) => {
       </div>
 
       {/* Left Section - Form */}
-      <section className="relative z-10 flex-1 flex items-center justify-center p-6 lg:p-8">
+      <section className="relative z-10 flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8">
         <div className="w-full max-w-[640px]">
           {/* Premium Header */}
-          <div className="mb-8">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500/20 to-amber-600/20 border border-amber-500/30 flex items-center justify-center">
-                <Calendar className="w-6 h-6 text-amber-400" />
+          <div className="mb-6 sm:mb-8">
+            <div className="flex items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-gradient-to-br from-amber-500/20 to-amber-600/20 border border-amber-500/30 flex items-center justify-center flex-shrink-0">
+                <Calendar className="w-5 h-5 sm:w-6 sm:h-6 text-amber-400" />
               </div>
               <div>
-                <h1 className="text-2xl lg:text-3xl font-bold tracking-tight">
+                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight">
                   <span className="bg-gradient-to-r from-amber-300 via-amber-400 to-amber-500 bg-clip-text text-transparent">
                     Make a Reservation
                   </span>
                 </h1>
-                <p className="text-slate-400 text-sm">Secure your table at AM | PM Lounge</p>
+                <p className="text-slate-400 text-xs sm:text-sm">Secure your table at AM | PM Lounge</p>
               </div>
             </div>
           </div>
 
           {/* Glass Form Container */}
-          <div className="backdrop-blur-2xl bg-slate-900/50 rounded-3xl border border-slate-700/40 p-6 lg:p-8 shadow-2xl shadow-black/20 ring-1 ring-white/5">
+          <div className="backdrop-blur-2xl bg-slate-900/50 rounded-2xl sm:rounded-3xl border border-slate-700/40 p-5 sm:p-6 lg:p-8 shadow-2xl shadow-black/20 ring-1 ring-white/5">
             {patient && (
               <div className="mb-6 p-4 bg-amber-500/10 rounded-xl border border-amber-500/20 flex items-start gap-3">
                 <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center flex-shrink-0">

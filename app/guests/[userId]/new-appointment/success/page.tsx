@@ -51,16 +51,16 @@ const ReservationSuccess = async ({
       </div>
 
       {/* Main Content */}
-      <div className="relative z-10 flex-1 flex items-center justify-center p-6 lg:p-8">
+      <div className="relative z-10 flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8">
         <div className="w-full max-w-2xl">
           {/* Header */}
-          <div className="text-center mb-8">
+          <div className="text-center mb-6 sm:mb-8">
             <Link href="/" className="inline-block">
-              <div className="flex items-center justify-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-green-500/20 to-green-600/20 border border-green-500/30 flex items-center justify-center">
-                  <CheckCircle className="w-7 h-7 text-green-400" />
+              <div className="flex items-center justify-center gap-3 sm:gap-4">
+                <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-gradient-to-br from-green-500/20 to-green-600/20 border border-green-500/30 flex items-center justify-center flex-shrink-0">
+                  <CheckCircle className="w-6 h-6 sm:w-7 sm:h-7 text-green-400" />
                 </div>
-                <h1 className="text-2xl lg:text-3xl font-bold tracking-tight">
+                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight">
                   <span className="bg-gradient-to-r from-green-400 via-green-300 to-amber-400 bg-clip-text text-transparent">
                     Reservation Confirmed!
                   </span>
@@ -85,7 +85,7 @@ const ReservationSuccess = async ({
           </div>
 
           {/* Glass Card with Details */}
-          <div className="backdrop-blur-2xl bg-slate-900/50 rounded-3xl border border-slate-700/40 p-6 lg:p-8 shadow-2xl shadow-black/20 ring-1 ring-white/5">
+          <div className="backdrop-blur-2xl bg-slate-900/50 rounded-2xl sm:rounded-3xl border border-slate-700/40 p-5 sm:p-6 lg:p-8 shadow-2xl shadow-black/20 ring-1 ring-white/5">
             <div className="text-center mb-6">
               <h2 className="text-xl lg:text-2xl font-semibold text-white mb-2 tracking-tight">
                 We Can't Wait to Serve You!

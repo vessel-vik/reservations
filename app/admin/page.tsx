@@ -176,133 +176,82 @@ const AdminPage = () => {
       <div className="relative z-10">
         {/* Premium Header */}
         <header className="backdrop-blur-2xl bg-slate-900/70 border-b border-slate-700/50 sticky top-0 z-50">
-          <div className="mx-auto flex max-w-[1600px] items-center justify-between px-6 py-4">
+          <div className="mx-auto flex max-w-[1600px] items-center justify-between px-4 sm:px-6 py-3 sm:py-4">
             <Link href="/" className="cursor-pointer group">
-              <div className="flex items-center gap-4">
-                <div className="size-11 flex items-center justify-center rounded-xl bg-gradient-to-br from-amber-500/20 to-amber-600/20 border border-amber-500/30 transition-all group-hover:border-amber-500/50">
-                  <span className="text-amber-400 font-bold text-lg">AM</span>
+              <div className="flex items-center gap-2 sm:gap-4">
+                <div className="size-9 sm:size-11 flex items-center justify-center rounded-xl bg-gradient-to-br from-amber-500/20 to-amber-600/20 border border-amber-500/30 transition-all group-hover:border-amber-500/50">
+                  <span className="text-amber-400 font-bold text-sm sm:text-lg">AM</span>
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold tracking-tight">
+                  <h1 className="text-base sm:text-xl font-bold tracking-tight">
                     <span className="bg-gradient-to-r from-amber-300 via-amber-400 to-amber-500 bg-clip-text text-transparent">AM | PM</span>
                     <span className="text-white/90 ml-1.5">Lounge</span>
                   </h1>
-                  <p className="text-xs text-slate-500">Restaurant Management</p>
+                  <p className="hidden sm:block text-xs text-slate-500">Restaurant Management</p>
                 </div>
               </div>
             </Link>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-4">
               {/* POS System Access */}
               <Link
                 href="/pos"
-                className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 hover:bg-amber-500/20 hover:border-amber-500/40 transition-all duration-200 group"
+                className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 sm:px-4 py-2 sm:py-2.5 hover:bg-amber-500/20 hover:border-amber-500/40 transition-all duration-200 group"
               >
                 <ShoppingCart className="size-4 text-amber-400" />
-                <span className="text-sm font-medium text-amber-400">Launch POS</span>
+                <span className="hidden sm:inline text-sm font-medium text-amber-400">Launch POS</span>
               </Link>
 
               {/* Live Status Indicator */}
-              <div className="flex items-center gap-2 rounded-xl border border-green-500/20 bg-green-500/10 px-4 py-2.5">
+              <div className="hidden sm:flex items-center gap-2 rounded-xl border border-green-500/20 bg-green-500/10 px-4 py-2.5">
                 <div className="size-2 animate-pulse rounded-full bg-green-400" />
                 <span className="text-sm font-medium text-green-400">Online</span>
               </div>
+              {/* Mobile online dot */}
+              <div className="flex sm:hidden items-center gap-1">
+                <div className="size-2 animate-pulse rounded-full bg-green-400" />
+              </div>
 
-              <div className="flex items-center gap-4">
-                <div className="text-right">
+              <div className="flex items-center gap-2 sm:gap-4">
+                <div className="hidden sm:block text-right">
                   <p className="text-sm text-slate-400">Manager</p>
                   <LiveDate className="text-xs text-amber-400 font-medium" />
                 </div>
-                <div className="size-10 flex items-center justify-center rounded-xl bg-slate-800/80 border border-slate-700/50">
-                  <ChefHat className="size-5 text-amber-400" />
+                <div className="size-9 sm:size-10 flex items-center justify-center rounded-xl bg-slate-800/80 border border-slate-700/50">
+                  <ChefHat className="size-4 sm:size-5 text-amber-400" />
                 </div>
               </div>
             </div>
           </div>
         </header>
 
-        <main className="mx-auto max-w-[1600px] px-6 py-8">
+        <main className="mx-auto max-w-[1600px] px-4 sm:px-6 py-6 sm:py-8">
           {/* Navigation Tabs */}
-          <div className="mb-8">
-            <nav className="flex gap-1 p-1 bg-slate-800/50 rounded-xl border border-slate-700/50">
-              <button
-                onClick={() => setActiveTab('dashboard')}
-                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
-                  activeTab === 'dashboard'
-                    ? 'bg-amber-500 text-slate-900 shadow-lg shadow-amber-500/20'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-                }`}
-                title="Press 1"
-              >
-                <Activity className="w-4 h-4" />
-                Dashboard
-                <span className={`text-xs ml-1 ${activeTab === 'dashboard' ? 'text-slate-700' : 'text-slate-600'}`}>1</span>
-              </button>
-              <button
-                onClick={() => setActiveTab('sales')}
-                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
-                  activeTab === 'sales'
-                    ? 'bg-amber-500 text-slate-900 shadow-lg shadow-amber-500/20'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-                }`}
-                title="Press 2"
-              >
-                <Receipt className="w-4 h-4" />
-                Sales
-                <span className={`text-xs ml-1 ${activeTab === 'sales' ? 'text-slate-700' : 'text-slate-600'}`}>2</span>
-              </button>
-              <button
-                onClick={() => setActiveTab('accounting')}
-                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
-                  activeTab === 'accounting'
-                    ? 'bg-amber-500 text-slate-900 shadow-lg shadow-amber-500/20'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-                }`}
-                title="Press 3"
-              >
-                <DollarSign className="w-4 h-4" />
-                Accounting
-                <span className={`text-xs ml-1 ${activeTab === 'accounting' ? 'text-slate-700' : 'text-slate-600'}`}>3</span>
-              </button>
-              <button
-                onClick={() => setActiveTab('vat')}
-                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
-                  activeTab === 'vat'
-                    ? 'bg-amber-500 text-slate-900 shadow-lg shadow-amber-500/20'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-                }`}
-                title="Press 4"
-              >
-                <Calculator className="w-4 h-4" />
-                VAT
-                <span className={`text-xs ml-1 ${activeTab === 'vat' ? 'text-slate-700' : 'text-slate-600'}`}>4</span>
-              </button>
-              <button
-                onClick={() => setActiveTab('expenses')}
-                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
-                  activeTab === 'expenses'
-                    ? 'bg-amber-500 text-slate-900 shadow-lg shadow-amber-500/20'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-                }`}
-                title="Press 5"
-              >
-                <ShoppingCart className="w-4 h-4" />
-                Expenses
-                <span className={`text-xs ml-1 ${activeTab === 'expenses' ? 'text-slate-700' : 'text-slate-600'}`}>5</span>
-              </button>
-              <button
-                onClick={() => setActiveTab('import')}
-                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
-                  activeTab === 'import'
-                    ? 'bg-amber-500 text-slate-900 shadow-lg shadow-amber-500/20'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-                }`}
-                title="Press 6"
-              >
-                <Upload className="w-4 h-4" />
-                Import
-                <span className={`text-xs ml-1 ${activeTab === 'import' ? 'text-slate-700' : 'text-slate-600'}`}>6</span>
-              </button>
+          <div className="mb-8 overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+            <nav className="flex gap-1 p-1 bg-slate-800/50 rounded-xl border border-slate-700/50 min-w-max sm:min-w-0">
+              {([
+                { id: 'dashboard', label: 'Dashboard', icon: Activity, key: '1' },
+                { id: 'sales', label: 'Sales', icon: Receipt, key: '2' },
+                { id: 'accounting', label: 'Accounting', icon: DollarSign, key: '3' },
+                { id: 'vat', label: 'VAT', icon: Calculator, key: '4' },
+                { id: 'expenses', label: 'Expenses', icon: ShoppingCart, key: '5' },
+                { id: 'import', label: 'Import', icon: Upload, key: '6' },
+              ] as const).map(({ id, label, icon: Icon, key }) => (
+                <button
+                  key={id}
+                  onClick={() => setActiveTab(id)}
+                  className={`flex items-center gap-2 px-3 sm:px-4 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 whitespace-nowrap ${
+                    activeTab === id
+                      ? 'bg-amber-500 text-slate-900 shadow-lg shadow-amber-500/20'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                  }`}
+                  title={`Press ${key}`}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span>{label}</span>
+                  <span className={`hidden sm:inline text-xs ml-1 ${activeTab === id ? 'text-slate-700' : 'text-slate-600'}`}>{key}</span>
+                </button>
+              ))}
             </nav>
           </div>
 
@@ -310,21 +259,21 @@ const AdminPage = () => {
           {activeTab === 'dashboard' && (
           <>
           <section className="mb-8">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h1 className="text-2xl lg:text-3xl font-bold text-white mb-1 tracking-tight">
+                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white mb-1 tracking-tight">
                   Restaurant Dashboard
                 </h1>
                 <p className="text-slate-400 text-sm">
                   Monitor performance in real-time
                 </p>
               </div>
-              <div className="text-right">
-                <div className="backdrop-blur-xl bg-slate-800/50 rounded-2xl border border-slate-700/50 px-5 py-3">
+              <div className="text-left sm:text-right">
+                <div className="backdrop-blur-xl bg-slate-800/50 rounded-2xl border border-slate-700/50 px-4 sm:px-5 py-3 inline-block">
                   <p className="text-xs text-slate-500 mb-1">Current Time</p>
                   <RealTimeClock
                     format="time"
-                    className="text-2xl font-bold text-amber-400 font-mono tracking-tight"
+                    className="text-xl sm:text-2xl font-bold text-amber-400 font-mono tracking-tight"
                     updateInterval={500}
                   />
                   <p className="text-xs text-slate-500 mt-1">

@@ -209,9 +209,9 @@ export const AppointmentForm = ({
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="flex-1 space-y-6">
         {type === "create" && (
-          <section className="mb-12 space-y-4">
-            <h1 className="text-2xl font-bold text-white">Make Your Reservation</h1>
-            <p className="text-gray-400">
+          <section className="mb-6 sm:mb-12 space-y-2 sm:space-y-4">
+            <h1 className="text-xl sm:text-2xl font-bold text-white">Make Your Reservation</h1>
+            <p className="text-gray-400 text-sm sm:text-base">
               Book your table and enjoy a complimentary welcome drink 🥂
             </p>
           </section>

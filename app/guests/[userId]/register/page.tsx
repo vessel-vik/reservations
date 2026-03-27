@@ -516,7 +516,7 @@ const Register: React.FC = () => {
       
       {/* Main Content */}
       <section className="remove-scrollbar container relative z-10">
-        <div className="sub-container max-w-[860px] flex-1 flex-col py-10">
+        <div className="sub-container max-w-[860px] flex-1 flex-col py-6 sm:py-10">
           {/* Enhanced Premium Logo */}
           <motion.div 
             className="mb-8"
@@ -537,7 +537,7 @@ const Register: React.FC = () => {
                     ease: "easeInOut"
                   }}
                 />
-                <h1 className="relative text-4xl font-bold bg-gradient-to-r from-amber-300 to-amber-500 bg-clip-text text-transparent">
+                <h1 className="relative text-2xl sm:text-4xl font-bold bg-gradient-to-r from-amber-300 to-amber-500 bg-clip-text text-transparent">
                   AM | PM Lounge
                 </h1>
               </div>
@@ -559,7 +559,7 @@ const Register: React.FC = () => {
           
           {/* Enhanced Glass Card Container */}
           <motion.div
-            className="backdrop-blur-2xl bg-slate-900/50 rounded-3xl border border-slate-700/40 shadow-2xl shadow-black/20 ring-1 ring-white/5 overflow-hidden"
+            className="backdrop-blur-2xl bg-slate-900/50 rounded-2xl sm:rounded-3xl border border-slate-700/40 shadow-2xl shadow-black/20 ring-1 ring-white/5 overflow-hidden"
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
@@ -594,7 +594,7 @@ const Register: React.FC = () => {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}
-                  className="p-8"
+                  className="p-5 sm:p-8"
                 >
                   {/* Header with Status */}
                   <div className="mb-6">
