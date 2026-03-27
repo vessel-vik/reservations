@@ -85,9 +85,10 @@ export function DateTimePicker({
       <PopoverTrigger asChild>
         <Button
           variant="ghost"
+          type="button"
           disabled={disabled}
           className={cn(
-            "w-full justify-start text-left font-normal border border-slate-700/50 bg-slate-800/50 hover:bg-slate-700/50 text-white rounded-xl h-11",
+            "w-full justify-start text-left font-normal border border-slate-700/50 bg-slate-800/50 hover:bg-slate-700/50 text-white rounded-xl h-11 min-h-[44px] text-base",
             !date && "text-gray-400",
             className
           )}
@@ -141,10 +142,10 @@ export function DateTimePicker({
                     type="button"
                     onClick={() => handleTimeSelect(timeSlot)}
                     className={cn(
-                      "w-full text-left px-3 py-2 text-sm rounded-md transition-colors",
+                      "w-full text-left px-3 py-2.5 text-base rounded-md transition-colors min-h-[44px] flex items-center",
                       "hover:bg-amber-500/10 hover:text-amber-400",
                       "text-gray-300 bg-transparent",
-                      date && format(date, "h:mm aa") === timeSlot && 
+                      date && format(date, "h:mm aa") === timeSlot &&
                       "bg-amber-500/20 text-amber-400 font-medium"
                     )}
                   >

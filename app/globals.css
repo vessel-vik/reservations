@@ -2,7 +2,55 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ========================================== TAILWIND STYLES */
+/* ==================== iOS & CROSS-DEVICE COMPATIBILITY ==================== */
+
+/* 1. Remove blue tap flash on iOS */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 2. Remove 300ms tap delay on all interactive elements */
+button,
+a,
+input,
+select,
+textarea,
+[role="button"] {
+  touch-action: manipulation;
+}
+
+/* 3. Prevent iOS input zoom — font-size must be >= 16px on mobile.
+      iOS Safari auto-zooms the viewport when an input is focused if font-size < 16px.
+      We override text-sm (14px) to 16px on mobile only, preserving desktop sizing. */
+@media (max-width: 768px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* 4. -webkit-backdrop-filter — Safari requires vendor prefix for blur effects */
+.backdrop-blur-sm   { -webkit-backdrop-filter: blur(4px);   backdrop-filter: blur(4px); }
+.backdrop-blur      { -webkit-backdrop-filter: blur(8px);   backdrop-filter: blur(8px); }
+.backdrop-blur-md   { -webkit-backdrop-filter: blur(12px);  backdrop-filter: blur(12px); }
+.backdrop-blur-lg   { -webkit-backdrop-filter: blur(16px);  backdrop-filter: blur(16px); }
+.backdrop-blur-xl   { -webkit-backdrop-filter: blur(24px);  backdrop-filter: blur(24px); }
+.backdrop-blur-2xl  { -webkit-backdrop-filter: blur(40px);  backdrop-filter: blur(40px); }
+.backdrop-blur-3xl  { -webkit-backdrop-filter: blur(64px);  backdrop-filter: blur(64px); }
+
+/* 5. Safe area insets — support iPhone notch and home indicator */
+.safe-area-padding {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.safe-area-pb {
+  padding-bottom: max(env(safe-area-inset-bottom), 1rem);
+}
+
+/* ==================== TAILWIND STYLES ==================== */
 @layer base {
   /* Remove scrollbar */
   .remove-scrollbar::-webkit-scrollbar {
@@ -199,15 +247,15 @@
   }
 
   .shad-input {
-    @apply bg-slate-800/50 placeholder:text-slate-500 text-white border-slate-700/50 h-11 rounded-xl focus-visible:ring-2 focus-visible:ring-amber-500/30 focus-visible:border-amber-500/40 transition-all duration-200 !important;
+    @apply bg-slate-800/50 placeholder:text-slate-500 text-white border-slate-700/50 h-11 rounded-xl focus-visible:ring-2 focus-visible:ring-amber-500/30 focus-visible:border-amber-500/40 transition-all duration-200 text-base appearance-none !important;
   }
 
   .shad-input-icon {
-    @apply bg-slate-800/50 placeholder:text-slate-500 text-white border-slate-700/50 h-11 rounded-xl focus-visible:ring-2 focus-visible:ring-amber-500/30 focus-visible:border-amber-500/40 transition-all duration-200 !important;
+    @apply bg-slate-800/50 placeholder:text-slate-500 text-white border-slate-700/50 h-11 rounded-xl focus-visible:ring-2 focus-visible:ring-amber-500/30 focus-visible:border-amber-500/40 transition-all duration-200 text-base appearance-none !important;
   }
 
   .shad-textArea {
-    @apply bg-slate-800/50 placeholder:text-slate-500 text-white border-slate-700/50 rounded-xl focus-visible:ring-2 focus-visible:ring-amber-500/30 focus-visible:border-amber-500/40 transition-all duration-200 !important;
+    @apply bg-slate-800/50 placeholder:text-slate-500 text-white border-slate-700/50 rounded-xl focus-visible:ring-2 focus-visible:ring-amber-500/30 focus-visible:border-amber-500/40 transition-all duration-200 text-base !important;
   }
 
   .shad-combobox-item {
@@ -219,7 +267,7 @@
   }
 
   .shad-select-trigger {
-    @apply bg-slate-800/50 placeholder:text-slate-500 text-white border-slate-700/50 h-11 rounded-xl focus:ring-2 focus:ring-amber-500/30 focus:ring-offset-0 transition-all duration-200 !important;
+    @apply bg-slate-800/50 placeholder:text-slate-500 text-white border-slate-700/50 h-11 rounded-xl focus:ring-2 focus:ring-amber-500/30 focus:ring-offset-0 transition-all duration-200 text-base !important;
   }
 
   .shad-select-content {

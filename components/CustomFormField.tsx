@@ -51,6 +51,8 @@ interface CustomProps {
   children?: React.ReactNode;
   renderSkeleton?: (field: any) => React.ReactNode;
   fieldType: FormFieldType;
+  autoComplete?: string;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
 }
 
 const RenderInput = ({ field, props }: { field: any; props: CustomProps }) => {
@@ -101,6 +103,8 @@ const RenderInput = ({ field, props }: { field: any; props: CustomProps }) => {
                 field.onChange(e);
                 setHasValue(!!e.target.value);
               }}
+              autoComplete={props.autoComplete}
+              inputMode={props.inputMode}
               className="shad-input border-0 transition-all duration-200 text-white placeholder:text-gray-400"
             />
           </FormControl>
@@ -162,6 +166,8 @@ const RenderInput = ({ field, props }: { field: any; props: CustomProps }) => {
               onChange={field.onChange}
               onFocus={handleFocus}
               onBlur={handleBlur}
+              autoComplete="tel"
+              inputMode="tel"
               className="input-phone transition-all duration-200"
             />
           </FormControl>

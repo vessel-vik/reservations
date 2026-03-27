@@ -138,6 +138,11 @@ export function EmailVerification({
             </div>
             <Input
               type="email"
+              inputMode="email"
+              autoComplete="email"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               value={email}
               onChange={(e) => handleEmailChange(e.target.value)}
               onBlur={handleEmailBlur}

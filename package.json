@@ -6,6 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "lint": "next lint",
     "purge": "node scripts/purge-database.js",
     "purge-confirm": "echo 'WARNING: This will delete ALL data!' && node scripts/purge-database.js",
@@ -74,6 +76,9 @@
     "zustand": "^5.0.9"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/africastalking": "^0.6.2",
     "@types/node": "^20",
     "@types/qrcode": "^1.5.6",
@@ -81,11 +86,14 @@
     "@types/react-datepicker": "^6.2.0",
     "@types/react-dom": "^18",
     "@types/uuid": "^10.0.0",
+    "@vitejs/plugin-react": "^6.0.1",
     "eslint": "^8",
     "eslint-config-next": "16.0.10",
     "eslint-plugin-import": "^2.29.1",
+    "jsdom": "^29.0.1",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.2"
   }
 }
