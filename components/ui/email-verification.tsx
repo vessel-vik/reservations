@@ -117,7 +117,7 @@ export function EmailVerification({
       case 'error':
         return 'border-red-500'
       default:
-        return 'border-dark-500'
+        return 'border-slate-700/50'
     }
   }
 
@@ -129,7 +129,7 @@ export function EmailVerification({
         </label>
         <div className="relative">
           <div className={cn(
-            "relative flex items-center rounded-md border bg-dark-400 transition-all duration-200",
+            "relative flex items-center rounded-xl border bg-slate-800/50 transition-all duration-200",
             getStatusColor(),
             disabled && "opacity-50"
           )}>

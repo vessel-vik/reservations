@@ -441,61 +441,43 @@ const Register: React.FC = () => {
       data-optimize-connection={optimizeForConnection}
       data-reduced-motion={reducedMotion}
     >
-      {/* Enhanced Animated Background */}
-      <div className="absolute inset-0 overflow-hidden">
-        {/* Dynamic Gradient Orbs */}
-        <motion.div 
-          className="absolute top-20 left-20 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl"
-          animate={{
-            scale: [1, 1.2, 1],
-            opacity: [0.3, 0.6, 0.3],
-          }}
-          transition={{
-            duration: 4,
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
-        />
-        <motion.div 
-          className="absolute bottom-20 right-20 w-96 h-96 bg-amber-600/10 rounded-full blur-3xl"
-          animate={{
-            scale: [1.2, 1, 1.2],
-            opacity: [0.4, 0.7, 0.4],
-          }}
-          transition={{
-            duration: 6,
-            repeat: Infinity,
-            ease: "easeInOut",
-            delay: 1
+      {/* Refined Background Elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {/* Primary ambient glow */}
+        <div className="absolute -top-1/4 -left-1/4 w-[600px] h-[600px] bg-gradient-to-br from-amber-500/8 to-amber-600/4 rounded-full blur-[120px]" />
+        <div className="absolute -bottom-1/4 -right-1/4 w-[500px] h-[500px] bg-gradient-to-tr from-amber-600/6 to-amber-500/3 rounded-full blur-[100px]" />
+
+        {/* Subtle grid overlay */}
+        <div
+          className="absolute inset-0 opacity-[0.02]"
+          style={{
+            backgroundImage: `linear-gradient(rgba(251,191,36,0.1) 1px, transparent 1px),
+                              linear-gradient(90deg, rgba(251,191,36,0.1) 1px, transparent 1px)`,
+            backgroundSize: '60px 60px'
           }}
         />
-        
-        {/* Floating Elements */}
-        <motion.div
-          className="absolute top-1/3 left-1/4 w-2 h-2 bg-amber-400/40 rounded-full"
-          animate={{
-            y: [0, -30, 0],
-            opacity: [0.4, 0.8, 0.4],
-          }}
-          transition={{
-            duration: 3,
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
-        />
-        <motion.div
-          className="absolute top-2/3 right-1/3 w-3 h-3 bg-amber-300/30 rounded-full"
-          animate={{
-            y: [0, -40, 0],
-            opacity: [0.3, 0.7, 0.3],
-          }}
-          transition={{
-            duration: 4,
-            repeat: Infinity,
-            ease: "easeInOut",
-            delay: 2
-          }}
-        />
+
+        {/* Floating orbs - reduced */}
+        {[...Array(4)].map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute w-1 h-1 bg-amber-400/20 rounded-full"
+            style={{
+              left: `${20 + i * 20}%`,
+              top: `${25 + (i % 2) * 30}%`,
+            }}
+            animate={{
+              y: [0, -25, 0],
+              opacity: [0.2, 0.4, 0.2],
+            }}
+            transition={{
+              duration: 5 + i * 0.5,
+              repeat: Infinity,
+              ease: "easeInOut",
+              delay: i * 0.6,
+            }}
+          />
+        ))}
       </div>
       
       {/* Connection Status Indicator */}
@@ -576,11 +558,11 @@ const Register: React.FC = () => {
           </motion.div>
           
           {/* Enhanced Glass Card Container */}
-          <motion.div 
-            className="backdrop-blur-xl bg-white/5 rounded-2xl border border-white/10 shadow-2xl overflow-hidden"
+          <motion.div
+            className="backdrop-blur-2xl bg-slate-900/50 rounded-3xl border border-slate-700/40 shadow-2xl shadow-black/20 ring-1 ring-white/5 overflow-hidden"
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
+            transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
           >
             {/* Loading and Data States */}
             <AnimatePresence mode="wait">
@@ -618,18 +600,18 @@ const Register: React.FC = () => {
                   <div className="mb-6">
                     <div className="flex items-center justify-between mb-4">
                       <div>
-                        <h2 className="text-2xl font-semibold text-white mb-2">Guest Information</h2>
-                        <p className="text-gray-400">Help us personalize your dining experience</p>
+                        <h2 className="text-xl lg:text-2xl font-semibold text-white mb-2 tracking-tight">Guest Information</h2>
+                        <p className="text-slate-400 text-sm">Help us personalize your dining experience</p>
                       </div>
-                      
+
                       {/* Profile Status Indicator */}
                       <motion.div
-                        className="flex items-center gap-2 bg-green-500/10 border border-green-500/20 rounded-full px-4 py-2"
+                        className="flex items-center gap-2 bg-green-500/10 border border-green-500/20 rounded-xl px-4 py-2"
                         initial={{ scale: 0 }}
                         animate={{ scale: 1 }}
                         transition={{ delay: 0.5, type: "spring", stiffness: 200 }}
                       >
-                        <div className="w-2 h-2 bg-green-500 rounded-full" />
+                        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
                         <span className="text-green-400 text-sm font-medium">Profile Ready</span>
                       </motion.div>
                     </div>
@@ -696,42 +678,32 @@ const Register: React.FC = () => {
           </motion.div>
           
           {/* Enhanced Footer */}
-          <motion.p 
-            className="text-center text-gray-500 py-12"
+          <motion.p
+            className="text-center text-slate-500 py-12 text-sm"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.8 }}
           >
-            © 2024 AM | PM Lounge · Premium Dining Experience
+            © 2025 AM | PM Lounge · Premium Dining Experience
           </motion.p>
         </div>
       </section>
       
       {/* Enhanced Side Image */}
-      <motion.div 
+      <motion.div
         className="hidden lg:flex items-center justify-center relative max-w-[500px] p-8"
         initial={{ opacity: 0, x: 50 }}
         animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.8, delay: 0.4 }}
+        transition={{ duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
       >
         <div className="relative">
           {/* Enhanced Glass Card Behind Image */}
-          <motion.div 
-            className="absolute inset-0 backdrop-blur-xl bg-gradient-to-br from-amber-500/10 to-amber-600/10 rounded-3xl border border-amber-500/20"
-            animate={{
-              borderColor: ['rgba(245, 158, 11, 0.2)', 'rgba(245, 158, 11, 0.4)', 'rgba(245, 158, 11, 0.2)'],
-            }}
-            transition={{
-              duration: 3,
-              repeat: Infinity,
-              ease: "easeInOut"
-            }}
-          />
-          
+          <div className="absolute inset-0 backdrop-blur-xl bg-gradient-to-br from-amber-500/5 to-amber-600/5 rounded-3xl border border-slate-700/40" />
+
           {/* Restaurant Image */}
           <div className="relative p-6">
             <motion.div
-              whileHover={{ scale: 1.02 }}
+              whileHover={{ scale: 1.01 }}
               transition={{ type: "spring", stiffness: 300 }}
             >
               <Image
@@ -739,57 +711,65 @@ const Register: React.FC = () => {
                 height={600}
                 width={500}
                 alt="Premium Dining"
-                className="rounded-2xl shadow-2xl"
+                className="rounded-2xl shadow-2xl shadow-black/30"
                 priority
               />
             </motion.div>
-            
+
             {/* Enhanced Overlay Text */}
-            <motion.div 
-              className="absolute bottom-10 left-10 right-10 backdrop-blur-md bg-black/60 rounded-xl p-6"
+            <motion.div
+              className="absolute bottom-10 left-10 right-10 backdrop-blur-xl bg-slate-900/70 rounded-2xl p-6 border border-slate-700/50"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 1 }}
             >
-              <div className="flex items-center gap-2 mb-2">
-                <ChefHat className="w-5 h-5 text-amber-500" />
-                <h3 className="text-white text-xl font-semibold">Exclusive Benefits</h3>
+              <div className="flex items-center gap-2 mb-3">
+                <ChefHat className="w-5 h-5 text-amber-400" />
+                <h3 className="text-white text-lg font-semibold tracking-tight">Exclusive Benefits</h3>
               </div>
-              <ul className="text-gray-300 space-y-2 text-sm">
-                <motion.li 
+              <ul className="text-slate-300 space-y-3 text-sm">
+                <motion.li
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 1.2 }}
+                  className="flex items-center gap-2"
                 >
-                  ✨ Priority Reservations
+                  <Sparkles className="w-4 h-4 text-amber-400" />
+                  <span>Priority Reservations</span>
                 </motion.li>
-                <motion.li 
+                <motion.li
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 1.4 }}
+                  className="flex items-center gap-2"
                 >
-                  🍷 Complimentary Welcome Drink
+                  <Heart className="w-4 h-4 text-amber-400" />
+                  <span>Complimentary Welcome Drink</span>
                 </motion.li>
-                <motion.li 
+                <motion.li
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 1.6 }}
+                  className="flex items-center gap-2"
                 >
-                  🎂 Special Occasion Perks
+                  <ChefHat className="w-4 h-4 text-amber-400" />
+                  <span>Special Occasion Perks</span>
                 </motion.li>
-                <motion.li 
+                <motion.li
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 1.8 }}
+                  className="flex items-center gap-2"
                 >
-                  ⭐ VIP Treatment
+                  <Shield className="w-4 h-4 text-amber-400" />
+                  <span>VIP Treatment</span>
                 </motion.li>
               </ul>
             </motion.div>
           </div>
         </div>
       </motion.div>
-      
+
       {/* Conflict Resolution Dialog */}
       {showConflictDialog && userProfile && (
         <ReservationConflictDialog

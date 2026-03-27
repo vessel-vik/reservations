@@ -321,7 +321,7 @@ export const getUserDetails = async (userId: string) => {
       return {
         name: user.name || 'Guest',
         email: user.email || 'guest@example.com',
-        phone: user.phone || '+254700000000'
+        phone: user.phone || '+254757650125'
       };
     } catch (userError) {
       // If not found in users, try patient collection
@@ -337,7 +337,7 @@ export const getUserDetails = async (userId: string) => {
           return {
             name: patient.name || 'Guest',
             email: patient.email || 'guest@example.com',
-            phone: patient.phone || '+254700000000'
+            phone: patient.phone || '+254757650125'
           };
         }
       } catch (patientError) {
@@ -349,14 +349,14 @@ export const getUserDetails = async (userId: string) => {
     return {
       name: 'Guest',
       email: 'guest@example.com',
-      phone: '+254700000000'
+      phone: '+254757650125'
     };
   } catch (error) {
     console.error('Error fetching user details:', error);
     return {
       name: 'Guest',
       email: 'guest@example.com',
-      phone: '+254700000000'
+      phone: '+254757650125'
     };
   }
 };

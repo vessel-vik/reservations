@@ -105,7 +105,7 @@ const formatEmailData = (reservation, guest) => {
     // Restaurant information
     restaurant_name: 'AM | PM Lounge',
     location: 'Northern Bypass, Thome',
-    phone: '+254 700 123456',
+    phone: '+254 757 650 125',
     email: 'reservations@ampmlounge.co.ke'
   };
 };

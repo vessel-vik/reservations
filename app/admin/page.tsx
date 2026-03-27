@@ -156,7 +156,10 @@ const AdminPage = () => {
   if (isLoading || !currentAnalytics) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center">
-        <div className="text-white text-xl">Loading dashboard...</div>
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-slate-300 text-sm">Loading dashboard...</p>
+        </div>
       </div>
     );
   }
@@ -172,45 +175,46 @@ const AdminPage = () => {
 
       <div className="relative z-10">
         {/* Premium Header */}
-        <header className="backdrop-blur-xl bg-slate-900/60 border-b border-amber-500/20 sticky top-0 z-50">
+        <header className="backdrop-blur-2xl bg-slate-900/70 border-b border-slate-700/50 sticky top-0 z-50">
           <div className="mx-auto flex max-w-[1600px] items-center justify-between px-6 py-4">
             <Link href="/" className="cursor-pointer group">
               <div className="flex items-center gap-4">
-                <div className="size-12 flex items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 shadow-lg shadow-amber-500/20 transition-all group-hover:shadow-amber-500/40">
-                  <span className="text-white font-bold text-xl">AM</span>
+                <div className="size-11 flex items-center justify-center rounded-xl bg-gradient-to-br from-amber-500/20 to-amber-600/20 border border-amber-500/30 transition-all group-hover:border-amber-500/50">
+                  <span className="text-amber-400 font-bold text-lg">AM</span>
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold bg-gradient-to-r from-amber-400 to-amber-600 bg-clip-text text-transparent">
-                    AM | PM Lounge
+                  <h1 className="text-xl font-bold tracking-tight">
+                    <span className="bg-gradient-to-r from-amber-300 via-amber-400 to-amber-500 bg-clip-text text-transparent">AM | PM</span>
+                    <span className="text-white/90 ml-1.5">Lounge</span>
                   </h1>
-                  <p className="text-xs text-slate-400">Restaurant Management System</p>
+                  <p className="text-xs text-slate-500">Restaurant Management</p>
                 </div>
               </div>
             </Link>
 
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-4">
               {/* POS System Access */}
               <Link
                 href="/pos"
-                className="flex items-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-2 hover:bg-amber-500/20 transition-colors group"
+                className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 hover:bg-amber-500/20 hover:border-amber-500/40 transition-all duration-200 group"
               >
-                <ShoppingCart className="size-4 text-amber-400 group-hover:text-amber-300" />
-                <span className="text-sm font-medium text-amber-400 group-hover:text-amber-300">Launch POS</span>
+                <ShoppingCart className="size-4 text-amber-400" />
+                <span className="text-sm font-medium text-amber-400">Launch POS</span>
               </Link>
 
               {/* Live Status Indicator */}
-              <div className="flex items-center gap-2 rounded-lg border border-green-500/20 bg-green-500/10 px-4 py-2">
-                <div className="size-2 animate-pulse rounded-full bg-green-500" />
-                <span className="text-sm font-medium text-green-500">System Online</span>
+              <div className="flex items-center gap-2 rounded-xl border border-green-500/20 bg-green-500/10 px-4 py-2.5">
+                <div className="size-2 animate-pulse rounded-full bg-green-400" />
+                <span className="text-sm font-medium text-green-400">Online</span>
               </div>
 
               <div className="flex items-center gap-4">
                 <div className="text-right">
-                  <p className="text-sm text-slate-400">Restaurant Manager</p>
-                  <LiveDate className="text-xs text-amber-500 font-medium" />
+                  <p className="text-sm text-slate-400">Manager</p>
+                  <LiveDate className="text-xs text-amber-400 font-medium" />
                 </div>
-                <div className="size-12 flex items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-amber-600 shadow-lg">
-                  <ChefHat className="size-6 text-white" />
+                <div className="size-10 flex items-center justify-center rounded-xl bg-slate-800/80 border border-slate-700/50">
+                  <ChefHat className="size-5 text-amber-400" />
                 </div>
               </div>
             </div>
@@ -219,84 +223,85 @@ const AdminPage = () => {
 
         <main className="mx-auto max-w-[1600px] px-6 py-8">
           {/* Navigation Tabs */}
-          <div className="mb-6">
-            <nav className="flex gap-2 border-b border-gray-700 pb-px">
+          <div className="mb-8">
+            <nav className="flex gap-1 p-1 bg-slate-800/50 rounded-xl border border-slate-700/50">
               <button
                 onClick={() => setActiveTab('dashboard')}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
                   activeTab === 'dashboard'
-                    ? 'border-amber-500 text-amber-500'
-                    : 'border-transparent text-gray-400 hover:text-white'
+                    ? 'bg-amber-500 text-slate-900 shadow-lg shadow-amber-500/20'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
                 }`}
                 title="Press 1"
               >
                 <Activity className="w-4 h-4" />
                 Dashboard
-                <span className="text-xs text-gray-500 ml-1">1</span>
+                <span className={`text-xs ml-1 ${activeTab === 'dashboard' ? 'text-slate-700' : 'text-slate-600'}`}>1</span>
               </button>
               <button
                 onClick={() => setActiveTab('sales')}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
                   activeTab === 'sales'
-                    ? 'border-amber-500 text-amber-500'
-                    : 'border-transparent text-gray-400 hover:text-white'
+                    ? 'bg-amber-500 text-slate-900 shadow-lg shadow-amber-500/20'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
                 }`}
                 title="Press 2"
               >
                 <Receipt className="w-4 h-4" />
-                Sales Reports
-                <span className="text-xs text-gray-500 ml-1">2</span>
+                Sales
+                <span className={`text-xs ml-1 ${activeTab === 'sales' ? 'text-slate-700' : 'text-slate-600'}`}>2</span>
               </button>
               <button
                 onClick={() => setActiveTab('accounting')}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
                   activeTab === 'accounting'
-                    ? 'border-amber-500 text-amber-500'
-                    : 'border-transparent text-gray-400 hover:text-white'
+                    ? 'bg-amber-500 text-slate-900 shadow-lg shadow-amber-500/20'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
                 }`}
+                title="Press 3"
               >
                 <DollarSign className="w-4 h-4" />
                 Accounting
-                <span className="text-xs text-gray-500 ml-1">3</span>
+                <span className={`text-xs ml-1 ${activeTab === 'accounting' ? 'text-slate-700' : 'text-slate-600'}`}>3</span>
               </button>
               <button
                 onClick={() => setActiveTab('vat')}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
                   activeTab === 'vat'
-                    ? 'border-amber-500 text-amber-500'
-                    : 'border-transparent text-gray-400 hover:text-white'
+                    ? 'bg-amber-500 text-slate-900 shadow-lg shadow-amber-500/20'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
                 }`}
                 title="Press 4"
               >
                 <Calculator className="w-4 h-4" />
                 VAT
-                <span className="text-xs text-gray-500 ml-1">4</span>
+                <span className={`text-xs ml-1 ${activeTab === 'vat' ? 'text-slate-700' : 'text-slate-600'}`}>4</span>
               </button>
               <button
                 onClick={() => setActiveTab('expenses')}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
                   activeTab === 'expenses'
-                    ? 'border-amber-500 text-amber-500'
-                    : 'border-transparent text-gray-400 hover:text-white'
+                    ? 'bg-amber-500 text-slate-900 shadow-lg shadow-amber-500/20'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
                 }`}
                 title="Press 5"
               >
                 <ShoppingCart className="w-4 h-4" />
                 Expenses
-                <span className="text-xs text-gray-500 ml-1">5</span>
+                <span className={`text-xs ml-1 ${activeTab === 'expenses' ? 'text-slate-700' : 'text-slate-600'}`}>5</span>
               </button>
               <button
                 onClick={() => setActiveTab('import')}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
                   activeTab === 'import'
-                    ? 'border-amber-500 text-amber-500'
-                    : 'border-transparent text-gray-400 hover:text-white'
+                    ? 'bg-amber-500 text-slate-900 shadow-lg shadow-amber-500/20'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
                 }`}
                 title="Press 6"
               >
                 <Upload className="w-4 h-4" />
                 Import
-                <span className="text-xs text-gray-500 ml-1">6</span>
+                <span className={`text-xs ml-1 ${activeTab === 'import' ? 'text-slate-700' : 'text-slate-600'}`}>6</span>
               </button>
             </nav>
           </div>
@@ -307,23 +312,23 @@ const AdminPage = () => {
           <section className="mb-8">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-4xl font-bold text-white mb-2">
+                <h1 className="text-2xl lg:text-3xl font-bold text-white mb-1 tracking-tight">
                   Restaurant Dashboard
                 </h1>
-                <p className="text-slate-400 text-lg">
-                  Monitor your restaurant performance in real-time
+                <p className="text-slate-400 text-sm">
+                  Monitor performance in real-time
                 </p>
               </div>
               <div className="text-right">
-                <div className="backdrop-blur-xl bg-white/5 rounded-2xl border border-white/10 px-6 py-4">
-                  <p className="text-sm text-slate-400 mb-1">Current Time</p>
+                <div className="backdrop-blur-xl bg-slate-800/50 rounded-2xl border border-slate-700/50 px-5 py-3">
+                  <p className="text-xs text-slate-500 mb-1">Current Time</p>
                   <RealTimeClock
                     format="time"
-                    className="text-3xl font-bold text-amber-500 font-mono tracking-tight"
+                    className="text-2xl font-bold text-amber-400 font-mono tracking-tight"
                     updateInterval={500}
                   />
                   <p className="text-xs text-slate-500 mt-1">
-                    {currentAnalytics.todaysReservations} reservations • {currentAnalytics.todaysOrders} orders today
+                    {currentAnalytics.todaysReservations} reservations · {currentAnalytics.todaysOrders} orders
                   </p>
                 </div>
               </div>

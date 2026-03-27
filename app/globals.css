@@ -183,31 +183,31 @@
 
   /* =====  SHADCN OVERRIDES */
   .shad-primary-btn {
-    @apply bg-green-500 text-white !important;
+    @apply bg-amber-500 text-slate-900 font-medium rounded-xl hover:bg-amber-400 transition-all duration-200 shadow-lg shadow-amber-500/20 !important;
   }
 
   .shad-danger-btn {
-    @apply bg-red-700 text-white !important;
+    @apply bg-red-500 text-white font-medium rounded-xl hover:bg-red-600 transition-all duration-200 !important;
   }
 
   .shad-gray-btn {
-    @apply border border-dark-500 cursor-pointer bg-dark-400 text-white !important;
+    @apply border border-slate-700/50 cursor-pointer bg-slate-800/50 text-slate-200 rounded-xl hover:bg-slate-700/50 hover:border-slate-600 transition-all duration-200 !important;
   }
 
   .shad-input-label {
-    @apply text-14-medium text-dark-700 !important;
+    @apply text-14-medium text-slate-300 !important;
   }
 
   .shad-input {
-    @apply bg-dark-400 placeholder:text-gray-400 text-white border-dark-500 h-11 focus-visible:ring-0 focus-visible:ring-offset-0 !important;
+    @apply bg-slate-800/50 placeholder:text-slate-500 text-white border-slate-700/50 h-11 rounded-xl focus-visible:ring-2 focus-visible:ring-amber-500/30 focus-visible:border-amber-500/40 transition-all duration-200 !important;
   }
 
   .shad-input-icon {
-    @apply bg-dark-400 placeholder:text-gray-400 text-white border-dark-500 h-11 focus-visible:ring-0 focus-visible:ring-offset-0 !important;
+    @apply bg-slate-800/50 placeholder:text-slate-500 text-white border-slate-700/50 h-11 rounded-xl focus-visible:ring-2 focus-visible:ring-amber-500/30 focus-visible:border-amber-500/40 transition-all duration-200 !important;
   }
 
   .shad-textArea {
-    @apply bg-dark-400 placeholder:text-gray-400 text-white border-dark-500 focus-visible:ring-0 focus-visible:ring-offset-0 !important;
+    @apply bg-slate-800/50 placeholder:text-slate-500 text-white border-slate-700/50 rounded-xl focus-visible:ring-2 focus-visible:ring-amber-500/30 focus-visible:border-amber-500/40 transition-all duration-200 !important;
   }
 
   .shad-combobox-item {
@@ -219,15 +219,15 @@
   }
 
   .shad-select-trigger {
-    @apply bg-dark-400  placeholder:text-gray-400 text-white border-dark-500 h-11 focus:ring-0 focus:ring-offset-0 !important;
+    @apply bg-slate-800/50 placeholder:text-slate-500 text-white border-slate-700/50 h-11 rounded-xl focus:ring-2 focus:ring-amber-500/30 focus:ring-offset-0 transition-all duration-200 !important;
   }
 
   .shad-select-content {
-    @apply bg-dark-400 border-dark-500 text-white !important;
+    @apply bg-slate-800 border-slate-700/50 text-white rounded-xl shadow-xl !important;
   }
 
   .shad-dialog {
-    @apply bg-dark-400 border-dark-500 !important;
+    @apply bg-slate-900 border-slate-700/50 rounded-2xl shadow-2xl !important;
   }
 
   .shad-dialog button {
@@ -235,19 +235,19 @@
   }
 
   .shad-error {
-    @apply text-red-400 !important;
+    @apply text-red-400 text-sm !important;
   }
 
   .shad-table {
-    @apply rounded-lg overflow-hidden !important;
+    @apply rounded-xl overflow-hidden border-slate-700/40 !important;
   }
 
   .shad-table-row-header {
-    @apply border-b border-dark-400 text-light-200 hover:bg-transparent !important;
+    @apply border-b border-slate-700/40 text-slate-300 hover:bg-transparent !important;
   }
 
   .shad-table-row {
-    @apply border-b border-dark-400 text-light-200 !important;
+    @apply border-b border-slate-700/40 text-slate-200 hover:bg-slate-800/30 transition-colors !important;
   }
 
   .shad-otp {
@@ -255,11 +255,11 @@
   }
 
   .shad-otp-slot {
-    @apply text-36-bold justify-center flex border border-dark-500 rounded-lg size-16 gap-4 !important;
+    @apply text-36-bold justify-center flex border border-slate-700/50 bg-slate-800/50 rounded-xl size-16 gap-4 text-white focus-within:ring-2 focus-within:ring-amber-500/30 focus-within:border-amber-500/40 transition-all duration-200 !important;
   }
 
   .shad-alert-dialog {
-    @apply space-y-5 bg-dark-400 border-dark-500 outline-none !important;
+    @apply space-y-5 bg-slate-900 border-slate-700/50 rounded-2xl outline-none shadow-2xl !important;
   }
 
   .shad-sheet-content button {
@@ -268,12 +268,12 @@
 
   /* =====  REACT PHONE NUMBER INPUT OVERRIDES */
   .input-phone {
-    @apply mt-2 h-11 rounded-md px-3 text-sm border bg-dark-400 placeholder:text-gray-400 text-white border-dark-500 !important;
+    @apply mt-2 h-11 rounded-xl px-4 text-sm border bg-slate-800/50 placeholder:text-slate-500 text-white border-slate-700/50 focus-within:ring-2 focus-within:ring-amber-500/30 focus-within:border-amber-500/40 transition-all duration-200 !important;
   }
 
   /* =====  REACT DATE PICKER OVERRIDES */
   .date-picker {
-    @apply overflow-hidden border-transparent w-full placeholder:text-gray-400 text-white h-11 text-14-medium rounded-md px-3 outline-none !important;
+    @apply overflow-hidden border-transparent w-full placeholder:text-slate-500 text-white h-11 text-14-medium rounded-xl px-4 outline-none !important;
   }
 }
 
@@ -290,9 +290,19 @@
 .react-datepicker__day-name,
 .react-datepicker__day,
 .react-datepicker-time__header {
-  background-color: #1a1d21 !important;
-  border-color: #363a3d !important;
-  color: #abb8c4 !important;
+  background-color: rgb(15 23 42) !important;
+  border-color: rgb(51 65 85 / 0.5) !important;
+  color: rgb(148 163 184) !important;
+}
+
+.react-datepicker {
+  border-radius: 12px !important;
+  overflow: hidden !important;
+  box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.5) !important;
+}
+
+.react-datepicker__header {
+  border-bottom: 1px solid rgb(51 65 85 / 0.5) !important;
 }
 
 .react-datepicker__current-month,
@@ -302,38 +312,42 @@
 }
 
 .react-datepicker__triangle {
-  fill: #1a1d21 !important;
-  color: #1a1d21 !important;
-  stroke: #1a1d21 !important;
+  fill: rgb(15 23 42) !important;
+  color: rgb(15 23 42) !important;
+  stroke: rgb(15 23 42) !important;
 }
 
 .react-datepicker__time-list-item:hover {
-  background-color: #363a3d !important;
+  background-color: rgb(51 65 85 / 0.5) !important;
 }
 
 .react-datepicker__input-container input {
-  background-color: #1a1d21 !important;
+  background-color: transparent !important;
   width: 100%;
   outline: none;
 }
 
 .react-datepicker__day--selected {
   background-color: rgb(245 158 11) !important;
-  color: #ffffff !important;
-  border-radius: 4px;
+  color: rgb(15 23 42) !important;
+  border-radius: 8px;
+  font-weight: 600;
 }
 
 .react-datepicker__day:hover {
-  background-color: rgb(245 158 11 / 0.2) !important;
+  background-color: rgb(245 158 11 / 0.15) !important;
   color: rgb(251 191 36) !important;
+  border-radius: 8px;
 }
 
 .react-datepicker__time-list-item--selected {
   background-color: rgb(245 158 11) !important;
+  color: rgb(15 23 42) !important;
+  font-weight: 600;
 }
 
 .react-datepicker__time-container {
-  border-left: 1px solid #363a3d !important;
+  border-left: 1px solid rgb(51 65 85 / 0.5) !important;
 }
 
 .react-datepicker__time-list-item {
@@ -341,16 +355,56 @@
   align-items: center !important;
 }
 
+.react-datepicker__navigation {
+  top: 12px !important;
+}
+
 /* =====  REACT PHONE NUMBER INPUT OVERRIDES */
 .PhoneInputInput {
   outline: none;
   margin-left: 4px;
-  background: #1a1d21;
+  background: transparent;
   font-size: 14px;
   font-weight: 500;
   color: white !important;
 }
 
 .PhoneInputInput::placeholder {
-  color: rgb(156 163 175) !important;
+  color: rgb(100 116 139) !important;
+}
+
+.PhoneInputCountryIcon {
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+/* =====  ELEGANT SCROLLBAR */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgb(15 23 42);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgb(51 65 85);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(71 85 105);
+}
+
+/* =====  SELECTION HIGHLIGHT */
+::selection {
+  background-color: rgb(245 158 11 / 0.3);
+  color: white;
+}
+
+/* =====  FOCUS VISIBLE UTILITIES */
+*:focus-visible {
+  outline: 2px solid rgb(245 158 11 / 0.5);
+  outline-offset: 2px;
 }

@@ -98,8 +98,8 @@ export default function GlobalError({
                 className="text-gray-500 text-sm mt-12"
               >
                 Need help? Contact us at{" "}
-                <a href="tel:+254700116190" className="text-amber-400 hover:text-amber-300">
-                  +254 700-116-190
+                <a href="tel:+254757650125" className="text-amber-400 hover:text-amber-300">
+                  +254 757 650 125
                 </a>
               </motion.p>
             </motion.div>

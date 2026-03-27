@@ -87,7 +87,7 @@ export function DateTimePicker({
           variant="ghost"
           disabled={disabled}
           className={cn(
-            "w-full justify-start text-left font-normal border border-dark-500 bg-dark-400 hover:bg-dark-300 text-white rounded-md h-11",
+            "w-full justify-start text-left font-normal border border-slate-700/50 bg-slate-800/50 hover:bg-slate-700/50 text-white rounded-xl h-11",
             !date && "text-gray-400",
             className
           )}
@@ -105,14 +105,14 @@ export function DateTimePicker({
         </Button>
       </PopoverTrigger>
       <PopoverContent 
-        className="w-auto p-0 bg-dark-400 border-dark-500" 
+        className="w-auto p-0 bg-slate-900 border-slate-700/50"
         align="start"
         side="bottom"
         sideOffset={5}
       >
         <div className="flex">
           {/* Calendar Section */}
-          <div className="p-3 border-r border-dark-500">
+          <div className="p-3 border-r border-slate-700/50">
             <Calendar
               mode="single"
               selected={date}

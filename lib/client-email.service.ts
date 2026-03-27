@@ -58,7 +58,7 @@ export const sendConfirmationEmail = async (emailData: EmailData): Promise<boole
       restaurant_name: emailData.restaurant_name || 'AM | PM Lounge',
       restaurant_tagline: emailData.restaurant_tagline || 'Premium Restaurant & Bar Experience',
       booking_id: emailData.booking_id || 'BOOK-' + Math.random().toString(36).substr(2, 6).toUpperCase(),
-      phone: emailData.phone || '+254 700-116-100',
+      phone: emailData.phone || '+254 757 650 125',
       email_contact: emailData.email_contact || 'reservations@ampmlounge.com',
       dress_code: emailData.dress_code || 'Smart Casual',
       parking: emailData.parking || 'Complimentary Valet Parking Available',

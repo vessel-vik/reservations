@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Mail, Send, CheckCircle, AlertCircle } from "lucide-react";
+import { Mail, Send, CheckCircle, AlertCircle, Utensils, PartyPopper, Gift, Wine } from "lucide-react";
 import emailjs from "@emailjs/browser";
 
 export const NewsletterSection = () => {
@@ -80,25 +80,25 @@ AM | PM Lounge Team`,
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6 }}
-      className="w-full max-w-2xl mx-auto"
+      transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
+      className="w-full max-w-[580px] mx-auto"
     >
-      <div className="relative backdrop-blur-xl bg-gradient-to-br from-amber-500/10 via-amber-600/5 to-transparent rounded-3xl border border-amber-500/20 p-8 shadow-2xl overflow-hidden">
-        {/* Decorative Elements */}
-        <div className="absolute top-0 right-0 w-40 h-40 bg-amber-500/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 left-0 w-32 h-32 bg-amber-600/10 rounded-full blur-2xl" />
-        
+      <div className="relative backdrop-blur-2xl bg-slate-900/50 rounded-3xl border border-slate-700/40 p-6 lg:p-8 shadow-2xl shadow-black/20 ring-1 ring-white/5 overflow-hidden">
+        {/* Subtle Background Elements */}
+        <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-24 h-24 bg-amber-600/5 rounded-full blur-2xl pointer-events-none" />
+
         <div className="relative z-10">
           {/* Header */}
           <div className="text-center mb-6">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-amber-500 to-amber-600 rounded-full mb-4 shadow-lg shadow-amber-500/30">
-              <Mail className="w-8 h-8 text-white" />
+            <div className="inline-flex items-center justify-center w-12 h-12 bg-gradient-to-br from-amber-500/20 to-amber-600/20 border border-amber-500/30 rounded-2xl mb-4">
+              <Mail className="w-5 h-5 text-amber-400" />
             </div>
-            <h3 className="text-2xl font-bold text-white mb-2">
-              Stay Updated with AM | PM Lounge
+            <h3 className="text-xl font-semibold text-white mb-2 tracking-tight">
+              Stay in the Loop
             </h3>
-            <p className="text-gray-400 text-sm max-w-md mx-auto">
-              Join our exclusive newsletter for special offers, new menu announcements, and VIP event invitations
+            <p className="text-slate-400 text-sm max-w-sm mx-auto leading-relaxed">
+              Get exclusive offers, menu updates, and VIP invitations
             </p>
           </div>
 
@@ -109,16 +109,16 @@ AM | PM Lounge Team`,
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email address"
+                placeholder="Enter your email"
                 disabled={isLoading}
                 className={`
-                  w-full px-6 py-4 pr-32 
-                  bg-white/5 backdrop-blur-sm
-                  border ${status === "error" ? "border-red-500/50" : "border-white/10"}
-                  rounded-2xl
-                  text-white placeholder-gray-500
-                  focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50
-                  transition-all duration-300
+                  w-full px-5 py-3.5 pr-28
+                  bg-slate-800/50
+                  border ${status === "error" ? "border-red-500/40" : "border-slate-600/50"}
+                  rounded-xl
+                  text-white text-sm placeholder-slate-500
+                  focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500/40
+                  transition-all duration-200
                   disabled:opacity-50 disabled:cursor-not-allowed
                 `}
               />
@@ -126,28 +126,27 @@ AM | PM Lounge Team`,
                 type="submit"
                 disabled={isLoading}
                 className={`
-                  absolute right-2 top-1/2 -translate-y-1/2
-                  px-6 py-2.5
-                  bg-gradient-to-r from-amber-500 to-amber-600
-                  text-white font-semibold
-                  rounded-xl
+                  absolute right-1.5 top-1/2 -translate-y-1/2
+                  px-4 py-2
+                  bg-amber-500 hover:bg-amber-400
+                  text-slate-900 font-medium text-sm
+                  rounded-lg
                   flex items-center gap-2
-                  hover:from-amber-600 hover:to-amber-700
-                  focus:outline-none focus:ring-2 focus:ring-amber-500/50
-                  transition-all duration-300
+                  focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:ring-offset-2 focus:ring-offset-slate-900
+                  transition-all duration-200
                   disabled:opacity-50 disabled:cursor-not-allowed
-                  ${isLoading ? "animate-pulse" : ""}
+                  cursor-pointer
                 `}
               >
                 {isLoading ? (
                   <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span className="hidden sm:inline">Subscribing...</span>
+                    <div className="w-4 h-4 border-2 border-slate-900/30 border-t-slate-900 rounded-full animate-spin" />
+                    <span className="hidden sm:inline">Joining...</span>
                   </>
                 ) : (
                   <>
-                    <Send className="w-4 h-4" />
-                    <span className="hidden sm:inline">Subscribe</span>
+                    <Send className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Join</span>
                   </>
                 )}
               </button>
@@ -159,17 +158,17 @@ AM | PM Lounge Team`,
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 className={`
-                  flex items-center gap-3 p-4 rounded-xl
-                  ${status === "success" 
-                    ? "bg-green-500/10 border border-green-500/20 text-green-400" 
+                  flex items-center gap-3 p-3 rounded-xl
+                  ${status === "success"
+                    ? "bg-green-500/10 border border-green-500/20 text-green-400"
                     : "bg-red-500/10 border border-red-500/20 text-red-400"
                   }
                 `}
               >
                 {status === "success" ? (
-                  <CheckCircle className="w-5 h-5 flex-shrink-0" />
+                  <CheckCircle className="w-4 h-4 flex-shrink-0" />
                 ) : (
-                  <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
                 )}
                 <p className="text-sm">{message}</p>
               </motion.div>
@@ -177,29 +176,31 @@ AM | PM Lounge Team`,
           </form>
 
           {/* Features */}
-          <div className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="mt-6 grid grid-cols-4 gap-2">
             {[
-              { icon: "🍽️", label: "Exclusive Menus" },
-              { icon: "🎉", label: "VIP Events" },
-              { icon: "🎁", label: "Special Offers" },
-              { icon: "🍷", label: "Wine Club" },
+              { icon: Utensils, label: "Menus" },
+              { icon: PartyPopper, label: "Events" },
+              { icon: Gift, label: "Offers" },
+              { icon: Wine, label: "Wine Club" },
             ].map((feature, index) => (
               <motion.div
                 key={feature.label}
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.1 * index }}
-                className="text-center"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 * index, duration: 0.3 }}
+                className="text-center group"
               >
-                <div className="text-2xl mb-1">{feature.icon}</div>
-                <p className="text-xs text-gray-400">{feature.label}</p>
+                <div className="w-10 h-10 mx-auto mb-1.5 rounded-xl bg-slate-800/60 border border-slate-700/50 flex items-center justify-center group-hover:bg-amber-500/10 group-hover:border-amber-500/30 transition-all duration-200">
+                  <feature.icon className="w-4 h-4 text-slate-400 group-hover:text-amber-400 transition-colors" />
+                </div>
+                <p className="text-xs text-slate-500">{feature.label}</p>
               </motion.div>
             ))}
           </div>
 
           {/* Privacy Note */}
-          <p className="text-xs text-gray-500 text-center mt-6">
-            We respect your privacy. Unsubscribe at any time.
+          <p className="text-xs text-slate-600 text-center mt-5">
+            Unsubscribe anytime. We respect your privacy.
           </p>
         </div>
       </div>

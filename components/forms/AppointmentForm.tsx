@@ -143,7 +143,7 @@ export const AppointmentForm = ({
             // Enhanced template data
             restaurant_name: 'AM | PM Lounge',
             booking_id: newAppointment.$id.slice(-8).toUpperCase(),
-            phone: '+254 700-116-100',
+            phone: '+254 757 650 125',
             email_contact: 'reservations@ampmlounge.com'
           };
 

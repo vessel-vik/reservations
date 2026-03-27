@@ -16,13 +16,13 @@ console.log('API_KEY:', process.env.API_KEY ? 'Present' : 'Missing');
 const testUserData = {
   name: "Test User",
   email: "test@example.com",
-  phone: "+254700000000"
+  phone: "+254757650125"
 };
 
 const testGuestData = {
   name: "Test User",
   email: "test@example.com", 
-  phone: "+254700000000",
+  phone: "+254757650125",
   birthDate: new Date(),
   favoriteTable: "Window Seating",
   dietaryPreferences: "Vegetarian"

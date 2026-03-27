@@ -22,7 +22,7 @@ console.log('\n2. 📝 TEST FORM SUBMISSION:');
 console.log('   Fill out the "Start Your Reservation" form:');
 console.log('   - Name: "Test User"');
 console.log('   - Email: "test@example.com"');
-console.log('   - Phone: "+254700000001"');
+console.log('   - Phone: "+254757650125"');
 console.log('   Click "Start Your Reservation" button');
 
 console.log('\n3. 👀 EXPECTED DEBUG LOGS (should now appear):');

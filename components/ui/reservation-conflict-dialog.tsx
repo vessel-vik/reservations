@@ -135,10 +135,10 @@ const ReservationConflictDialog: React.FC<ReservationConflictDialogProps> = ({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.9, y: 20 }}
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
-          className="bg-dark-400 border border-dark-500 rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto"
+          className="backdrop-blur-2xl bg-slate-900/90 border border-slate-700/50 rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto"
         >
           {/* Header */}
-          <div className="p-6 border-b border-dark-500">
+          <div className="p-6 border-b border-slate-700/50">
             <motion.div 
               className="flex items-center gap-4"
               initial={{ opacity: 0, x: -20 }}
@@ -159,7 +159,7 @@ const ReservationConflictDialog: React.FC<ReservationConflictDialogProps> = ({
 
           {/* User Info */}
           <motion.div 
-            className="p-6 border-b border-dark-500"
+            className="p-6 border-b border-slate-700/50"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
@@ -191,7 +191,7 @@ const ReservationConflictDialog: React.FC<ReservationConflictDialogProps> = ({
           {/* Conflict Details */}
           {userProfile.conflictDetails && (
             <motion.div 
-              className="p-6 border-b border-dark-500 bg-amber-500/5"
+              className="p-6 border-b border-slate-700/50 bg-amber-500/5"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
@@ -224,7 +224,7 @@ const ReservationConflictDialog: React.FC<ReservationConflictDialogProps> = ({
                   className={`w-full p-4 rounded-xl border transition-all duration-200 text-left ${
                     option.primary
                       ? 'bg-amber-500/10 border-amber-500/30 hover:border-amber-500/50'
-                      : 'bg-dark-500/30 border-dark-500 hover:border-dark-400'
+                      : 'bg-slate-800/30 border-slate-700/50 hover:border-slate-600'
                   }`}
                 >
                   <div className="flex items-center gap-3">

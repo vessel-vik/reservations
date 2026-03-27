@@ -265,7 +265,7 @@ export async function runETIMSTestSuite(): Promise<{
     invoiceDate: new Date().toISOString(),
     customerTin: 'A0000000000', // Test TIN
     customerName: 'Test Customer',
-    customerMobile: '+254700000000',
+    customerMobile: '+254757650125',
     subtotal: 1000,
     totalTax: 160,
     totalAmount: 1160,

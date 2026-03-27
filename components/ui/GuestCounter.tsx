@@ -38,12 +38,12 @@ export const GuestCounter = ({
                     {label}
                 </label>
             )}
-            <div className="flex items-center gap-4 bg-dark-400 border border-dark-500 p-2 rounded-xl">
+            <div className="flex items-center gap-4 bg-slate-800/50 border border-slate-700/50 p-2 rounded-xl">
                 <button
                     type="button"
                     onClick={handleDecrement}
                     disabled={value <= min}
-                    className="p-3 hover:bg-dark-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 bg-dark-300/50"
+                    className="p-3 hover:bg-slate-700/50 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 bg-slate-700/30"
                     aria-label="Decrease guests"
                 >
                     <Minus className="w-5 h-5 text-gray-200" />
@@ -62,7 +62,7 @@ export const GuestCounter = ({
                     type="button"
                     onClick={handleIncrement}
                     disabled={value >= max}
-                    className="p-3 hover:bg-dark-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 bg-dark-300/50"
+                    className="p-3 hover:bg-slate-700/50 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 bg-slate-700/30"
                     aria-label="Increase guests"
                 >
                     <Plus className="w-5 h-5 text-gray-200" />

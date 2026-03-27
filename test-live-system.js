@@ -25,7 +25,7 @@ console.log('\n2. 📝 TEST INITIAL FORM:');
 console.log('   Fill out:');
 console.log('   - Name: "John Doe"');
 console.log('   - Email: "john@example.com"');
-console.log('   - Phone: "+254700000001"');
+console.log('   - Phone: "+254757650125"');
 console.log('   Click "Start Your Reservation"');
 
 console.log('\n3. 👀 WATCH FOR DEBUG LOGS:');

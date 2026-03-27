@@ -7,7 +7,7 @@
 const testUserInput = {
   name: "John Doe",
   email: "john.doe@example.com", 
-  phone: "+254700123456",
+  phone: "+254757650125",
   birthDate: new Date("1990-05-15"),
   dietaryPreferences: "Vegetarian",
   favoriteTable: "Window"

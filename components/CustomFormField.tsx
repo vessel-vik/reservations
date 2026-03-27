@@ -67,7 +67,7 @@ const RenderInput = ({ field, props }: { field: any; props: CustomProps }) => {
     case FormFieldType.INPUT:
       return (
         <motion.div
-          className="flex rounded-md border border-dark-500 bg-dark-400 relative overflow-hidden"
+          className="flex rounded-xl border border-slate-700/50 bg-slate-800/50 relative overflow-hidden"
           whileTap={{ scale: 0.995 }}
           animate={{
             borderColor: isFocused ? "rgb(251 191 36)" : "rgb(64 64 64)",
@@ -208,7 +208,7 @@ const RenderInput = ({ field, props }: { field: any; props: CustomProps }) => {
     case FormFieldType.DATE_PICKER:
       return (
         <motion.div
-          className="flex rounded-md border border-dark-500 bg-dark-400 relative overflow-hidden"
+          className="flex rounded-xl border border-slate-700/50 bg-slate-800/50 relative overflow-hidden"
           whileTap={{ scale: 0.995 }}
           animate={{
             borderColor: isFocused ? "rgb(251 191 36)" : "rgb(64 64 64)",

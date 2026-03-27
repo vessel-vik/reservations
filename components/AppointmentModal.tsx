@@ -97,7 +97,7 @@ export const AppointmentModal = ({
         restaurant_name: 'AM | PM Lounge',
         restaurant_tagline: 'Premium Restaurant & Bar Experience',
         booking_id: appointment.$id.slice(-8).toUpperCase(),
-        phone: '+254 700-116-100',
+        phone: '+254 757 650 125',
         email_contact: 'reservations@ampmlounge.com',
         dress_code: 'Smart Casual',
         parking: 'Complimentary Valet Parking Available',

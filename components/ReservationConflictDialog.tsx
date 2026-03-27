@@ -101,7 +101,7 @@ export function ReservationConflictDialog({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.9, y: 20 }}
           transition={{ type: "spring", stiffness: 300, damping: 20 }}
-          className="bg-dark-400 border border-dark-500 rounded-2xl shadow-2xl max-w-md w-full p-6 text-white"
+          className="backdrop-blur-2xl bg-slate-900/90 border border-slate-700/50 rounded-2xl shadow-2xl max-w-md w-full p-6 text-white"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center gap-4 mb-6">
@@ -194,7 +194,7 @@ export function ReservationConflictDialog({
                   variant="ghost"
                   onClick={handleCancel}
                   disabled={loading}
-                  className="flex-1 bg-dark-500 hover:bg-dark-400 text-gray-300 hover:text-white border border-dark-400"
+                  className="flex-1 bg-slate-800/50 hover:bg-slate-700/50 text-gray-300 hover:text-white border border-slate-700/50"
                 >
                   <X className="w-4 h-4 mr-2" />
                   {dialogContent.cancelText}

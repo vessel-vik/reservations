@@ -129,7 +129,7 @@ export default function ReceiptPage({ params }: { params: Promise<{ orderId: str
                     <h2 className="text-lg font-semibold">LOUNGE</h2>
                     <p className="text-gray-600 text-xs">Northern Bypass, Thome</p>
                     <p className="text-gray-600 text-xs">After Windsor, Nairobi</p>
-                    <p className="text-gray-600 text-xs">Tel: +254 702-333-182</p>
+                    <p className="text-gray-600 text-xs">Tel: +254 757 650 125</p>
                     <p className="text-gray-600 text-xs">info@ampm.co.ke</p>
                 </div>
 

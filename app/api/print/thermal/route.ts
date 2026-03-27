@@ -110,7 +110,7 @@ function generateESCPOSReceipt(order: Order): number[] {
     // Address
     commands.push(...encode('Northern Bypass, Thome\n'));
     commands.push(...encode('After Windsor, Nairobi\n'));
-    commands.push(...encode('Tel: +254 702-333-182\n'));
+    commands.push(...encode('Tel: +254 757 650 125\n'));
     commands.push(...encode('info@ampm.co.ke\n'));
 
     // Separator
