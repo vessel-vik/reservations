@@ -25,6 +25,54 @@ The admin panel has no dedicated product management UI. Menu items can only be b
 
 ---
 
+## TypeScript Types Required
+
+The following new types must be added to `types/pos.types.ts` before any component in `components/admin/menu/` will compile. The existing `Product` type is **not** extended — `MenuItem` is a separate admin-layer type that includes CMS-only fields.
+
+```typescript
+// types/pos.types.ts — add alongside existing types
+
+export interface MenuItem {
+  $id: string
+  name: string
+  price: number
+  stock: number
+  lowStockThreshold: number  // default 5
+  isAvailable: boolean
+  category: string           // category $id
+  imageUrl?: string
+  vatCategory: 'standard' | 'zero-rated' | 'exempt'
+  description?: string
+  preparationTime?: number   // minutes; 0 if not set
+  isVegetarian: boolean
+  isVegan: boolean
+  isGlutenFree: boolean
+  ingredients: string[]
+  allergens: string[]
+  modifierGroupIds: string[]
+  $createdAt: string
+  $updatedAt: string
+}
+
+export interface ModifierGroup {
+  $id: string
+  name: string
+  isRequired: boolean
+  maxSelections: number
+  defaultOptionIndex: number  // -1 = no default; index into options array (required groups only)
+  options: string[]           // serialised as "name:priceAdjustment"
+  createdAt: string
+}
+```
+
+**Note on `isActive` vs `isAvailable` (confirmed discrepancy):** `pos.actions.ts:48` queries `Query.equal("isActive", true)` on `MENU_ITEMS_COLLECTION_ID`, but the `Product` TypeScript interface (line 24) uses `isAvailable`. Note that `isActive` is the correct field name for `Category` documents (line 224). The MENU_ITEMS Appwrite attribute name must be verified at implementation time:
+- If the Appwrite attribute is `isActive` → the `Product` type has a wrong field name; rename to `isActive` (or alias both)
+- If the Appwrite attribute is `isAvailable` → `pos.actions.ts:48` query is wrong and returns all items without filtering
+
+Step 14 (stock decrement) must resolve this before writing the PATCH call that sets availability. Do not proceed with `PATCH { isAvailable }` without confirming the correct Appwrite attribute name.
+
+---
+
 ## Required Environment Variables
 
 ```
@@ -55,27 +103,31 @@ The product list is a live, editable table. **Stock counts, prices, and availabi
 
 ```
 MenuCMS.tsx
-  State: activeSection ('items' | 'categories' | 'modifiers')
+  State: activeSection ('items' | 'categories' | 'modifiers'), searchTerm (string), selectedCategoryId (string | null), filterToLowStock (boolean), items (MenuItem[]), categories (Category[]), modifierGroups (ModifierGroup[]), loading (boolean), error (string | null)
   Fetches on mount: GET /api/menu/items, GET /api/menu/categories, GET /api/menu/modifiers
   Passes data to all child sections
 
   LowStockAlertStrip.tsx
-    Props: items: MenuItem[]
+    Props: items: MenuItem[], onFilterToLowStock: () => void
     Renders: pinned banner listing items where stock ≤ lowStockThreshold
-    Hidden when no items are low. "Jump to items" filters table to low-stock rows only.
+    Hidden when no items are low.
+    "Jump to items" calls onFilterToLowStock() — MenuCMS sets activeSection='items' and filterToLowStock=true, which MenuItemsSection uses to filter rows to stock ≤ lowStockThreshold
 
   MenuSectionNav.tsx
-    Props: activeSection, onSectionChange, onAddItem, onImportCSV
+    Props: activeSection, searchTerm, selectedCategoryId, onSectionChange, onSearchChange, onCategoryFilterChange, onAddItem, onImportCSV
     Renders: Items | Categories | Modifiers segmented control + search input + category filter + Add Item + Import CSV buttons
-    Emits: onSectionChange(section), onAddItem(), onImportCSV()
+    Emits: onSectionChange(section), onSearchChange(term), onCategoryFilterChange(id | null), onAddItem(), onImportCSV()
+    Note: search and category filter are controlled — state lives in MenuCMS and is passed down
 
   [Items section]
   MenuItemsSection.tsx
-    Props: items, categories, loading, onEdit(item), onDelete(id), onRefresh()
-    Renders: sortable, searchable table of MenuItemRow components
+    Props: items, categories, loading, searchTerm, selectedCategoryId, filterToLowStock, onEdit(item), onDelete(id), onRefresh()
+    Note: items passed in are the full unfiltered list from MenuCMS; component applies searchTerm/category/filterToLowStock client-side
+    Renders: sortable, filtered table of MenuItemRow components
 
     MenuItemRow.tsx
       Props: item, categories, onEdit(item), onDelete(id), onFieldSaved()
+      Note: onFieldSaved() calls onRefresh() on the parent — MenuItemRow fires onFieldSaved() after any inline PATCH succeeds, which propagates to MenuCMS.refresh() to reload the full items list (ensures isAvailable state stays in sync after stock→0 side effect)
       Renders: image thumbnail, name+category, inline price, inline stock, availability toggle, VAT badge, Edit/Delete actions
 
       InlineStockInput.tsx
@@ -107,6 +159,7 @@ MenuCMS.tsx
       Props: currentUrl, onFileStaged(file), onUrlSet(url), onRemoved()
       Renders: image thumbnail (if currentUrl), drag-drop zone, URL paste input
       Upload fires on form submit (not immediately on file selection)
+      URL paste flow: onUrlSet(url) sets formData.imageUrl directly in MenuItemDrawer (no upload needed). stagedImageFile remains null. On submit, step 2 is skipped and the pasted URL is included in the POST/PATCH body directly.
 
     TagInput.tsx
       Props: tags: string[], onChange(tags), placeholder
@@ -144,15 +197,19 @@ MenuCMS.tsx
     ModifierGroupDrawer.tsx
       Props: open, group (null = create, ModifierGroup = edit), onClose, onSaved
       Fields: name, isRequired (toggle), maxSelections (number), options list
-      Each option: name (string) + priceAdjustment (number ≥ 0), default flag (radio for required groups)
+      Each option: name (string) + priceAdjustment (number ≥ 0)
+      Default flag: radio button shown only when isRequired=true; selecting it sets defaultOptionIndex to that option's array index. When isRequired=false the default flag row is hidden and defaultOptionIndex is saved as -1.
+      Colon constraint: form validates option names for `:` character — shows inline error "Option name may not contain a colon" if detected, blocks submit.
       Serialises options as "name:priceAdjustment" strings for Appwrite storage
 ```
 
 ### Modified Files
 
 - `app/admin/page.tsx` — replace Import tab (4) with Menu & Stock tab; keyboard shortcut 4 now opens MenuCMS
-- `lib/actions/pos.actions.ts` — `createOrder()` decrements stock for each cart item after order is saved
-- `lib/actions/menu.actions.ts` — extend with `createMenuItem`, `updateMenuItem`, `deleteMenuItem`, `getMenuItemById`
+- `lib/actions/pos.actions.ts` — `createOrder()` decrements stock for each cart item after order is saved; audit `isActive` vs `isAvailable` query
+- `lib/actions/menu.actions.ts` — extend with `createMenuItem`, `updateMenuItem`, `deleteMenuItem`, `getMenuItemById` (these call Appwrite directly, same pattern as existing actions)
+- `lib/actions/modifier.actions.ts` — **new file** with `createModifierGroup`, `updateModifierGroup`, `deleteModifierGroup`, `getModifierGroups`, `getModifierGroupById`
+- `types/pos.types.ts` — add `MenuItem` and `ModifierGroup` interfaces (see TypeScript Types section above)
 
 ---
 
@@ -236,6 +293,7 @@ Accepts `multipart/form-data` with a `file` field. Uploads to `MENU_IMAGES_BUCKE
 ### `GET /api/menu/categories`
 
 **Success (200):** `{ "categories": Category[] }` sorted by `index` ascending.
+**Error:** `500 { "error": "Failed to fetch categories" }`
 
 ---
 
@@ -243,11 +301,14 @@ Accepts `multipart/form-data` with a `file` field. Uploads to `MENU_IMAGES_BUCKE
 
 Body: `{ name, label, slug, icon, index, isActive }`.
 
+Route queries for existing slug before creating. Returns 409 on duplicate.
+
 **Success (201):** `{ "category": Category }`
 
 **Error responses:**
 - `400 { "error": "name is required" }`
-- `400 { "error": "slug is required and must be unique" }`
+- `400 { "error": "slug is required" }`
+- `409 { "error": "A category with this slug already exists" }`
 - `500 { "error": "Failed to create category" }`
 
 ---
@@ -257,7 +318,12 @@ Body: `{ name, label, slug, icon, index, isActive }`.
 Partial update. Used for: inline name/icon edit, isActive toggle, drag-reorder (index).
 
 **Success (200):** `{ "category": Category }`
-**Error:** `404 { "error": "Category not found" }` | `500 { "error": "Failed to update category" }`
+
+**Error responses:**
+- `400 { "error": "name cannot be empty" }` — if `name` field is present and blank
+- `400 { "error": "index must be a non-negative integer" }` — if `index` field is present and invalid
+- `404 { "error": "Category not found" }`
+- `500 { "error": "Failed to update category" }`
 
 ---
 
@@ -277,6 +343,7 @@ Blocked if category has items — returns `409` instead of deleting.
 ### `GET /api/menu/modifiers`
 
 **Success (200):** `{ "groups": ModifierGroup[] }`
+**Error:** `500 { "error": "Failed to fetch modifier groups" }`
 
 ---
 
@@ -297,14 +364,26 @@ Body: `{ name, isRequired, maxSelections, options: string[] }` where each option
 ### `PATCH /api/menu/modifiers/[id]`
 
 **Success (200):** `{ "group": ModifierGroup }`
-**Error:** `404 { "error": "Modifier group not found" }` | `500 { "error": "Failed to update modifier group" }`
+
+**Error responses:**
+- `400 { "error": "name cannot be empty" }` — if `name` field is present and blank
+- `400 { "error": "options must have at least one entry" }` — if `options` field is present and empty
+- `400 { "error": "invalid option format — expected 'name:price'" }` — if any option string is malformed
+- `404 { "error": "Modifier group not found" }`
+- `500 { "error": "Failed to update modifier group" }`
 
 ---
 
 ### `DELETE /api/menu/modifiers/[id]`
 
+Blocked if any menu item references this group in `modifierGroupIds` — returns `409` instead of deleting.
+
 **Success (200):** `{ "success": true }`
-**Error:** `404 { "error": "Modifier group not found" }` | `500 { "error": "Failed to delete modifier group" }`
+
+**Error responses:**
+- `409 { "error": "Cannot delete modifier group — it is attached to N item(s). Remove it from all items first." }`
+- `404 { "error": "Modifier group not found" }`
+- `500 { "error": "Failed to delete modifier group" }`
 
 ---
 
@@ -327,6 +406,7 @@ All other fields (`name`, `price`, `imageUrl`, `isAvailable`, `category`, `vatCa
 | `name` | string | yes | — | e.g. "Sauce Choice" |
 | `isRequired` | boolean | yes | false | customer must pick if true |
 | `maxSelections` | integer | yes | 1 | max options selectable |
+| `defaultOptionIndex` | integer | yes | -1 | -1 = no default; valid index only when isRequired=true |
 | `options` | string[] | yes | — | serialised as `"name:priceAdjustment"` |
 | `createdAt` | string (ISO) | yes | — | |
 
@@ -377,34 +457,52 @@ function isOutOfStock(stock: number): boolean
 | `modifierGroupIds` | optional, string[] |
 | `imageUrl` | optional, set after upload or URL paste |
 
-### Submit Flow
+### Submit Flow — Edit Mode (`item != null`)
 
 1. Zod validation — show inline errors, abort if failing.
-2. If `stagedImageFile` present: `POST /api/menu/items/[id]/image` → receive `imageUrl`. If upload fails: toast error, keep drawer open, abort.
-3. `POST /api/menu/items` (create) or `PATCH /api/menu/items/[id]` (edit) with full payload.
-4. On `200/201`: toast "Item saved" → `onSaved()` → `onClose()` → parent refetches list.
+2. If `stagedImageFile` present: `POST /api/menu/items/[id]/image` → receive `imageUrl`. Set `formData.imageUrl = imageUrl`. If upload fails: toast error, keep drawer open, abort.
+3. `PATCH /api/menu/items/[id]` with full payload (includes `imageUrl` from step 2 if uploaded).
+4. On `200`: toast "Item saved" → `onSaved()` → `onClose()` → parent refetches list.
 5. On `4xx/5xx`: toast error → keep drawer open.
+
+### Submit Flow — Create Mode (`item == null`)
+
+1. Zod validation — show inline errors, abort if failing.
+2. `POST /api/menu/items` with full payload **excluding** `imageUrl` (image is uploaded after creation). On `4xx/5xx`: toast error, keep drawer open, abort.
+3. If `stagedImageFile` present: `POST /api/menu/items/[newId]/image` using the `$id` returned in step 2 → receive `imageUrl`. Then `PATCH /api/menu/items/[newId] { imageUrl }`. If either call fails: toast warning "Item saved but image upload failed" — item is still created, drawer closes.
+4. On success: toast "Item saved" → `onSaved()` → `onClose()` → parent refetches list.
 
 ---
 
 ## Stock Auto-Decrement — `pos.actions.ts` Change
 
-After `createOrder()` successfully saves the order document, it fires a `Promise.allSettled` of PATCH calls — one per unique item in the cart:
+After `createOrder()` successfully saves the order document, it fires a `Promise.allSettled` of PATCH calls — one per unique item in the cart.
+
+**Stock source:** Immediately before firing the PATCHes, `createOrder()` reads the live stock for each unique item via `getMenuItemById(itemId)` (Appwrite `getDocument`). This avoids stale-cart race conditions. If `getMenuItemById` fails for an item, that item's stock decrement is skipped and logged — the order is not affected.
 
 ```
-PATCH /api/menu/items/[itemId] { stock: currentStock - orderedQuantity }
+PATCH /api/menu/items/[itemId] { stock: max(0, liveStock - orderedQuantity) }
 ```
 
 - `Promise.allSettled` is used (not `Promise.all`) — a failed stock update does not roll back the order.
-- Stock is not decremented below 0. If `currentStock - quantity < 0`, the value is clamped to 0.
+- Stock is clamped to 0: `Math.max(0, liveStock - quantity)` — never goes negative.
 - The server-side PATCH route handles the `isAvailable = false` side-effect when `stock === 0`.
 - Failed decrements are logged: `console.error('[Stock decrement failed]', itemId, error)`.
+- Step 14 must also audit the existing `Query.equal("isActive", true)` in `pos.actions.ts` and correct to `isAvailable` if the field name differs.
 
 ---
 
 ## Category Display Order
 
-Drag-and-drop reorder in `CategoriesSection` uses the HTML Drag and Drop API (no external library). On drag-end, the new order is computed and a `PATCH /api/menu/categories/[id] { index: newIndex }` is fired for every category whose index changed. The POS product grid respects this order (already sorts by `index` in `getCategories()`).
+Drag-and-drop reorder in `CategoriesSection` uses the HTML Drag and Drop API (no external library).
+
+On drag-end:
+1. Compute new order locally — apply it to the rendered list immediately (optimistic update).
+2. Fire `Promise.allSettled` of `PATCH /api/menu/categories/[id] { index: newIndex }` for every category whose index changed.
+3. If **any** PATCH fails: revert the entire list to the pre-drag order, show a toast "Reorder failed — please try again", call `onRefresh()` to reload from server.
+4. If all succeed: no further action (optimistic order stands).
+
+The POS product grid respects this order (already sorts by `index` in `getCategories()`).
 
 ---
 
@@ -491,16 +589,34 @@ All tests written RED before implementation begins.
 ✗ shows error toast and keeps open when image upload fails
 ```
 
+### `__tests__/menu/inline-price-input.test.tsx`
+
+```
+✗ renders current price value
+✗ clicking field enters edit mode
+✗ pressing Enter triggers PATCH /api/menu/items/[id] with new price
+✗ pressing Escape cancels without saving (reverts value)
+✗ blur triggers save
+✗ rejects price of 0 — shows inline error, does not save
+✗ rejects negative price — shows inline error, does not save
+✗ shows saving spinner while request is in flight
+✗ disables input while saving
+✗ reverts to original value on API error
+```
+
 ### `__tests__/menu/stock-decrement.test.ts`
 
 ```
+✗ createOrder fetches live stock before decrementing (not using stale cart value)
 ✗ createOrder decrements stock by ordered quantity for single item
 ✗ createOrder decrements stock for multiple items independently
 ✗ createOrder clamps stock to 0 (never negative)
-✗ createOrder sets isAvailable=false when stock reaches 0
 ✗ order document is still created when stock decrement PATCH fails
+✗ order document is still created when live stock fetch fails for one item
 ✗ stock is not decremented when order creation itself fails
 ```
+
+Note: "createOrder sets isAvailable=false when stock reaches 0" is tested in `api-menu-items.test.ts` — the PATCH route handles that side-effect server-side; `createOrder()` only sends the PATCH, it does not itself set `isAvailable`.
 
 ### `__tests__/menu/api-menu-items.test.ts`
 
@@ -531,10 +647,13 @@ All tests written RED before implementation begins.
 ✗ POST returns 400 when name is missing
 ✗ POST returns 400 when options array is empty
 ✗ POST returns 400 for invalid option format (missing colon)
+✗ POST saves defaultOptionIndex=-1 for non-required group
 ✗ PATCH updates modifier group name
+✗ PATCH returns 400 when options array is patched empty
 ✗ PATCH returns 404 for unknown groupId
 ✗ DELETE returns 200 on success
 ✗ DELETE returns 404 for unknown groupId
+✗ DELETE returns 409 when modifier group is referenced by at least one menu item
 ```
 
 ---
