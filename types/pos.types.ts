@@ -30,6 +30,9 @@ export interface Product {
   isGlutenFree: boolean;
   calories?: number;
   popularity: number;
+  // Stock tracking (undefined = untracked — no badge shown)
+  stock?: number;
+  lowStockThreshold?: number;  // defaults to 5 when absent from Appwrite doc
   // VAT categorization for Kenya compliance
   vatCategory?: VatCategory;  // Per-item VAT classification
   vatRate?: number;           // Override default 16% if needed
@@ -103,6 +106,7 @@ export interface Expense {
   invoiceDate: string;
   paymentStatus: 'pending' | 'paid' | 'cancelled';
   paymentDate?: string;
+  receiptUrl?: string | null;
   // VAT categorization
   vatCategory: 'standard' | 'zero-rated' | 'exempt';
   vatRate: number;  // VAT rate on the expense
