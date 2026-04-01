@@ -16,7 +16,7 @@ interface Props {
 
 export function BudgetManager({ open, comparisons, onClose, onSaved }: Props) {
   const [limits, setLimits] = useState<Record<string, number>>(
-    Object.fromEntries(comparisons.map((c) => [c.category, c.monthlyLimit]))
+    Object.fromEntries(comparisons.map((c) => [c.category, c.limit]))
   );
   const [saving, setSaving] = useState(false);
 
@@ -60,7 +60,7 @@ export function BudgetManager({ open, comparisons, onClose, onSaved }: Props) {
             <div key={c.category} className="space-y-2">
               <Label className="text-slate-300 capitalize flex justify-between">
                 <span>{c.category.replace('_', ' ')}</span>
-                <span className="text-slate-500 font-normal">Actual: KSh {c.actualSpent.toLocaleString()}</span>
+                <span className="text-slate-500 font-normal">Actual: KSh {c.actual.toLocaleString()}</span>
               </Label>
               <Input
                 type="number"
@@ -69,6 +69,32 @@ export function BudgetManager({ open, comparisons, onClose, onSaved }: Props) {
                 onChange={(e) => handleChange(c.category, e.target.value)}
                 className="bg-slate-800 border-slate-700 text-slate-100"
               />
+              {(() => {
+                const barColor = c.status === 'over' ? 'bg-red-400'
+                  : c.status === 'warn' ? 'bg-amber-400'
+                  : 'bg-emerald-400'
+                const textColor = c.status === 'over' ? 'text-red-400'
+                  : c.status === 'warn' ? 'text-amber-400'
+                  : c.limit === 0 ? 'text-slate-500'
+                  : 'text-emerald-400'
+                const label = c.limit === 0 ? 'no budget set'
+                  : c.status === 'over' ? 'over budget ⚠'
+                  : c.status === 'warn' ? 'near limit'
+                  : 'on track'
+                return (
+                  <div className="mt-1">
+                    <div className="h-1.5 w-full rounded bg-slate-700">
+                      <div
+                        className={`h-1.5 rounded transition-all ${barColor}`}
+                        style={{ width: `${Math.min(c.percentage, 100)}%` }}
+                      />
+                    </div>
+                    <p className={`text-xs mt-0.5 ${textColor}`}>
+                      {label} · spent KSh {c.actual.toLocaleString()}
+                    </p>
+                  </div>
+                )
+              })()}
             </div>
           ))}
         </div>
