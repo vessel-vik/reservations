@@ -24,13 +24,13 @@ export const CartSidebar = ({ cart, onUpdateQuantity, onRemove, onCheckout, onAd
     return (
         <div className="flex h-full flex-col bg-neutral-900 border-l border-white/10 w-[400px]">
             {/* Header */}
-            <div className="p-6 border-b border-white/10">
-                <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                    Current Order
-                    <span className="bg-emerald-500/20 text-emerald-400 text-xs px-2 py-1 rounded-full border border-emerald-500/20">
-                        {cart.length} items
+            <div className="px-6 py-5 border-b border-white/10 bg-gradient-to-r from-neutral-900 to-neutral-800/50">
+                <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-bold text-white">Current Order</h2>
+                    <span className="bg-emerald-500/20 text-emerald-400 text-xs font-bold px-2.5 py-1 rounded-full border border-emerald-500/20 tabular-nums">
+                        {cart.reduce((s, i) => s + i.quantity, 0)} items
                     </span>
-                </h2>
+                </div>
             </div>
 
             {/* Cart Items - Scrollable area */}
@@ -46,38 +46,50 @@ export const CartSidebar = ({ cart, onUpdateQuantity, onRemove, onCheckout, onAd
                     cart.map((item, index) => (
                         <div
                             key={item.$id}
-                            className="group relative flex gap-3 bg-white/5 hover:bg-white/10 rounded-xl p-3 border border-transparent hover:border-white/10 transition-all cart-item-enter"
+                            className="group relative flex gap-3 bg-white/5 hover:bg-white/8 rounded-xl p-3 border border-transparent hover:border-white/10 transition-all cart-item-enter"
                             style={{ animationDelay: `${index * 0.05}s` }}
                         >
-                            {/* Quantity Controls */}
-                            <div className="flex flex-col items-center justify-between bg-black/20 rounded-lg w-8 py-1">
-                                <button
-                                    onClick={() => onUpdateQuantity(item.$id, 1)}
-                                    className="p-1 hover:text-emerald-400 transition-colors"
-                                >
-                                    <Plus size={14} />
-                                </button>
-                                <span className="text-sm font-bold">{item.quantity}</span>
-                                <button
-                                    onClick={() => onUpdateQuantity(item.$id, -1)}
-                                    className="p-1 hover:text-rose-400 transition-colors"
-                                >
-                                    <Minus size={14} />
-                                </button>
-                            </div>
+                            {/* Thumbnail */}
+                            {item.imageUrl ? (
+                                <img
+                                    src={item.imageUrl}
+                                    alt={item.name}
+                                    className="w-10 h-10 rounded-lg object-cover shrink-0 mt-0.5"
+                                />
+                            ) : (
+                                <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center shrink-0 mt-0.5 text-base">
+                                    🍽️
+                                </div>
+                            )}
 
                             {/* Item Details */}
-                            <div className="flex-1 min-w-0 py-1">
-                                <div className="flex justify-between items-start">
-                                    <h4 className="font-medium text-neutral-200 truncate pr-2">
+                            <div className="flex-1 min-w-0 py-0.5">
+                                <div className="flex justify-between items-start gap-2">
+                                    <h4 className="font-medium text-neutral-200 truncate text-sm">
                                         {item.name}
                                     </h4>
-                                    <span className="font-bold text-emerald-400 whitespace-nowrap">
+                                    <span className="font-bold text-emerald-400 whitespace-nowrap text-sm">
                                         {formatCurrency(item.price * item.quantity)}
                                     </span>
                                 </div>
-                                <div className="text-xs text-neutral-500 mt-1">
-                                    {formatCurrency(item.price)} each
+                                <div className="flex items-center gap-3 mt-1.5">
+                                    {/* Quantity Controls */}
+                                    <div className="flex items-center gap-1 bg-black/30 rounded-lg px-1 py-0.5">
+                                        <button
+                                            onClick={() => onUpdateQuantity(item.$id, -1)}
+                                            className="p-1 hover:text-rose-400 transition-colors text-neutral-400"
+                                        >
+                                            <Minus size={12} />
+                                        </button>
+                                        <span className="text-xs font-bold text-white w-4 text-center">{item.quantity}</span>
+                                        <button
+                                            onClick={() => onUpdateQuantity(item.$id, 1)}
+                                            className="p-1 hover:text-emerald-400 transition-colors text-neutral-400"
+                                        >
+                                            <Plus size={12} />
+                                        </button>
+                                    </div>
+                                    <span className="text-xs text-neutral-500">{formatCurrency(item.price)} each</span>
                                 </div>
                             </div>
 
@@ -86,7 +98,7 @@ export const CartSidebar = ({ cart, onUpdateQuantity, onRemove, onCheckout, onAd
                                 onClick={() => onRemove(item.$id)}
                                 className="opacity-0 group-hover:opacity-100 absolute -right-2 -top-2 bg-rose-500 text-white p-1.5 rounded-full shadow-lg hover:bg-rose-600 transition-all scale-75 group-hover:scale-100"
                             >
-                                <Trash2 size={14} />
+                                <Trash2 size={12} />
                             </button>
                         </div>
                     ))

@@ -122,7 +122,7 @@ export const ProductCard = ({ product, onAdd, onView, priority = false }: Produc
                 )}
             </div>
 
-            {/* Content - Mobile optimized text */}
+            {/* Content */}
             <div className="p-3 md:p-4 space-y-2">
                 <h3 className="font-bold text-white text-sm md:text-base line-clamp-2 min-h-[2.5rem] md:min-h-[3rem]">
                     {product.name}
@@ -130,11 +130,35 @@ export const ProductCard = ({ product, onAdd, onView, priority = false }: Produc
                 <p className="text-xs md:text-sm text-neutral-400 line-clamp-2 min-h-[2rem] md:min-h-[2.5rem]">
                     {product.description}
                 </p>
-                <div className="flex items-center justify-between pt-2">
+                <div className="flex items-center justify-between pt-1">
                     <span className="text-lg md:text-xl font-bold text-emerald-400">
                         {formatCurrency(product.price)}
                     </span>
+                    {product.preparationTime > 0 && (
+                        <span className="text-[10px] text-neutral-500 bg-neutral-800 px-2 py-0.5 rounded-full border border-white/5">
+                            ⏱ {product.preparationTime}m
+                        </span>
+                    )}
                 </div>
+                {(product.isVegan || product.isVegetarian || product.isGlutenFree) && (
+                    <div className="flex gap-1 flex-wrap">
+                        {product.isVegan && (
+                            <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
+                                VEGAN
+                            </span>
+                        )}
+                        {product.isVegetarian && !product.isVegan && (
+                            <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-green-500/15 text-green-400 border border-green-500/20">
+                                VEG
+                            </span>
+                        )}
+                        {product.isGlutenFree && (
+                            <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-yellow-500/15 text-yellow-400 border border-yellow-500/20">
+                                GF
+                            </span>
+                        )}
+                    </div>
+                )}
             </div>
         </div>
     );

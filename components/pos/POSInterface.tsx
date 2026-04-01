@@ -417,15 +417,16 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
                 </div>
 
                 {/* Desktop Category Tabs */}
-                <div className="hidden md:block category-tabs">
+                <div className="hidden md:flex gap-1 px-4 md:px-8 py-3 overflow-x-auto scrollbar-hide border-b border-white/5 bg-neutral-900/50">
                     {displayCategories.map(category => (
                         <button
                             key={category.slug}
                             onClick={() => handleCategoryChange(category.slug)}
-                            className={`category-tab ${selectedCategory === category.slug
-                                ? 'category-tab-active'
-                                : 'category-tab-inactive'
-                                }`}
+                            className={`shrink-0 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-150 ${
+                                selectedCategory === category.slug
+                                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                    : 'text-neutral-400 hover:text-white hover:bg-white/5'
+                            }`}
                         >
                             {category.label}
                         </button>
@@ -454,10 +455,13 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
                 {/* Products Grid - Optimized responsive layout */}
                 <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6 pb-24 md:pb-6 scrollbar-hide">
                     {visibleProducts.length === 0 ? (
-                        <div className="flex items-center justify-center h-full text-neutral-500">
-                            <div className="text-center space-y-4">
-                                <div className="text-6xl opacity-50">🍽️</div>
-                                <p className="text-lg">No products available in this category</p>
+                        <div className="flex items-center justify-center h-full">
+                            <div className="text-center space-y-3 max-w-xs">
+                                <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mx-auto text-3xl">
+                                    🍽️
+                                </div>
+                                <p className="text-neutral-400 font-medium">No items available</p>
+                                <p className="text-neutral-600 text-sm">Try a different category or search term</p>
                             </div>
                         </div>
                     ) : (
