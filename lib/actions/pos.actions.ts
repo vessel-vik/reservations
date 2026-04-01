@@ -45,7 +45,7 @@ export const getMenuItems = async () => {
             DATABASE_ID,
             MENU_ITEMS_COLLECTION_ID,
             [
-                Query.equal("isActive", true),
+                Query.equal("isAvailable", true),
                 Query.limit(100), // Get enough items
                 Query.orderDesc("popularity")
             ]
