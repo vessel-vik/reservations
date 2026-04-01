@@ -157,20 +157,24 @@ export default function ReceiptPage({ params }: { params: Promise<{ orderId: str
                 <div className="mb-6 border-b border-dashed border-gray-300 pb-4">
                     <table className="w-full">
                         <thead>
-                            <tr className="text-left border-b border-gray-300">
-                                <th className="pb-2 w-12">Qty</th>
+                            <tr className="text-left border-b-2 border-gray-800 text-[10px] uppercase tracking-tighter">
+                                <th className="pb-2 w-8">Qty</th>
                                 <th className="pb-2">Item</th>
-                                <th className="pb-2 text-right">Unit Price</th>
-                                <th className="pb-2 text-right">Total</th>
+                                <th className="pb-2 text-right w-20">Price</th>
+                                <th className="pb-2 text-right w-20">Total</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
                             {order.items.map((item, i) => (
-                                <tr key={i}>
-                                    <td className="py-2 pr-2">{item.quantity} x </td>
-                                    <td className="py-2 pr-2">{item.name}</td>
-                                    <td className="py-2 text-right whitespace-nowrap">{formatCurrency(item.price)}</td>
-                                    <td className="py-2 text-right whitespace-nowrap">{formatCurrency(item.price * item.quantity)}</td>
+                                <tr key={i} className="border-b border-gray-50 last:border-0 text-xs">
+                                    <td className="py-3 pr-1 text-gray-500">{item.quantity}x</td>
+                                    <td className="py-3 pr-2 font-medium">{item.name}</td>
+                                    <td className="py-3 text-right tabular-nums">
+                                        {(item.price).toLocaleString('en-KE', { minimumFractionDigits: 2 })}
+                                    </td>
+                                    <td className="py-3 text-right font-semibold tabular-nums">
+                                        {(item.price * item.quantity).toLocaleString('en-KE', { minimumFractionDigits: 2 })}
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>
@@ -181,7 +185,7 @@ export default function ReceiptPage({ params }: { params: Promise<{ orderId: str
                 <div className="space-y-2 mb-6 border-b border-dashed border-gray-300 pb-6">
                     <div className="flex justify-between text-sm">
                         <span>Subtotal</span>
-                        <span>{formatCurrency(order.subtotal)}</span>
+                        <span>{formatCurrency(order.totalAmount)}</span>
                     </div>
                     <div className="text-xs text-gray-500 italic text-center">
                         *Prices include VAT

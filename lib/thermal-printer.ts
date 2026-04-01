@@ -10,7 +10,13 @@ export interface PrinterConfig {
     ipAddress?: string;
     port?: number;
     deviceName?: string;
+    // New persistent calibration settings
+    terminalName?: string;
+    lineWidth?: number; // Default 32, max 48
+    characterSet?: string; // e.g. 'PC437'
 }
+
+const STORAGE_KEY = 'ampm_pos_printer_config';
 
 export interface DetectedDevice {
     vendorId: number;
@@ -25,6 +31,29 @@ export class ThermalPrinterClient {
 
     constructor(config: PrinterConfig) {
         this.config = config;
+    }
+
+    /**
+     * Save printer configuration to local storage
+     */
+    static saveConfig(config: PrinterConfig): void {
+        if (typeof window === 'undefined') return;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+    }
+
+    /**
+     * Load printer configuration from local storage
+     */
+    static loadConfig(): PrinterConfig | null {
+        if (typeof window === 'undefined') return null;
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (!saved) return null;
+        try {
+            return JSON.parse(saved);
+        } catch (e) {
+            console.error('Failed to parse saved printer config:', e);
+            return null;
+        }
     }
 
     /**
@@ -48,6 +77,53 @@ export class ThermalPrinterClient {
         } catch (error) {
             console.error('USB enumeration failed:', error);
             throw error;
+        }
+    }
+
+    /**
+     * Attempt to find a previously authorized printer
+     * or a standard POS printer currently connected.
+     */
+    static async autoDetect(): Promise<DetectedDevice | null> {
+        try {
+            if (typeof navigator === 'undefined' || !('usb' in navigator)) return null;
+            const devices = await (navigator as any).usb.getDevices();
+            if (devices.length === 0) return null;
+
+            // 1. Look for a device that matches our known common printers
+            const knownVIDs = Object.values(COMMON_PRINTERS)
+                .map((p: any) => p.vendorId)
+                .filter(Boolean);
+            const commonDevice = devices.find((d: any) => 
+                knownVIDs.includes(d.vendorId) || 
+                d.productName?.toLowerCase().includes('printer') ||
+                d.productName?.toLowerCase().includes('epos') ||
+                d.productName?.toLowerCase().includes('tm-')
+            );
+
+            if (commonDevice) {
+                return {
+                    vendorId: commonDevice.vendorId,
+                    productId: commonDevice.productId,
+                    productName: commonDevice.productName,
+                    manufacturerName: commonDevice.manufacturerName
+                };
+            }
+
+            // 2. Return the first available device if only one is present
+            if (devices.length === 1) {
+                return {
+                    vendorId: devices[0].vendorId,
+                    productId: devices[0].productId,
+                    productName: devices[0].productName,
+                    manufacturerName: devices[0].manufacturerName
+                };
+            }
+
+            return null;
+        } catch (error) {
+            console.error('Auto-detect failed:', error);
+            return null;
         }
     }
 
@@ -94,7 +170,10 @@ export class ThermalPrinterClient {
                 },
                 body: JSON.stringify({
                     orderId,
-                    printerType: this.config.type
+                    printerType: this.config.type,
+                    terminalName: this.config.terminalName,
+                    lineWidth: this.config.lineWidth || 32,
+                    characterSet: this.config.characterSet
                 })
             });
 
@@ -210,8 +289,8 @@ export class ThermalPrinterClient {
 
             type EndpointInfo = { interfaceNumber: number; alternate: number; endpointNumber: number };
             const candidate: EndpointInfo | null = config.interfaces
-                .flatMap((iface) => iface.alternates.map((alt) => ({ iface, alt })))
-                .flatMap(({ iface, alt }) =>
+                .flatMap((iface: any) => iface.alternates.map((alt: any) => ({ iface, alt })))
+                .flatMap(({ iface, alt }: any) =>
                     (alt.endpoints || [])
                         .filter((ep: any) => ep.direction === 'out')
                         .map((ep: any) => ({
@@ -220,7 +299,7 @@ export class ThermalPrinterClient {
                             endpointNumber: ep.endpointNumber
                         }))
                 )
-                .sort((a, b) => a.endpointNumber - b.endpointNumber)[0] || null;
+                .sort((a: any, b: any) => a.endpointNumber - b.endpointNumber)[0] || null;
 
             if (!candidate) {
                 throw new Error('No OUT endpoint found on the selected USB interface. Ensure this is an ESC/POS-compatible printer.');
@@ -363,7 +442,15 @@ export const COMMON_PRINTERS = {
         type: 'usb' as const,
         vendorId: 0x0471,
         productId: 0x0055,
-        deviceName: 'E-POS TEP-220MC'
+        deviceName: 'E-POS TEP-220MC',
+        lineWidth: 42
+    },
+    // Xprinter / Generic Chinese POS
+    XPRINTER: {
+        type: 'usb' as const,
+        vendorId: 0x1fc9,
+        productId: 0x2016,
+        deviceName: 'Xprinter'
     },
     // Generic ESC/POS printer
     GENERIC: {

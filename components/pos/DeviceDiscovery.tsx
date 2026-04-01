@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Search, Usb, AlertCircle, CheckCircle, RefreshCw } from "lucide-react";
+import { Search, Usb, AlertCircle, CheckCircle, RefreshCw, Terminal, Copy } from "lucide-react";
 import { ThermalPrinterClient, DetectedDevice } from "@/lib/thermal-printer";
 
 interface DeviceDiscoveryProps {
@@ -14,6 +14,17 @@ export function DeviceDiscovery({ onDeviceSelected }: DeviceDiscoveryProps) {
     const [selectedDevice, setSelectedDevice] = useState<DetectedDevice | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [webUSBSupported, setWebUSBSupported] = useState<boolean | null>(null);
+    const [copied, setCopied] = useState(false);
+
+    const isLinux = typeof window !== 'undefined' && (
+        window.navigator.platform.toLowerCase().includes('linux') || 
+        window.navigator.userAgent.toLowerCase().includes('linux')
+    );
+
+    const isWindows = typeof window !== 'undefined' && (
+        window.navigator.platform.toLowerCase().includes('win') ||
+        window.navigator.userAgent.toLowerCase().includes('windows')
+    );
 
     const checkWebUSBSupport = () => {
         const support = ThermalPrinterClient.checkWebUSBSupport();
@@ -182,6 +193,47 @@ export function DeviceDiscovery({ onDeviceSelected }: DeviceDiscoveryProps) {
                         <li>Note down the Vendor ID and Product ID shown</li>
                         <li>Use these IDs to configure your printer in the main setup</li>
                     </ol>
+                </div>
+            )}
+
+            {/* OS Specific Troubleshooting */}
+            {(error?.toLowerCase().includes('access denied') || error?.toLowerCase().includes('forbidden') || devices.length > 0) && (
+                <div className="space-y-3">
+                    {isWindows && (
+                        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                            <h4 className="font-semibold text-orange-800 mb-2 flex items-center gap-2">
+                                <AlertCircle className="w-4 h-4" /> 
+                                Windows 10/11 Users:
+                            </h4>
+                            <p className="text-sm text-orange-700 mb-3">
+                                If you see "Access Denied", you must replace the default driver with **WinUSB** using Zadig:
+                            </p>
+                            <ol className="text-xs text-orange-700 space-y-2 list-decimal list-inside">
+                                <li>Download <a href="https://zadig.akeo.ie/" target="_blank" rel="noopener noreferrer" className="underline font-bold">Zadig</a></li>
+                                <li>In Zadig, go to <strong>Options</strong> &gt; <strong>List All Devices</strong></li>
+                                <li>Select your printer from the list</li>
+                                <li>Ensure <strong>WinUSB</strong> is selected on the right</li>
+                                <li>Click <strong>Replace Driver</strong></li>
+                            </ol>
+                        </div>
+                    )}
+
+                    {isLinux && (
+                        <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+                            <h4 className="font-semibold text-emerald-800 mb-2 flex items-center gap-2">
+                                <Terminal className="w-4 h-4" /> 
+                                Linux Permission Fix:
+                            </h4>
+                            <p className="text-sm text-emerald-700 mb-3">
+                                Run this command to grant the browser permission to access the printer:
+                            </p>
+                            <div className="relative group">
+                                <pre className="p-3 bg-gray-900 text-gray-100 rounded-lg text-[10px] font-mono overflow-x-auto whitespace-pre-wrap break-all">
+                                    {`echo 'SUBSYSTEM=="usb", ATTR{idVendor}=="${selectedDevice ? formatHex(selectedDevice.vendorId).replace('0x', '') : '0471'}", ATTR{idProduct}=="${selectedDevice ? formatHex(selectedDevice.productId).replace('0x', '') : '0055'}", MODE="0666", GROUP="plugdev", RUN+="/bin/sh -c \\"echo -n %k > /sys/bus/usb/drivers/usblp/unbind\\""' | sudo tee /etc/udev/rules.d/99-printer.rules && sudo udevadm control --reload-rules && sudo udevadm trigger`}
+                                </pre>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 

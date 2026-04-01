@@ -50,6 +50,7 @@ export async function createExpense(data: {
   vatCategory?: 'standard' | 'zero-rated' | 'exempt';
   invoiceNumber: string;
   invoiceDate: string;
+  receiptUrl?: string | null;
 }): Promise<{ success: boolean; expense?: Expense; error?: string }> {
   try {
     if (!DATABASE_ID || !EXPENSES_COLLECTION_ID) {
@@ -73,6 +74,7 @@ export async function createExpense(data: {
       paymentStatus: 'pending',
       vatCategory,
       vatRate,
+      receiptUrl: data.receiptUrl || null,
     };
 
     const result = await databases.createDocument(
@@ -310,6 +312,60 @@ export async function deleteExpense(
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to delete expense',
+    };
+  }
+}
+
+/**
+ * Update an existing expense record
+ */
+export async function updateExpense(expenseId: string, data: Partial<{
+  supplierName: string;
+  supplierTin: string;
+  category: ExpenseCategory;
+  description: string;
+  amount: number;
+  vatCategory: 'standard' | 'zero-rated' | 'exempt';
+  invoiceNumber: string;
+  invoiceDate: string;
+  receiptUrl: string | null;
+  paymentStatus: 'pending' | 'paid' | 'cancelled';
+}>): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!DATABASE_ID || !EXPENSES_COLLECTION_ID) {
+      return { success: false, error: 'Database configuration missing' };
+    }
+
+    const updateData: any = { ...data };
+
+    if (data.amount !== undefined || data.vatCategory !== undefined) {
+      // Re-calculate VAT if amount or vatCategory changes
+      const current = await databases.getDocument(DATABASE_ID, EXPENSES_COLLECTION_ID, expenseId);
+      const amount = data.amount ?? current.amount;
+      const vatCat = data.vatCategory ?? current.vatCategory;
+      let vatRate = 16;
+      if (vatCat === 'zero-rated' || vatCat === 'exempt') vatRate = 0;
+      const vatAmount = Math.round(amount * (vatRate / 100) * 100) / 100;
+      const totalAmount = amount + vatAmount;
+
+      updateData.vatAmount = vatAmount;
+      updateData.totalAmount = totalAmount;
+      updateData.vatRate = vatRate;
+    }
+
+    await databases.updateDocument(
+      DATABASE_ID,
+      EXPENSES_COLLECTION_ID,
+      expenseId,
+      updateData
+    );
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating expense:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to update expense',
     };
   }
 }

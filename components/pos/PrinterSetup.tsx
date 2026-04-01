@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { Printer, Usb, Wifi, Settings, AlertCircle, CheckCircle } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Printer, Usb, Wifi, Settings, AlertCircle, CheckCircle, Terminal } from "lucide-react";
 import { ThermalPrinterClient, COMMON_PRINTERS, PrinterConfig, DetectedDevice } from "@/lib/thermal-printer";
 import { DeviceDiscovery } from "./DeviceDiscovery";
+import { PrinterCalibrationInfo } from "./PrinterCalibrationInfo";
 
 interface PrinterSetupProps {
     orderId: string;
@@ -19,13 +20,45 @@ export function PrinterSetup({ orderId, onPrintSuccess }: PrinterSetupProps) {
     const [webUSBSupported, setWebUSBSupported] = useState<boolean | null>(null);
     const [lastError, setLastError] = useState<string | null>(null);
 
+    // Load configuration on mount or auto-detect
+    useEffect(() => {
+        const load = async () => {
+            const savedConfig = ThermalPrinterClient.loadConfig();
+            if (savedConfig) {
+                setPrinterConfig(savedConfig);
+                setPrinterType('thermal');
+            } else {
+                // Try to auto-detect a previously authorized printer
+                const autoDevice = await ThermalPrinterClient.autoDetect();
+                if (autoDevice) {
+                    const newConfig = {
+                        ...COMMON_PRINTERS.EPOS_TEP_220MC, // Default settings
+                        vendorId: autoDevice.vendorId,
+                        productId: autoDevice.productId,
+                        deviceName: autoDevice.productName || 'Detected Printer'
+                    };
+                    setPrinterConfig(newConfig);
+                    setPrinterType('thermal');
+                }
+            }
+        };
+        load();
+    }, []);
+
+    // Save configuration whenever it changes
+    const updateConfig = (newConfig: PrinterConfig) => {
+        setPrinterConfig(newConfig);
+        ThermalPrinterClient.saveConfig(newConfig);
+    };
+
     const handleDeviceSelected = (device: DetectedDevice) => {
-        setPrinterConfig({
+        const newConfig = {
             ...printerConfig,
             vendorId: device.vendorId,
             productId: device.productId,
             deviceName: device.productName
-        });
+        };
+        updateConfig(newConfig);
         setShowDeviceDiscovery(false);
         setLastError(null);
     };
@@ -55,20 +88,32 @@ export function PrinterSetup({ orderId, onPrintSuccess }: PrinterSetupProps) {
             const printer = new ThermalPrinterClient(printerConfig);
             const result = await printer.printReceipt(orderId);
 
-            if (result.success) {
-                alert('✓ Receipt printed successfully!');
-                onPrintSuccess?.();
-            } else {
-                const errMsg = result.error || 'Print failed';
-                setLastError(errMsg);
-
-                // give specific feedback for common backend errors
-                if (errMsg.toLowerCase().includes('order not found')) {
-                    alert(`✗ Print failed: ${errMsg}\n\nPlease verify that the order ID exists in the system.`);
-                } else {
-                    alert(`✗ Print failed: ${errMsg}\n\nTroubleshooting tips:\n• Make sure your printer is connected and powered on\n• Grant USB permissions when prompted\n• Try the Device Discovery tool to identify your printer`);
-                }
-            }
+                    {result.success ? (
+                        <div className="flex items-center gap-2 bg-emerald-100 text-emerald-800 px-4 py-2 rounded-lg font-bold">
+                            <CheckCircle className="w-5 h-5" />
+                            <span>Printed Successfully</span>
+                        </div>
+                    ) : (
+                        <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4 space-y-3">
+                            <div className="flex items-start gap-2">
+                                <AlertCircle className="w-5 h-5 text-red-600 mt-0.5" />
+                                <div className="space-y-1">
+                                    <div className="text-sm font-bold text-red-800">Print Failure</div>
+                                    <div className="text-xs text-red-700 leading-tight">{result.error}</div>
+                                </div>
+                            </div>
+                            {result.error?.toLowerCase().includes('unable to claim interface') && (
+                                <div className="bg-white p-3 rounded border border-red-100 text-[10px] space-y-2">
+                                    <p className="font-bold text-red-900 flex items-center gap-1">
+                                        <Terminal className="w-3 h-3" /> Linux Kernel Driver Conflict (usblp)
+                                    </p>
+                                    <p className="text-gray-600">The operating system has locked this printer. Run this to release it:</p>
+                                    <code className="block bg-gray-900 text-gray-100 p-2 rounded select-all font-mono">sudo modprobe -r usblp</code>
+                                    <p className="text-[9px] italic text-gray-500">* Unplug and replug the printer after running command.</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
         } catch (error) {
             console.error('Print error:', error);
             const errorMessage = error instanceof Error ? error.message : 'Print failed';
@@ -145,16 +190,75 @@ export function PrinterSetup({ orderId, onPrintSuccess }: PrinterSetupProps) {
 
                     {/* Error Display */}
                     {lastError && (
-                        <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                        <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4 space-y-3">
                             <div className="flex items-start gap-2">
-                                <AlertCircle className="w-4 h-4 text-red-600 mt-0.5" />
-                                <div className="text-sm text-red-700">{lastError}</div>
+                                <AlertCircle className="w-5 h-5 text-red-600 mt-0.5" />
+                                <div className="space-y-1">
+                                    <div className="text-sm font-bold text-red-800">Print Failure</div>
+                                    <div className="text-xs text-red-700 leading-tight">{lastError}</div>
+                                </div>
                             </div>
+                            {lastError.toLowerCase().includes('unable to claim interface') && (
+                                <div className="bg-white p-3 rounded border border-red-100 text-[10px] space-y-2">
+                                    <p className="font-bold text-red-900 flex items-center gap-1">
+                                        <Terminal className="w-3 h-3" /> Linux Kernel Driver Conflict (usblp)
+                                    </p>
+                                    <p className="text-gray-600">The operating system has locked this printer. Run this to release it:</p>
+                                    <code className="block bg-gray-900 text-gray-100 p-2 rounded select-all font-mono">sudo modprobe -r usblp</code>
+                                    <p className="text-[9px] italic text-gray-500">* Unplug and replug the printer after running command.</p>
+                                </div>
+                            )}
                         </div>
                     )}
 
                     {showConfig && (
                         <div className="space-y-3 pt-2 border-t border-gray-200">
+                            {/* Terminal Name */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Terminal Name
+                                </label>
+                                <input
+                                    type="text"
+                                    placeholder="e.g. Front Desk, Bar"
+                                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg text-sm"
+                                    value={printerConfig.terminalName || ''}
+                                    onChange={(e) => updateConfig({ ...printerConfig, terminalName: e.target.value })}
+                                />
+                                <p className="text-[10px] text-gray-500 mt-1">Identifies this station in reports</p>
+                            </div>
+
+                            {/* Calibration Settings */}
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Line Width
+                                    </label>
+                                    <select
+                                        className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg text-sm"
+                                        value={printerConfig.lineWidth || 32}
+                                        onChange={(e) => updateConfig({ ...printerConfig, lineWidth: parseInt(e.target.value) })}
+                                    >
+                                        <option value={32}>32 chars (58mm)</option>
+                                        <option value={42}>42 chars (80mm)</option>
+                                        <option value={48}>48 chars (Wide)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Char Set
+                                    </label>
+                                    <select
+                                        className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg text-sm"
+                                        value={printerConfig.characterSet || 'PC437'}
+                                        onChange={(e) => updateConfig({ ...printerConfig, characterSet: e.target.value })}
+                                    >
+                                        <option value="PC437">Standard (US)</option>
+                                        <option value="PC858">Euro</option>
+                                    </select>
+                                </div>
+                            </div>
+
                             {/* Device Discovery */}
                             <div>
                                 <div className="flex items-center justify-between mb-2">
@@ -182,7 +286,7 @@ export function PrinterSetup({ orderId, onPrintSuccess }: PrinterSetupProps) {
                                 </label>
                                 <div className="flex gap-2">
                                     <button
-                                        onClick={() => setPrinterConfig({ ...printerConfig, type: 'usb' })}
+                                        onClick={() => updateConfig({ ...printerConfig, type: 'usb' })}
                                         className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-all ${printerConfig.type === 'usb'
                                             ? 'bg-emerald-100 text-emerald-700 border-2 border-emerald-500'
                                             : 'bg-gray-100 text-gray-600 border-2 border-gray-200'
@@ -192,7 +296,7 @@ export function PrinterSetup({ orderId, onPrintSuccess }: PrinterSetupProps) {
                                         USB
                                     </button>
                                     <button
-                                        onClick={() => setPrinterConfig({ ...printerConfig, type: 'network' })}
+                                        onClick={() => updateConfig({ ...printerConfig, type: 'network' })}
                                         className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-all ${printerConfig.type === 'network'
                                             ? 'bg-emerald-100 text-emerald-700 border-2 border-emerald-500'
                                             : 'bg-gray-100 text-gray-600 border-2 border-gray-200'
@@ -234,7 +338,7 @@ export function PrinterSetup({ orderId, onPrintSuccess }: PrinterSetupProps) {
                                             onChange={(e) => {
                                                 const hex = e.target.value.replace(/^0x/, '');
                                                 const vendorId = hex ? parseInt(hex, 16) : undefined;
-                                                setPrinterConfig({ ...printerConfig, vendorId });
+                                                updateConfig({ ...printerConfig, vendorId });
                                             }}
                                         />
                                     </div>
@@ -248,7 +352,7 @@ export function PrinterSetup({ orderId, onPrintSuccess }: PrinterSetupProps) {
                                             onChange={(e) => {
                                                 const hex = e.target.value.replace(/^0x/, '');
                                                 const productId = hex ? parseInt(hex, 16) : undefined;
-                                                setPrinterConfig({ ...printerConfig, productId });
+                                                updateConfig({ ...printerConfig, productId });
                                             }}
                                         />
                                     </div>
@@ -266,7 +370,8 @@ export function PrinterSetup({ orderId, onPrintSuccess }: PrinterSetupProps) {
                                             type="text"
                                             placeholder="192.168.1.100"
                                             className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg text-sm"
-                                            onChange={(e) => setPrinterConfig({ ...printerConfig, ipAddress: e.target.value })}
+                                            value={printerConfig.ipAddress || ''}
+                                            onChange={(e) => updateConfig({ ...printerConfig, ipAddress: e.target.value })}
                                         />
                                     </div>
                                     <div>
@@ -292,6 +397,13 @@ export function PrinterSetup({ orderId, onPrintSuccess }: PrinterSetupProps) {
                                     <li>• Grant USB permissions when prompted</li>
                                     <li>• Check printer power and USB connection</li>
                                 </ul>
+                            </div>
+
+                            <div className="pt-2">
+                                <PrinterCalibrationInfo 
+                                    vendorId={printerConfig.vendorId} 
+                                    productId={printerConfig.productId} 
+                                />
                             </div>
                         </div>
                     )}

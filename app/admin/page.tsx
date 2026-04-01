@@ -29,12 +29,10 @@ import { useLivePOSMetrics } from "@/lib/hooks/useLivePOSMetrics";
 
 // Report components
 import SalesReport from "@/components/reports/SalesReport";
-import AccountingDashboard from "@/components/reports/AccountingDashboard";
-import VATDashboard from "@/components/reports/VATDashboard";
-import ExpensesManager from "@/components/reports/ExpensesManager";
-import MenuImport from "@/components/admin/MenuImport";
+import { FinanceHub } from "@/components/reports/FinanceHub";
+import { MenuCMS } from "@/components/admin/menu/MenuCMS";
 
-type TabType = 'dashboard' | 'sales' | 'accounting' | 'vat' | 'expenses' | 'import';
+type TabType = 'dashboard' | 'sales' | 'finance' | 'menu';
 
 const AdminPage = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -120,16 +118,10 @@ const AdminPage = () => {
         setActiveTab('sales');
         break;
       case '3':
-        setActiveTab('accounting');
+        setActiveTab('finance');
         break;
       case '4':
-        setActiveTab('vat');
-        break;
-      case '5':
-        setActiveTab('expenses');
-        break;
-      case '6':
-        setActiveTab('import');
+        setActiveTab('menu');
         break;
       // Ctrl+R to refresh data
       case 'r':
@@ -232,10 +224,8 @@ const AdminPage = () => {
               {([
                 { id: 'dashboard', label: 'Dashboard', icon: Activity, key: '1' },
                 { id: 'sales', label: 'Sales', icon: Receipt, key: '2' },
-                { id: 'accounting', label: 'Accounting', icon: DollarSign, key: '3' },
-                { id: 'vat', label: 'VAT', icon: Calculator, key: '4' },
-                { id: 'expenses', label: 'Expenses', icon: ShoppingCart, key: '5' },
-                { id: 'import', label: 'Import', icon: Upload, key: '6' },
+                { id: 'finance', label: 'Finance Hub', icon: DollarSign, key: '3' },
+                { id: 'menu', label: 'Menu & Stock', icon: Upload, key: '4' },
               ] as const).map(({ id, label, icon: Icon, key }) => (
                 <button
                   key={id}
@@ -478,26 +468,14 @@ const AdminPage = () => {
             <SalesReport />
           )}
 
-          {/* Accounting Tab */}
-          {activeTab === 'accounting' && (
-            <AccountingDashboard />
+          {/* Finance Hub Tab */}
+          {activeTab === 'finance' && (
+            <FinanceHub />
           )}
 
-          {/* VAT Tab */}
-          {activeTab === 'vat' && (
-            <VATDashboard />
-          )}
-
-          {/* Expenses Tab */}
-          {activeTab === 'expenses' && (
-            <ExpensesManager />
-          )}
-
-          {/* Import Tab */}
-          {activeTab === 'import' && (
-            <div className="bg-gray-800/50 rounded-xl border border-gray-700 p-6">
-              <MenuImport />
-            </div>
+          {/* Menu & Stock CMS Tab */}
+          {activeTab === 'menu' && (
+            <MenuCMS />
           )}
         </main>
       </div>

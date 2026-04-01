@@ -612,6 +612,31 @@ export const getOrder = async (orderId: string): Promise<Order | null> => {
     }
 };
 
+export const updateOrder = async (orderId: string, data: Partial<Order>) => {
+    try {
+        if (!DATABASE_ID || !ORDERS_COLLECTION_ID) {
+            throw new Error("Database configuration is missing");
+        }
+
+        const updateData = { ...data };
+        if (data.items) {
+            (updateData as any).items = JSON.stringify(data.items);
+        }
+
+        const result = await databases.updateDocument(
+            DATABASE_ID,
+            ORDERS_COLLECTION_ID,
+            orderId,
+            updateData
+        );
+
+        return parseStringify(result);
+    } catch (error) {
+        console.error("Error updating order:", error);
+        throw new Error("Failed to update order");
+    }
+};
+
 export const getRecentOrders = async () => {
     try {
         if (!DATABASE_ID || !ORDERS_COLLECTION_ID) {
