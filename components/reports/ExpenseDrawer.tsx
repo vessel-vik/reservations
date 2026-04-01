@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -8,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Loader2 } from 'lucide-react';
 
 import { ReceiptUpload } from './ReceiptUpload';
 import { createExpense, updateExpense } from '@/lib/actions/expense.actions';
@@ -43,6 +45,8 @@ interface Props {
 }
 
 export function ExpenseDrawer({ open, expense, onClose, onSaved }: Props) {
+  const [stagedFile, setStagedFile] = useState<File | null>(null);
+
   const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting } } = useForm<ExpenseFormValues>({
     resolver: zodResolver(createExpenseSchema),
     defaultValues: {
@@ -164,9 +168,10 @@ export function ExpenseDrawer({ open, expense, onClose, onSaved }: Props) {
             {errors.description && <p className="text-xs text-red-400 font-medium">{errors.description.message}</p>}
           </div>
 
-          <ReceiptUpload 
-            initialValue={receiptUrl}
-            onUploadComplete={(url) => setValue('receiptUrl', url)} 
+          <ReceiptUpload
+            currentUrl={receiptUrl}
+            onFileStaged={(file) => setStagedFile(file)}
+            onRemoved={() => { setStagedFile(null); setValue('receiptUrl', null) }}
           />
 
           <div className="space-y-2">
@@ -202,5 +207,3 @@ export function ExpenseDrawer({ open, expense, onClose, onSaved }: Props) {
     </Dialog>
   );
 }
-
-import { Loader2 } from 'lucide-react';
