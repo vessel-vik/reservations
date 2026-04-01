@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ProductCard } from '@/components/pos/ProductCard';
 import POSInterface from '@/components/pos/POSInterface';
@@ -313,8 +313,9 @@ describe('POSInterface — out-of-stock warning dialog', () => {
 
     fireEvent.click(screen.getByText('Fish Fillet'));
 
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByText(/Fish Fillet/)).toBeInTheDocument();
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toBeInTheDocument();
+    expect(within(dialog).getByText(/Fish Fillet/)).toBeInTheDocument();
   });
 
   it('shows warning dialog when an isAvailable=false card is clicked', () => {

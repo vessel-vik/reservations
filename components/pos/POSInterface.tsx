@@ -158,28 +158,25 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
     // Sort: out-of-stock and unavailable items sink to the bottom
     const sorted = useMemo(() => {
         return [...filteredProducts].sort((a, b) => {
-            const aOut = !a.isAvailable || (a.stock !== undefined && a.stock === 0);
-            const bOut = !b.isAvailable || (b.stock !== undefined && b.stock === 0);
+            const aOut = !a.isAvailable || isOutOfStock(a.stock);
+            const bOut = !b.isAvailable || isOutOfStock(b.stock);
             if (aOut === bOut) return 0;
             return aOut ? 1 : -1;
         });
     }, [filteredProducts]);
 
-    // Apply show/hide filter (only when toggle is off); remove item currently shown in dialog
+    // Apply show/hide filter (only when toggle is off)
     const visibleProducts = useMemo(() => {
-        const base = showOutOfStock
-            ? sorted
-            : sorted.filter(
-                  (item) => item.isAvailable !== false && (item.stock === undefined || item.stock > 0),
-              );
-        if (!outOfStockItem) return base;
-        return base.filter((item) => item.$id !== outOfStockItem.$id);
-    }, [sorted, showOutOfStock, outOfStockItem]);
+        if (showOutOfStock) return sorted;
+        return sorted.filter(
+            (item) => item.isAvailable !== false && !isOutOfStock(item.stock),
+        );
+    }, [sorted, showOutOfStock]);
 
     // Count of items currently hidden by the toggle
     const hiddenOutOfStockCount = useMemo(() => {
         return sorted.filter(
-            (item) => !item.isAvailable || (item.stock !== undefined && item.stock === 0),
+            (item) => !item.isAvailable || isOutOfStock(item.stock),
         ).length;
     }, [sorted]);
 
@@ -437,7 +434,7 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
 
                 {/* Show / Hide Out-of-Stock Toggle */}
                 {(hiddenOutOfStockCount > 0 || showOutOfStock) && (
-                    <div className="hidden md:flex px-8 py-2 justify-end">
+                    <div className="flex px-4 md:px-8 py-2 justify-end">
                         <button
                             onClick={() => setShowOutOfStock((prev) => !prev)}
                             aria-label={
