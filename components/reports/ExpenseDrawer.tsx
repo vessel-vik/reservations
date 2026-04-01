@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useState, useMemo } from 'react';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -10,16 +10,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { ReceiptUpload } from './ReceiptUpload';
 import { createExpense, updateExpense } from '@/lib/actions/expense.actions';
 import { ExpenseCategory, EXPENSE_CATEGORY_LABELS } from '@/types/pos.types';
-// import { toast } from 'sonner';
-
-const toast = {
-  success: (msg: string) => console.log('Success:', msg),
-  error: (msg: string) => console.error('Error:', msg),
-};
 
 const createExpenseSchema = z.object({
   supplierName: z.string().min(2, "Supplier name must be at least 2 characters").max(200),
@@ -33,7 +28,10 @@ const createExpenseSchema = z.object({
   dueDate: z.string().optional(),
   notes: z.string().max(2000).optional(),
   receiptUrl: z.string().nullable().optional()
-});
+}).refine(
+  (d) => !d.dueDate || !d.invoiceDate || d.dueDate >= d.invoiceDate,
+  { message: 'Due date must be on or after invoice date', path: ['dueDate'] }
+);
 
 type ExpenseFormValues = z.infer<typeof createExpenseSchema>;
 
@@ -46,9 +44,9 @@ interface Props {
 
 export function ExpenseDrawer({ open, expense, onClose, onSaved }: Props) {
   const [stagedFile, setStagedFile] = useState<File | null>(null);
-  // TODO(Task 3): upload stagedFile to /api/expenses/upload on form submit
+  const [isUploading, setIsUploading] = useState(false);
 
-  const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting } } = useForm<ExpenseFormValues>({
+  const { register, handleSubmit, setValue, watch, control, formState: { errors, isSubmitting } } = useForm<ExpenseFormValues>({
     resolver: zodResolver(createExpenseSchema),
     defaultValues: {
       supplierName: expense?.supplierName || '',
@@ -67,29 +65,60 @@ export function ExpenseDrawer({ open, expense, onClose, onSaved }: Props) {
 
   const receiptUrl = watch('receiptUrl');
 
+  const amount = useWatch({ control, name: 'amount', defaultValue: 0 });
+  const vatCategory = useWatch({ control, name: 'vatCategory', defaultValue: 'standard' });
+
+  const vatPreview = useMemo(() => {
+    const base = Number(amount) || 0;
+    const rate = vatCategory === 'standard' ? 0.16 : 0;
+    return { vat: base * rate, total: base + base * rate };
+  }, [amount, vatCategory]);
+
   const onSubmit = async (data: ExpenseFormValues) => {
+    // ── Step 1: Upload receipt if staged ───────────────────────
+    let receiptUrl: string | null = (data as any).receiptUrl ?? expense?.receiptUrl ?? null;
+
+    if (stagedFile) {
+      setIsUploading(true);
+      const form = new FormData();
+      form.append('file', stagedFile);
+      try {
+        const res = await fetch('/api/expenses/upload', { method: 'POST', body: form });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error ?? 'Upload failed');
+        receiptUrl = json.receiptUrl;
+      } catch (err: any) {
+        toast.error(err.message ?? 'Upload failed');
+        setIsUploading(false);
+        return;
+      }
+      setIsUploading(false);
+    }
+
+    // ── Step 2: Save expense ────────────────────────────────────
     try {
+      const payload = { ...data, receiptUrl };
       if (expense) {
-        const res = await updateExpense(expense.$id, data);
+        const res = await updateExpense(expense.$id, payload as any);
         if (res.success) {
-          toast.success("Expense updated successfully");
+          toast.success('Expense updated successfully');
           onSaved();
           onClose();
         } else {
-          toast.error(res.error || "Failed to update expense");
+          toast.error(res.error || 'Failed to update expense');
         }
       } else {
-        const res = await createExpense(data as any);
+        const res = await createExpense(payload as any);
         if (res.success) {
-          toast.success("Expense created successfully");
+          toast.success('Expense created successfully');
           onSaved();
           onClose();
         } else {
-          toast.error(res.error || "Failed to create expense");
+          toast.error(res.error || 'Failed to create expense');
         }
       }
-    } catch (error) {
-      toast.error("An unexpected error occurred");
+    } catch {
+      toast.error('An unexpected error occurred');
     }
   };
 
@@ -130,6 +159,16 @@ export function ExpenseDrawer({ open, expense, onClose, onSaved }: Props) {
               <Label htmlFor="amount" className="text-slate-400">Amount (Excl. VAT)</Label>
               <Input id="amount" type="number" step="0.01" {...register('amount')} className="bg-slate-800 border-slate-700 text-slate-100" />
               {errors.amount && <p className="text-xs text-red-400 font-medium">{errors.amount.message}</p>}
+              {vatPreview.vat > 0 && (
+                <p className="text-xs text-slate-400 mt-1">
+                  VAT (16%): KSh {vatPreview.vat.toLocaleString()} · Total: KSh {vatPreview.total.toLocaleString()}
+                </p>
+              )}
+              {vatPreview.vat === 0 && Number(amount) > 0 && (
+                <p className="text-xs text-slate-500 mt-1">
+                  VAT: KSh 0 · Total: KSh {Number(amount).toLocaleString()}
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -155,6 +194,18 @@ export function ExpenseDrawer({ open, expense, onClose, onSaved }: Props) {
             <div className="space-y-2">
               <Label htmlFor="invoiceDate" className="text-slate-400">Invoice Date</Label>
               <Input id="invoiceDate" type="date" {...register('invoiceDate')} className="bg-slate-800 border-slate-700 text-slate-100" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <Label htmlFor="supplierTin" className="text-slate-400">Supplier TIN</Label>
+              <Input id="supplierTin" {...register('supplierTin')} className="bg-slate-800 border-slate-700 text-slate-100" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="dueDate" className="text-slate-400">Due Date</Label>
+              <Input id="dueDate" type="date" {...register('dueDate')} className="bg-slate-800 border-slate-700 text-slate-100" />
+              {errors.dueDate && <p className="text-xs text-red-400 font-medium">{errors.dueDate.message}</p>}
             </div>
           </div>
 
@@ -189,13 +240,17 @@ export function ExpenseDrawer({ open, expense, onClose, onSaved }: Props) {
           <Button type="button" variant="outline" onClick={onClose} className="border-slate-700 text-slate-400 hover:bg-slate-800 hover:text-slate-200">
             Cancel
           </Button>
-          <Button 
+          <Button
             form="expense-form"
-            type="submit" 
-            disabled={isSubmitting}
+            type="submit"
+            disabled={isUploading || isSubmitting}
             className="bg-emerald-600 hover:bg-emerald-500 text-white min-w-[120px]"
           >
-            {isSubmitting ? (
+            {isUploading ? (
+              <span className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" /> Uploading...
+              </span>
+            ) : isSubmitting ? (
               <span className="flex items-center gap-2">
                 <Loader2 className="w-4 h-4 animate-spin" /> Saving...
               </span>
