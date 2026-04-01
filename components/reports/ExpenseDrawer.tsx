@@ -46,6 +46,7 @@ interface Props {
 
 export function ExpenseDrawer({ open, expense, onClose, onSaved }: Props) {
   const [stagedFile, setStagedFile] = useState<File | null>(null);
+  // TODO(Task 3): upload stagedFile to /api/expenses/upload on form submit
 
   const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting } } = useForm<ExpenseFormValues>({
     resolver: zodResolver(createExpenseSchema),
@@ -170,7 +171,7 @@ export function ExpenseDrawer({ open, expense, onClose, onSaved }: Props) {
 
           <ReceiptUpload
             currentUrl={receiptUrl}
-            onFileStaged={(file) => setStagedFile(file)}
+            onFileStaged={setStagedFile}
             onRemoved={() => { setStagedFile(null); setValue('receiptUrl', null) }}
           />
 

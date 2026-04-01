@@ -4,6 +4,8 @@ import React, { useCallback, useState, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Upload, X, FileText } from 'lucide-react';
 
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+
 interface Props {
   currentUrl?: string | null;
   onFileStaged: (file: File) => void;
@@ -14,8 +16,6 @@ export function ReceiptUpload({ currentUrl, onFileStaged, onRemoved }: Props) {
   const [stagedFile, setStagedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
