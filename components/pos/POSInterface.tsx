@@ -5,13 +5,14 @@ import { createOrder } from "@/lib/actions/pos.actions";
 import { useState, useMemo, useEffect } from "react";
 import { Product, CartItem, Category } from "@/types/pos.types";
 import { ProductCard } from "./ProductCard";
+import { isOutOfStock } from "@/lib/stock-utils";
 import { CartSidebar } from "./CartSidebar";
 import { MobileCart } from "./MobileCart";
 import { ServerDashboard } from "./ServerDashboard";
 import { ProcessingOverlay } from "./ProcessingOverlay";
 import { SettleTableTabModal } from "./SettleTableTabModal";
 import { AddToTabModal } from "./AddToTabModal";
-import { Search, Grid, List, LayoutDashboard, LogOut, Menu, X, CreditCard } from "lucide-react";
+import { Search, Grid, List, LayoutDashboard, LogOut, Menu, X, CreditCard, AlertTriangle } from "lucide-react";
 import dynamic from 'next/dynamic';
 import { usePOSStore } from "@/store/pos-store";
 import { ProductDetailsModal } from "./ProductDetailsModal";
@@ -60,6 +61,8 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
     const [processingStatus, setProcessingStatus] = useState<"processing" | "generating" | "complete">("processing");
     const [isSettleTabModalOpen, setIsSettleTabModalOpen] = useState(false);
     const [isAddToTabModalOpen, setIsAddToTabModalOpen] = useState(false);
+    const [showOutOfStock, setShowOutOfStock] = useState(false);
+    const [outOfStockItem, setOutOfStockItem] = useState<Product | null>(null);
 
     // O(1) category lookup optimization
     const categoryMap = useMemo(() => {
@@ -81,6 +84,11 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
             setSelectedCategory(cat);
         }
     }, [searchParams]);
+
+    // Reset out-of-stock toggle when category changes
+    useEffect(() => {
+        setShowOutOfStock(false);
+    }, [selectedCategory]);
 
     const handleCategoryChange = (categoryId: string) => {
         setSelectedCategory(categoryId);
@@ -146,6 +154,34 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
             return matchesCategory && matchesSearch;
         });
     }, [products, selectedCategory, searchQuery, categoryMap]);
+
+    // Sort: out-of-stock and unavailable items sink to the bottom
+    const sorted = useMemo(() => {
+        return [...filteredProducts].sort((a, b) => {
+            const aOut = !a.isAvailable || (a.stock !== undefined && a.stock === 0);
+            const bOut = !b.isAvailable || (b.stock !== undefined && b.stock === 0);
+            if (aOut === bOut) return 0;
+            return aOut ? 1 : -1;
+        });
+    }, [filteredProducts]);
+
+    // Apply show/hide filter (only when toggle is off); remove item currently shown in dialog
+    const visibleProducts = useMemo(() => {
+        const base = showOutOfStock
+            ? sorted
+            : sorted.filter(
+                  (item) => item.isAvailable !== false && (item.stock === undefined || item.stock > 0),
+              );
+        if (!outOfStockItem) return base;
+        return base.filter((item) => item.$id !== outOfStockItem.$id);
+    }, [sorted, showOutOfStock, outOfStockItem]);
+
+    // Count of items currently hidden by the toggle
+    const hiddenOutOfStockCount = useMemo(() => {
+        return sorted.filter(
+            (item) => !item.isAvailable || (item.stock !== undefined && item.stock === 0),
+        ).length;
+    }, [sorted]);
 
     const handleCheckout = () => {
         setPaymentModalOpen(true);
@@ -220,8 +256,16 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
 
             const newOrder = await createOrder(orderData);
 
+            // Clean up temporary metadata from localStorage
+            Object.keys(localStorage).forEach(key => {
+                if (key.startsWith('pos_metadata_temp-')) {
+                    localStorage.removeItem(key);
+                }
+            });
+
             // Mark as complete
             setProcessingStatus("complete");
+
 
             // Clear cart
             clearCart();
@@ -391,9 +435,28 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
                     ))}
                 </div>
 
+                {/* Show / Hide Out-of-Stock Toggle */}
+                {(hiddenOutOfStockCount > 0 || showOutOfStock) && (
+                    <div className="hidden md:flex px-8 py-2 justify-end">
+                        <button
+                            onClick={() => setShowOutOfStock((prev) => !prev)}
+                            aria-label={
+                                showOutOfStock
+                                    ? 'Hide out-of-stock'
+                                    : `Show out-of-stock (${hiddenOutOfStockCount})`
+                            }
+                            className="text-xs text-slate-400 hover:text-slate-200 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 transition-all duration-150 cursor-pointer select-none"
+                        >
+                            {showOutOfStock
+                                ? 'Hide out-of-stock'
+                                : `Show out-of-stock (${hiddenOutOfStockCount})`}
+                        </button>
+                    </div>
+                )}
+
                 {/* Products Grid - Optimized responsive layout */}
                 <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6 pb-24 md:pb-6 scrollbar-hide">
-                    {filteredProducts.length === 0 ? (
+                    {visibleProducts.length === 0 ? (
                         <div className="flex items-center justify-center h-full text-neutral-500">
                             <div className="text-center space-y-4">
                                 <div className="text-6xl opacity-50">🍽️</div>
@@ -402,13 +465,27 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
                         </div>
                     ) : (
                         <div className="product-grid">
-                            {filteredProducts.map((product, index) => (
+                            {visibleProducts.map((product, index) => (
                                 <ProductCard
                                     key={product.$id}
                                     product={product}
-                                    onAdd={(p) => addToCart(p, 1)}
-                                    onView={(p) => setSelectedProduct(p)}
-                                    priority={index < 6} // Prioritize first 6 products for above-the-fold loading
+                                    onAdd={(p) => {
+                                        const isOut = !p.isAvailable || isOutOfStock(p.stock);
+                                        if (isOut) {
+                                            setOutOfStockItem(p);
+                                        } else {
+                                            addToCart(p, 1);
+                                        }
+                                    }}
+                                    onView={(p) => {
+                                        const isOut = !p.isAvailable || isOutOfStock(p.stock);
+                                        if (isOut) {
+                                            setOutOfStockItem(p);
+                                        } else {
+                                            setSelectedProduct(p);
+                                        }
+                                    }}
+                                    priority={index < 6}
                                 />
                             ))}
                         </div>
@@ -461,6 +538,52 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
                 isVisible={isProcessingPayment}
                 status={processingStatus}
             />
+
+            {/* Out-of-Stock Warning Dialog */}
+            {outOfStockItem && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center">
+                    <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="oos-dialog-title"
+                        className="bg-neutral-900 border border-white/10 rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl animate-in fade-in zoom-in-95 duration-200"
+                        onKeyDown={(e) => e.key === 'Escape' && setOutOfStockItem(null)}
+                    >
+                        <h2
+                            id="oos-dialog-title"
+                            className="text-white font-semibold text-lg flex items-center gap-2"
+                        >
+                            <AlertTriangle className="w-5 h-5 text-amber-400" />
+                            Out of Stock
+                        </h2>
+                        <p className="text-slate-400 text-sm mt-2 leading-relaxed">
+                            <span className="text-white font-medium">
+                                &ldquo;{outOfStockItem.name}&rdquo;
+                            </span>{' '}
+                            is currently out of stock. Adding it to the cart may not be
+                            fulfillable.
+                        </p>
+                        <div className="flex gap-3 mt-6">
+                            <button
+                                autoFocus
+                                onClick={() => setOutOfStockItem(null)}
+                                className="flex-1 px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-sm font-medium transition"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => {
+                                    addToCart(outOfStockItem, 1);
+                                    setOutOfStockItem(null);
+                                }}
+                                className="flex-1 px-4 py-2.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30 text-sm font-medium transition"
+                            >
+                                Add Anyway
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Settle Table Tab Modal */}
             <SettleTableTabModal
