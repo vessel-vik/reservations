@@ -227,3 +227,36 @@ export interface Category {
   isActive: boolean;
 }
 
+// ─── Admin CMS Types ──────────────────────────────────────────────────────────
+
+export interface MenuItem {
+  $id: string
+  name: string
+  price: number
+  stock: number
+  lowStockThreshold: number
+  isAvailable: boolean
+  category: string
+  imageUrl?: string
+  vatCategory: VatCategory
+  description?: string
+  preparationTime?: number
+  isVegetarian: boolean
+  isVegan: boolean
+  isGlutenFree: boolean
+  ingredients: string[]
+  allergens: string[]
+  modifierGroupIds: string[]
+  $createdAt: string
+  $updatedAt: string
+}
+
+export interface ModifierGroup {
+  $id: string
+  name: string
+  isRequired: boolean
+  maxSelections: number
+  defaultOptionIndex: number
+  options: string[]
+  createdAt: string
+}
