@@ -3,10 +3,9 @@
 import { useState } from "react";
 import Image from "next/image";
 import { Product } from "@/types/pos.types";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, cn } from "@/lib/utils";
 import { Plus, AlertTriangle, XCircle } from "lucide-react";
 import { getStockStatus, isOutOfStock } from "@/lib/stock-utils";
-import { cn } from "@/lib/utils";
 
 interface ProductCardProps {
     product: Product;
