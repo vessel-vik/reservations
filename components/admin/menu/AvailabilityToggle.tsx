@@ -52,13 +52,16 @@ export function AvailabilityToggle({ itemId, isAvailable, stock, onSaved }: Prop
       className={`transition-all ${disabled ? 'opacity-30 cursor-not-allowed' : 'hover:scale-105'}`}
       type="button"
     >
-      {isSaving ? (
-        <Loader2 className="w-6 h-6 animate-spin text-slate-500" />
-      ) : internalState ? (
-        <ToggleRight className="w-6 h-6 text-emerald-400" />
-      ) : (
-        <ToggleLeft className="w-6 h-6 text-slate-600" />
-      )}
+      <span className="relative">
+        {internalState ? (
+          <ToggleRight className="w-6 h-6 text-emerald-400" />
+        ) : (
+          <ToggleLeft className="w-6 h-6 text-slate-600" />
+        )}
+        {isSaving && (
+          <Loader2 className="w-3 h-3 animate-spin text-slate-400 absolute -top-1 -right-1" />
+        )}
+      </span>
     </button>
   );
 }

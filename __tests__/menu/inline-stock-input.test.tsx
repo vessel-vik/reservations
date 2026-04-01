@@ -1,9 +1,13 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { InlineStockInput } from '@/components/admin/menu/InlineStockInput';
 
 // Mock fetch
 global.fetch = vi.fn();
+
+beforeEach(() => {
+  (global.fetch as any).mockClear();
+});
 
 describe('InlineStockInput', () => {
   it('renders current stock value', () => {
