@@ -4,7 +4,9 @@ import { useState } from "react";
 import Image from "next/image";
 import { Product } from "@/types/pos.types";
 import { formatCurrency } from "@/lib/utils";
-import { Plus } from "lucide-react";
+import { Plus, AlertTriangle, XCircle } from "lucide-react";
+import { getStockStatus, isOutOfStock } from "@/lib/stock-utils";
+import { cn } from "@/lib/utils";
 
 interface ProductCardProps {
     product: Product;
@@ -16,6 +18,10 @@ interface ProductCardProps {
 export const ProductCard = ({ product, onAdd, onView, priority = false }: ProductCardProps) => {
     const [imageError, setImageError] = useState(false);
     const [imageLoading, setImageLoading] = useState(true);
+
+    const stockStatus = getStockStatus(product.stock, product.lowStockThreshold);
+    const isOut = !product.isAvailable || isOutOfStock(product.stock);
+    const isLow = stockStatus === 'low' && !isOut;
 
     const handleCardClick = () => {
         onView(product);
@@ -45,13 +51,17 @@ export const ProductCard = ({ product, onAdd, onView, priority = false }: Produc
 
     return (
         <div
-            className="group relative bg-gradient-to-br from-neutral-800 to-neutral-900 rounded-2xl overflow-hidden border border-white/10 hover:border-emerald-500/50 transition-all duration-300 hover-lift cursor-pointer animate-fade-in"
+            className={cn(
+                "group relative bg-gradient-to-br from-neutral-800 to-neutral-900 rounded-2xl overflow-hidden border border-white/10 hover:border-emerald-500/50 transition-all duration-300 cursor-pointer animate-fade-in",
+                !isOut && "hover-lift",
+                isOut && "opacity-40",
+            )}
             onClick={handleCardClick}
         >
             {/* Quick Add Button - Desktop only, properly positioned */}
             <button
                 onClick={handleQuickAdd}
-                className="product-card-quick-add"
+                className={cn("product-card-quick-add", isOut && "pointer-events-none opacity-0")}
                 aria-label="Quick add to cart"
             >
                 <Plus className="w-5 h-5 text-white" />
@@ -59,6 +69,20 @@ export const ProductCard = ({ product, onAdd, onView, priority = false }: Produc
 
             {/* Image Container */}
             <div className="product-card-image">
+                {/* Stock Status Badge */}
+                {isOut && (
+                    <div className="absolute top-2 left-2 z-10 animate-in fade-in duration-300 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border bg-red-500/20 text-red-400 border-red-500/30 backdrop-blur-sm">
+                        <XCircle className="w-3 h-3" />
+                        Out of Stock
+                    </div>
+                )}
+                {isLow && (
+                    <div className="absolute top-2 left-2 z-10 animate-in fade-in duration-300 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border bg-amber-500/20 text-amber-400 border-amber-500/30 backdrop-blur-sm">
+                        <AlertTriangle className="w-3 h-3" />
+                        Last {product.stock}
+                    </div>
+                )}
+
                 {product.imageUrl && !imageError ? (
                     <>
                         {imageLoading && (
@@ -111,11 +135,6 @@ export const ProductCard = ({ product, onAdd, onView, priority = false }: Produc
                     <span className="text-lg md:text-xl font-bold text-emerald-400">
                         {formatCurrency(product.price)}
                     </span>
-                    {!product.isAvailable && (
-                        <span className="text-xs bg-rose-500/20 text-rose-400 px-2 py-1 rounded-full border border-rose-500/20">
-                            Unavailable
-                        </span>
-                    )}
                 </div>
             </div>
         </div>
