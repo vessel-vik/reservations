@@ -67,6 +67,12 @@ describe('API: /api/menu/modifiers', () => {
     expect(res.status).toBe(404);
   });
 
+  it('PATCH /api/menu/modifiers/[id] accepts defaultOptionIndex in payload', async () => {
+    const req = mockRequest({ name: 'Updated', defaultOptionIndex: 2 });
+    const res = await PATCH(req, { params: Promise.resolve({ id: 'group1' }) });
+    expect(res.status).toBe(200);
+  });
+
   it('DELETE /api/menu/modifiers/[id] returns 200 on success', async () => {
     const res = await DELETE({} as any, { params: Promise.resolve({ id: 'group1' }) });
     expect(res.status).toBe(200);

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createCategory, updateCategory, deleteCategory } from '@/lib/actions/menu.actions';
+import { toast } from 'sonner';
 import { Plus, Trash2, Edit2, GripVertical, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,6 +17,37 @@ export function CategoriesSection({ categories, onRefresh }: Props) {
   const [newName, setNewName] = useState('');
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [localCategories, setLocalCategories] = useState(categories);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+
+  useEffect(() => { setLocalCategories(categories); }, [categories]);
+
+  const handleDragStart = (i: number) => setDragIndex(i);
+
+  const handleDragOver = (e: React.DragEvent, i: number) => {
+    e.preventDefault();
+    if (dragIndex === null || dragIndex === i) return;
+    const reordered = [...localCategories];
+    const [moved] = reordered.splice(dragIndex, 1);
+    reordered.splice(i, 0, moved);
+    setLocalCategories(reordered);
+    setDragIndex(i);
+  };
+
+  const handleDrop = async () => {
+    if (dragIndex === null) return;
+    setDragIndex(null);
+    const prev = categories;
+    try {
+      await Promise.all(
+        localCategories.map((cat, idx) => updateCategory(cat.$id, { index: idx }))
+      );
+      onRefresh();
+    } catch {
+      setLocalCategories(prev);
+      toast.error('Failed to reorder categories');
+    }
+  };
 
   const handleAddCategory = async () => {
     if (!newName.trim()) return;
@@ -60,8 +92,15 @@ export function CategoriesSection({ categories, onRefresh }: Props) {
       </div>
 
       <ul className="divide-y divide-slate-700/50">
-        {categories.map((cat) => (
-          <li key={cat.$id} className="flex items-center gap-4 px-4 py-3 hover:bg-slate-700/20">
+        {localCategories.map((cat, i) => (
+          <li
+            key={cat.$id}
+            draggable
+            onDragStart={() => handleDragStart(i)}
+            onDragOver={(e) => handleDragOver(e, i)}
+            onDrop={handleDrop}
+            className={`flex items-center gap-4 px-4 py-3 hover:bg-slate-700/20 transition-opacity ${dragIndex === i ? 'opacity-40' : ''}`}
+          >
             <GripVertical className="w-4 h-4 text-slate-600 cursor-grab" />
             <div className="flex-1">
               <p className="font-medium text-slate-200">{cat.label || cat.name}</p>

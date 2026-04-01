@@ -24,6 +24,7 @@ export function ModifierGroupDrawer({ open, group, onClose, onSaved }: Props) {
     { name: '', price: '0' }
   ]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [defaultOptionIndex, setDefaultOptionIndex] = useState<number>(-1);
 
   useEffect(() => {
     if (open) {
@@ -35,14 +36,20 @@ export function ModifierGroupDrawer({ open, group, onClose, onSaved }: Props) {
           const [n, p] = opt.split(':');
           return { name: n, price: p };
         }));
+        setDefaultOptionIndex(group.defaultOptionIndex ?? -1);
       } else {
         setName('');
         setIsRequired(false);
         setMaxSelections(1);
         setOptions([{ name: '', price: '0' }]);
+        setDefaultOptionIndex(-1);
       }
     }
   }, [open, group]);
+
+  useEffect(() => {
+    if (!isRequired) setDefaultOptionIndex(-1);
+  }, [isRequired]);
 
   const addOption = () => setOptions([...options, { name: '', price: '0' }]);
   
@@ -84,7 +91,8 @@ export function ModifierGroupDrawer({ open, group, onClose, onSaved }: Props) {
       name: name.trim(),
       isRequired,
       maxSelections,
-      options: serializedOptions
+      options: serializedOptions,
+      defaultOptionIndex,
     };
 
     try {
@@ -164,6 +172,17 @@ export function ModifierGroupDrawer({ open, group, onClose, onSaved }: Props) {
               {options.map((opt, i) => (
                 <div key={i} className="flex items-center gap-2 bg-slate-800 p-2 rounded-lg border border-slate-700/50">
                   <GripVertical className="w-5 h-5 text-slate-500 cursor-grab px-1" />
+                  {isRequired && (
+                    <input
+                      type="radio"
+                      name="defaultOption"
+                      checked={defaultOptionIndex === i}
+                      onChange={() => setDefaultOptionIndex(i)}
+                      className="w-4 h-4 accent-emerald-500 cursor-pointer shrink-0"
+                      title="Set as default"
+                      aria-label={`Set ${opt.name || `option ${i + 1}`} as default`}
+                    />
+                  )}
                   <div className="flex-1">
                     <Input 
                       placeholder="Name (e.g. Extra Cheese)"

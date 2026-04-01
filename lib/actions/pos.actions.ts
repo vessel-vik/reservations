@@ -4,6 +4,7 @@ import { databases, DATABASE_ID, MENU_ITEMS_COLLECTION_ID, ORDERS_COLLECTION_ID,
 import { ID, Query } from "node-appwrite";
 import { parseStringify } from "@/lib/utils";
 import { Order } from "@/types/pos.types";
+import { decrementItemStocks } from '@/lib/actions/menu.actions';
 
 export const getCategories = async () => {
     try {
@@ -90,6 +91,15 @@ export const createOrder = async (order: Omit<Order, "$id" | "$createdAt" | "$up
             ID.unique(),
             orderData
         );
+
+        // Decrement stock for ordered items (best-effort — never fail the order)
+        try {
+          await decrementItemStocks(
+            (order.items as any[]).map(item => ({ itemId: item.$id, quantity: item.quantity || 1 }))
+          );
+        } catch (stockErr) {
+          console.error('Error decrementing stock after order:', stockErr);
+        }
 
         // Optimize popularity updates with batch processing
         // Use Promise.allSettled to prevent one failure from affecting others
