@@ -22,21 +22,29 @@ export const usePOSStore = create<POSState>()(
 
             addToCart: (product, quantity = 1) => set((state) => {
                 const existing = state.cart.find((item) => item.$id === product.$id);
+                const currentQty = existing?.quantity ?? 0;
+                const maxQty = product.stock !== undefined ? product.stock : Infinity;
+                const addable = Math.min(quantity, maxQty - currentQty);
+                if (addable <= 0) return state; // already at stock limit
+
                 if (existing) {
                     return {
                         cart: state.cart.map((item) =>
                             item.$id === product.$id
-                                ? { ...item, quantity: item.quantity + quantity }
+                                ? { ...item, quantity: item.quantity + addable }
                                 : item
                         ),
                     };
                 }
-                return { cart: [...state.cart, { ...product, quantity }] };
+                return { cart: [...state.cart, { ...product, quantity: addable }] };
             }),
 
             updateQuantity: (id, delta) => set((state) => {
                 const updated = state.cart.map((item) => {
                     if (item.$id === id) {
+                        if (delta > 0 && item.stock !== undefined && item.quantity >= item.stock) {
+                            return item; // at stock limit — don't increment
+                        }
                         const newQuantity = item.quantity + delta;
                         return newQuantity > 0 ? { ...item, quantity: newQuantity } : null;
                     }

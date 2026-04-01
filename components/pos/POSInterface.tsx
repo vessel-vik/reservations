@@ -13,6 +13,7 @@ import { ProcessingOverlay } from "./ProcessingOverlay";
 import { SettleTableTabModal } from "./SettleTableTabModal";
 import { AddToTabModal } from "./AddToTabModal";
 import { Search, Grid, List, LayoutDashboard, LogOut, Menu, X, CreditCard, AlertTriangle } from "lucide-react";
+import { toast } from "sonner";
 import dynamic from 'next/dynamic';
 import { usePOSStore } from "@/store/pos-store";
 import { ProductDetailsModal } from "./ProductDetailsModal";
@@ -110,13 +111,22 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
             (response) => {
                 if (response.events.includes("databases.*.collections.*.documents.*.update")) {
                     const updatedDoc = response.payload as any;
-                    console.log("Realtime update received:", updatedDoc);
 
+                    // Update product list
                     setProducts((prev) => prev.map((p) =>
                         p.$id === updatedDoc.$id
-                            ? { ...p, ...updatedDoc, popularity: updatedDoc.popularity } // Merge updates
+                            ? { ...p, ...updatedDoc }
                             : p
                     ));
+
+                    // Keep cart item stock in sync so the quantity cap stays accurate
+                    usePOSStore.setState((state) => ({
+                        cart: state.cart.map((item) =>
+                            item.$id === updatedDoc.$id
+                                ? { ...item, stock: updatedDoc.stock, isAvailable: updatedDoc.isAvailable }
+                                : item
+                        ),
+                    }));
                 }
             }
         );
@@ -474,9 +484,16 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
                                         const isOut = !p.isAvailable || isOutOfStock(p.stock);
                                         if (isOut) {
                                             setOutOfStockItem(p);
-                                        } else {
-                                            addToCart(p, 1);
+                                            return;
                                         }
+                                        if (p.stock !== undefined) {
+                                            const inCart = cart.find(c => c.$id === p.$id)?.quantity ?? 0;
+                                            if (inCart >= p.stock) {
+                                                toast.error(`Only ${p.stock} available — already in cart`);
+                                                return;
+                                            }
+                                        }
+                                        addToCart(p, 1);
                                     }}
                                     onView={(p) => {
                                         const isOut = !p.isAvailable || isOutOfStock(p.stock);

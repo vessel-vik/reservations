@@ -87,7 +87,8 @@ export function MobileCart({ cart, onUpdateQuantity, onRemove, onCheckout, onAdd
                                 <div className="flex flex-col items-center justify-between bg-black/20 rounded-lg w-10 py-2">
                                     <button
                                         onClick={() => onUpdateQuantity(item.$id, 1)}
-                                        className="p-2 hover:text-emerald-400 transition-colors touch-feedback"
+                                        disabled={item.stock !== undefined && item.quantity >= item.stock}
+                                        className="p-2 hover:text-emerald-400 transition-colors touch-feedback disabled:opacity-30 disabled:cursor-not-allowed"
                                     >
                                         <Plus size={16} />
                                     </button>

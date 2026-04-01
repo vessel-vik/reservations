@@ -84,7 +84,8 @@ export const CartSidebar = ({ cart, onUpdateQuantity, onRemove, onCheckout, onAd
                                         <span className="text-xs font-bold text-white w-4 text-center">{item.quantity}</span>
                                         <button
                                             onClick={() => onUpdateQuantity(item.$id, 1)}
-                                            className="p-1 hover:text-emerald-400 transition-colors text-neutral-400"
+                                            disabled={item.stock !== undefined && item.quantity >= item.stock}
+                                            className="p-1 hover:text-emerald-400 transition-colors text-neutral-400 disabled:opacity-30 disabled:cursor-not-allowed"
                                         >
                                             <Plus size={12} />
                                         </button>

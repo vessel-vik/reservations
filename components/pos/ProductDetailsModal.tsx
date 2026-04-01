@@ -151,6 +151,14 @@ export const ProductDetailsModal = ({ product, isOpen, onClose, onAdd }: Product
 
                         {/* Footer Controls */}
                         <div className="mt-8 pt-6 border-t border-white/10">
+                            {product.stock !== undefined && (
+                                <p className="text-xs text-neutral-500 mb-3">
+                                    {product.stock === 0
+                                        ? <span className="text-red-400">Out of stock</span>
+                                        : <span>{product.stock} available</span>
+                                    }
+                                </p>
+                            )}
                             <div className="flex items-center gap-4">
                                 <div className="flex items-center bg-neutral-800 rounded-lg p-1 border border-white/5">
                                     <button
@@ -161,8 +169,9 @@ export const ProductDetailsModal = ({ product, isOpen, onClose, onAdd }: Product
                                     </button>
                                     <span className="w-12 text-center font-bold text-white">{quantity}</span>
                                     <button
-                                        onClick={() => setQuantity(quantity + 1)}
-                                        className="w-10 h-10 flex items-center justify-center text-neutral-400 hover:text-white hover:bg-neutral-700 rounded transition"
+                                        onClick={() => setQuantity(Math.min(product.stock ?? Infinity, quantity + 1))}
+                                        disabled={product.stock !== undefined && quantity >= product.stock}
+                                        className="w-10 h-10 flex items-center justify-center text-neutral-400 hover:text-white hover:bg-neutral-700 rounded transition disabled:opacity-30 disabled:cursor-not-allowed"
                                     >
                                         +
                                     </button>
@@ -170,10 +179,10 @@ export const ProductDetailsModal = ({ product, isOpen, onClose, onAdd }: Product
                                 <button
                                     onClick={() => {
                                         onAdd(product, quantity);
-                                        // Optional: keep modal open or close? Usually close.
                                         onClose();
                                     }}
-                                    className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-black font-bold h-12 rounded-lg transition-colors flex items-center justify-center gap-2"
+                                    disabled={product.stock !== undefined && product.stock === 0}
+                                    className="flex-1 bg-emerald-500 hover:bg-emerald-600 disabled:bg-neutral-700 disabled:text-neutral-500 disabled:cursor-not-allowed text-black font-bold h-12 rounded-lg transition-colors flex items-center justify-center gap-2"
                                 >
                                     Add to Order • {formatCurrency(product.price * quantity)}
                                 </button>
