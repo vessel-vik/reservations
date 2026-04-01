@@ -12,6 +12,31 @@ import { RevenueExpenseChart } from "./RevenueExpenseChart";
 import { PLSummaryTable } from "./PLSummaryTable";
 import { BudgetComparison, compareBudgetToActual, getOverBudgetCategories } from "@/lib/budget-utils";
 import { Expense } from "@/types/pos.types";
+import { BudgetMeters } from './BudgetMeters'
+import { ExportButtons } from './ExportButtons'
+
+function getPeriodDateRange(period: FinancePeriod) {
+  const today = new Date()
+  const fmt = (d: Date) => d.toISOString().slice(0, 10)
+  switch (period) {
+    case 'today':
+      return { startDate: fmt(today), endDate: fmt(today) }
+    case 'week': {
+      const s = new Date(today)
+      s.setDate(today.getDate() - 7)
+      return { startDate: fmt(s), endDate: fmt(today) }
+    }
+    case 'month': {
+      const s = new Date(today.getFullYear(), today.getMonth(), 1)
+      return { startDate: fmt(s), endDate: fmt(today) }
+    }
+    case 'quarter': {
+      const q = Math.floor(today.getMonth() / 3)
+      const s = new Date(today.getFullYear(), q * 3, 1)
+      return { startDate: fmt(s), endDate: fmt(today) }
+    }
+  }
+}
 
 export function FinanceHub() {
   const [activeSection, setActiveSection] = useState<'expenses'|'vat'|'reports'>('expenses');
@@ -25,13 +50,17 @@ export function FinanceHub() {
   const [isExpenseDrawerOpen, setIsExpenseDrawerOpen] = useState(false);
   const [isBudgetManagerOpen, setIsBudgetManagerOpen] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
+  const [chartStartDate, setChartStartDate] = useState('')
+  const [chartEndDate, setChartEndDate] = useState('')
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Simulate fetching KPI data, expenses, and budgets (would be individual API endpoints in full implementation)
-      const kpiRes = await fetch(`/api/reports/accounting?period=${period}`);
-      const expensesRes = await fetch(`/api/expenses?period=${period}`);
+      const { startDate, endDate } = getPeriodDateRange(period)
+      setChartStartDate(startDate)
+      setChartEndDate(endDate)
+      const kpiRes = await fetch(`/api/reports/accounting?startDate=${startDate}&endDate=${endDate}`)
+      const expensesRes = await fetch(`/api/expenses?startDate=${startDate}&endDate=${endDate}`)
       const d = new Date();
       const budgetsRes = await fetch(`/api/budgets?month=${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
       
@@ -100,12 +129,12 @@ export function FinanceHub() {
       />
 
       {activeSection === 'expenses' && (
-        <ExpenseList 
-          expenses={expenses} 
-          comparisons={comparisons}
-          loading={loading}
-          onEdit={(exp: Expense) => { setSelectedExpense(exp); setIsExpenseDrawerOpen(true); }}
-        />
+        <>
+          <BudgetMeters comparisons={comparisons} />
+          <ExpenseList expenses={expenses} comparisons={comparisons} loading={loading}
+            onEdit={(exp: Expense) => { setSelectedExpense(exp); setIsExpenseDrawerOpen(true); }}
+          />
+        </>
       )}
 
       {activeSection === 'vat' && (
@@ -114,20 +143,31 @@ export function FinanceHub() {
 
       {activeSection === 'reports' && (
         <div className="space-y-6">
-          <RevenueExpenseChart 
-            data={[
-              { label: 'Week 1', revenue: 300000, expenses: 200000, profit: 100000 },
-              { label: 'Week 2', revenue: 450000, expenses: 180000, profit: 270000 },
-              { label: 'Week 3', revenue: 380000, expenses: 220000, profit: 160000 },
-              { label: 'Current', revenue: kpiData?.totalIncome || 1250000, expenses: kpiData?.totalExpenses || 850000, profit: kpiData?.netProfit || 400000 }
-            ]}
+          <div className="flex justify-end">
+            <ExportButtons startDate={chartStartDate} endDate={chartEndDate} />
+          </div>
+          <RevenueExpenseChart
+            data={
+              kpiData
+                ? [
+                    { label: 'Period Revenue', revenue: kpiData.totalIncome ?? 0, expenses: kpiData.totalExpenses ?? 0, profit: kpiData.netProfit ?? 0 },
+                  ]
+                : []
+            }
           />
-          <PLSummaryTable 
-            data={[
-              { period: 'March 2026', revenue: kpiData?.totalIncome || 1250000, expenses: kpiData?.totalExpenses || 850000, profit: kpiData?.netProfit || 400000 },
-              { period: 'February 2026', revenue: 980000, expenses: 750000, profit: 230000 },
-              { period: 'January 2026', revenue: 1100000, expenses: 800000, profit: 300000 },
-            ]}
+          <PLSummaryTable
+            data={
+              kpiData
+                ? [
+                    {
+                      period: chartStartDate && chartEndDate ? `${chartStartDate} → ${chartEndDate}` : 'Current Period',
+                      revenue: kpiData.totalIncome ?? 0,
+                      expenses: kpiData.totalExpenses ?? 0,
+                      profit: kpiData.netProfit ?? 0,
+                    },
+                  ]
+                : []
+            }
           />
         </div>
       )}
