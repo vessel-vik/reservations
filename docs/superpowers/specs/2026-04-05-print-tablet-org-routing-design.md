@@ -312,7 +312,9 @@ Update `app/pos/product-card.css`:
 | `components/pos/MobileCart.tsx` | Modify | Add portrait-tablet bottom tab bar mode; wire Orders/Settle/Closed modals via new props (see 5.2) |
 | `components/pos/CartSidebar.tsx` | Modify | Responsive width (`w-[150px]` on tablet, `w-[400px]` on desktop); compact mode hides images |
 | `app/pos/product-card.css` | Modify | Orientation-aware grid columns for portrait and landscape tablet |
-| `app/api/print/thermal/route.ts` | Modify | Update `generateESCPOSKitchenDocket` and `generateESCPOSKitchenDelta` to match approved docket format |
+| `app/api/print/thermal/route.ts` | Modify | Update `generateESCPOSKitchenDocket`, `generateESCPOSKitchenDelta`, and `generateESCPOSReceipt` to match approved physical formats (see §3.5 and §9) |
+| `lib/kitchen-print-snapshot.ts` | Modify | Strip `n` (name) from `linesFromCartItems`; lower merge cap to 950 chars (§10) |
+| `lib/actions/pos.actions.ts` | Modify | Add `guestCount: 1` default to `createTabOrderFromCart`; move `clearCart` after `updateOrder` in POSInterface (§3.4) |
 
 ---
 
@@ -372,7 +374,104 @@ PrintBridge: membership.role === 'org:admin' → picks up kitchen_delta job
 
 ---
 
-## 9. Out of Scope
+## 9. Receipt ESC/POS Format
+
+The physical receipt (reference photo) must be replicated in `generateESCPOSReceipt` inside `app/api/print/thermal/route.ts`. Supports up to 20 line items without truncation.
+
+```
+[TWO-COLUMN HEADER — 80mm width]
+Left:  "Northern Bypass, Thome"          AM | PM         Right: "Tel: +254 757 650 125"
+       "After Windsor, Nairobi"           LOUNGE                 "info@ampm.co.ke"
+                                                                  "Terminal: front desk"
+------------------------------------------------------------------------  [dashed]
+ORD #: ORD-XXXX | Date: DD/MM/YYYY | Time: HH:MM:SS
+Server: <waiterName> | Table: <N> | Guests: <guestCount>
+------------------------------------------------------------------------  [dashed]
+QTY    ITEM DESCRIPTION                              TOTAL (KSh)
+------------------------------------------------------------------------  [dashed]
+1x     Jagermeister (original)                            1,500
+1x     Veuve Clicquot NV (Bottle)                        18,000
+[... up to 20 items, all right-aligned prices]
+------------------------------------------------------------------------  [dashed]
+Subtotal:                                                77,500
+VAT (16%):                                              12,400
+------------------------------------------------------------------------  [dashed]
+GRAND TOTAL: KSh 89,900                     [double-height bold, full width]
+                 PAID - THANK YOU           [centered bold]
+                    [QR CODE — orderId]
+       Thank you for choosing AM | PM.
+       We hope to see you again soon.
+```
+
+**Key differences from current implementation:**
+- Business address left-aligned, brand center, contact right-aligned in header
+- Column header: `QTY  ITEM DESCRIPTION  TOTAL (KSh)` not `Qty Item Price`
+- `TOTAL (KSh)` column is right-aligned
+- Subtotal + VAT (16%) lines before grand total
+- `GRAND TOTAL: KSh X,XXX` in double-height bold (ESC `!` with size byte)
+- `PAID - THANK YOU` centered below grand total
+- QR code encodes the `orderId`
+- Closing message at bottom
+
+---
+
+## 10. Bug Fix — >5 Items Order Creation Failure
+
+### Root cause (confirmed via Appwrite MCP)
+
+The `specialInstructions` attribute in the `orders` collection has **`size: 1000` chars** (set at schema creation and cannot be increased on the free plan — the collection is at its attribute size limit).
+
+The kitchen snapshot stored in `specialInstructions` uses this format per line:
+```json
+{"i":"67f2a3b4c5d6e7f8a9b0","q":1,"n":"Jagermeister (original)"}
+```
+≈ 72 chars per item with name. At 6 items this pushes `specialInstructions` to ~550 chars; at 12 items it exceeds 1000. With long item names it fails sooner.
+
+### Secondary issues fixed via Appwrite MCP (already applied)
+
+| Field | Old | New | Why |
+|-------|-----|-----|-----|
+| `guestCount` | required, no default, max 20 | optional, default 1, max 999 | `createTabOrderFromCart` doesn't pass it → every order was at risk |
+| `tableNumber` | max 100 | max 9999 | Busy days exceed 100 auto-assigned tabs |
+
+### Code fix: strip names from kitchen snapshot
+
+In `lib/kitchen-print-snapshot.ts`, `linesFromCartItems` currently stores `{ i, q, n }`. Change to `{ i, q }` only:
+
+```typescript
+// BEFORE:
+export function linesFromCartItems(items: CartItem[]): KitchenLine[] {
+  return items.map(item => ({ i: item.$id, q: item.quantity, n: item.name }));
+}
+
+// AFTER:
+export function linesFromCartItems(items: CartItem[]): KitchenLine[] {
+  return items.map(item => ({ i: item.$id, q: item.quantity }));
+  // Names omitted — specialInstructions is capped at 1000 chars.
+  // Delta computation only needs ID + quantity; names come from order.items.
+}
+```
+
+With names stripped: each line is `{"i":"67f2a3b4c5d6e7f8a9b0","q":1},` ≈ 35 chars.
+20 items × 35 = 700 chars + JSON wrapper (52 chars) + TAB prefix (20 chars) = **~772 chars — fits in 1000**.
+
+This is safe because `computeKitchenDelta` only reads `i` (ID) and `q` (quantity) from the snapshot — names are never used for delta computation. When printing, item names come from `order.items`, not the snapshot.
+
+Also lower the cap in `mergeKitchenSnapshotIntoSpecialInstructions` from 9500 to **950** to match the actual Appwrite field limit.
+
+### Code fix: always pass `guestCount` in `createTabOrderFromCart`
+
+Add `guestCount: 1` to the `orderData` object in `createTabOrderFromCart` as a safe fallback (the Appwrite schema now has `default: 1` but being explicit prevents any edge-case schema-migration gaps).
+
+### `items` field (5000 chars) — no change needed
+
+With `compressOrderItems` stripping to `{ $id, name, price, quantity }`:
+- 20 items × ~90 chars = ~1800 chars — well under 5000
+- Schema increase was attempted but blocked by free-plan limits; not needed at this item count
+
+---
+
+## 11. Out of Scope
 
 - Waiter-specific printer configuration UI
 - Network printer support (`/api/print/network` does not exist and is not added here)
