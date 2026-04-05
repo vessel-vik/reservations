@@ -13,7 +13,7 @@ import { ServerDashboard } from "./ServerDashboard";
 import { SettleTableTabModal } from "./SettleTableTabModal";
 import { OpenOrdersModal } from "./OpenOrdersModal";
 import { ClosedOrdersModal } from "./ClosedOrdersModal";
-import { OrderConfirmationModal } from "./OrderConfirmationModal";
+import { DocketPreviewModal } from "./DocketPreviewModal";
 import { Search, Grid, LayoutDashboard, X, CreditCard, Receipt, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { usePOSStore } from "@/store/pos-store";
@@ -56,8 +56,10 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
     const [isSettleTabModalOpen, setIsSettleTabModalOpen] = useState(false);
     const [isOpenOrdersOpen, setIsOpenOrdersOpen] = useState(false);
     const [isClosedOrdersOpen, setIsClosedOrdersOpen] = useState(false);
-    const [isRecentOrderModalOpen, setIsRecentOrderModalOpen] = useState(false);
-    const [recentOrder, setRecentOrder] = useState<any | null>(null);
+    const [isDocketModalOpen, setIsDocketModalOpen] = useState(false);
+    const [docketModalType, setDocketModalType] = useState<"new" | "addition">("new");
+    const [docketModalOrder, setDocketModalOrder] = useState<any | null>(null);
+    const [docketModalDelta, setDocketModalDelta] = useState<{ name: string; quantity: number; price: number }[]>([]);
     const [editingOrder, setEditingOrder] = useState<any | null>(null);
     const [showOutOfStock, setShowOutOfStock] = useState(false);
     const [outOfStockItem, setOutOfStockItem] = useState<Product | null>(null);
@@ -220,10 +222,11 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
             } as any;
 
             clearCart();
-            // Print the kitchen docket immediately — fire-and-forget so the modal opens instantly
             void printOrderDocket(newOrder.$id);
-            setRecentOrder(normalizedOrder);
-            setIsRecentOrderModalOpen(true);
+            setDocketModalOrder(normalizedOrder);
+            setDocketModalType("new");
+            setDocketModalDelta([]);
+            setIsDocketModalOpen(true);
         } catch (error) {
             console.error("Failed to add to tab:", error);
             const message =
@@ -250,7 +253,6 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
         setIsOpenOrdersOpen(false);
         setIsClosedOrdersOpen(false);
         setIsSettleTabModalOpen(false);
-        setIsRecentOrderModalOpen(false);
 
         toast.success("Order loaded — adjust quantities or items, then tap Update Order.");
     };
@@ -274,14 +276,15 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
                 cartLines
             );
 
-            if (deltaItems.length > 0) {
-                const printRes = await printKitchenDelta(editingOrder.$id, deltaItems);
-                if (!printRes.success) {
-                    toast.error(
-                        "Kitchen addition did not print; order was not saved. Fix the printer and try Update Order again."
-                    );
-                    return;
-                }
+            // Enrich delta with price from cart BEFORE clearing — cart is still available
+            const enrichedDelta = deltaItems.map((d) => {
+                const cartItem = cart.find((c) => c.name === d.name);
+                return { ...d, price: cartItem?.price ?? 0 };
+            });
+
+            // Queue delta print (fire-and-forget — order is saved regardless)
+            if (enrichedDelta.length > 0) {
+                void printKitchenDelta(editingOrder.$id, enrichedDelta);
             }
 
             await updateOrder(editingOrder.$id, {
@@ -292,9 +295,19 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
                 kitchenSnapshotLines: newSnapshotLines,
             } as any);
 
-            toast.success("Order updated successfully.");
-            setEditingOrder(null);
+            // clearCart AFTER updateOrder so enrichedDelta price lookup above is valid
             clearCart();
+            setEditingOrder(null);
+
+            // Show docket modal for additions
+            if (enrichedDelta.length > 0) {
+                setDocketModalOrder(editingOrder);
+                setDocketModalType("addition");
+                setDocketModalDelta(enrichedDelta);
+                setIsDocketModalOpen(true);
+            } else {
+                toast.success("Order updated successfully.");
+            }
         } catch (error) {
             console.error("Failed to save order changes:", error);
             toast.error("Unable to save order updates.");
@@ -566,6 +579,9 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
                 editingCustomerName={editingOrder?.customerName ?? null}
                 onSaveOrderChanges={handleSaveOrderChanges}
                 onCancelEdit={handleCancelOrderEdit}
+                onOpenOrders={() => setIsOpenOrdersOpen(true)}
+                onSettle={() => setIsSettleTabModalOpen(true)}
+                onClosedOrders={() => setIsClosedOrdersOpen(true)}
             />
 
             {/* Product Details Modal */}
@@ -647,27 +663,22 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
             />
 
 
-            {/* Recent Order Review Modal */}
-            <OrderConfirmationModal
-                isOpen={isRecentOrderModalOpen && recentOrder !== null}
+            {/* Docket Preview Modal — shown after Add to Tab or Update Order */}
+            <DocketPreviewModal
+                isOpen={isDocketModalOpen}
                 onClose={() => {
-                    setIsRecentOrderModalOpen(false);
-                    setRecentOrder(null);
+                    setIsDocketModalOpen(false);
+                    setDocketModalOrder(null);
                 }}
-                items={recentOrder?.items || []}
-                total={recentOrder?.totalAmount || 0}
-                tableNumber={recentOrder?.tableNumber}
-                customerName={recentOrder?.customerName}
                 onEdit={() => {
-                    if (recentOrder) {
-                        handleEditOrder(recentOrder);
+                    setIsDocketModalOpen(false);
+                    if (docketModalOrder) {
+                        handleEditOrder(docketModalOrder);
                     }
                 }}
-                onConfirm={() => {
-                    setIsRecentOrderModalOpen(false);
-                    setRecentOrder(null);
-                }}
-                confirmLabel="Done"
+                order={docketModalOrder ?? { totalAmount: 0, items: [] }}
+                deltaItems={docketModalDelta}
+                type={docketModalType}
             />
         </div>
     );
