@@ -126,6 +126,7 @@ Dialog: open={isOpen}, max-w-3xl, max-h-[90vh], overflow hidden
   │     Close button
   ├── StatsRow (sticky, flex-shrink-0)
   │     Fresh <1hr | Ageing 1–3hr | Urgent >3hr | Total outstanding
+  │     (counts computed client-side: orders.filter(o => orderAgeColor(o.ageMinutes) === "green").length, etc.)
   ├── FilterBar (sticky, flex-shrink-0)
   │     Search input (table #, order #, customer name)
   │     Filter chips: All | 🔴 Urgent | active table filter if set
@@ -173,6 +174,8 @@ OrderCard (border + bg tinted by age)
 
 Tap the card row (outside checkbox) to expand/collapse. Tap checkbox to select/deselect.
 
+Items are parsed using the same `parseOrderItems` pattern already in the existing modal (handles both JSON-string and array forms of `order.items`).
+
 ### State
 
 ```typescript
@@ -212,11 +215,13 @@ const selectedTotal = selectedOrders.reduce((s, o) => s + o.totalAmount, 0);
 const grandTotal = orders.reduce((s, o) => s + o.totalAmount, 0);
 ```
 
+**"Charge All" operates on the full unfiltered `orders` list**, not the search-filtered view. The button label shows the unfiltered grand total (`grandTotal`) to make this clear to staff. Search/filter only affects what's visible for selection — it never silently restricts a full-tab charge.
+
 ### Settlement flow (unchanged logic, new wiring)
 
 - **Charge Selected**: calls existing `settleSelectedOrders({ orderIds: selectedIds, paymentMethod, paymentReference })`
 - **Charge All**: calls existing `settleSelectedOrders({ orderIds: orders.map(o => o.$id), paymentMethod, paymentReference })`
-- Paystack: existing `handlePaystackFlow` helper, unchanged
+- Paystack: `handlePaystackFlow` is adapted — the synthetic order ID becomes `tab-multi-${Date.now()}` (no table number available). The metadata object changes from `{ tableNumber, date, type, orders }` to `{ type: "table_tab_multi", orderIds: orderIdsBeingSettled }`. The Paystack amount and the verify/amount-check logic are unchanged.
 - On success: `toast.success(...)`, re-load summary, push receipt if `consolidatedOrderId` returned
 
 `settleTableTabAndCreateOrder` is **not used** by the new modal — `settleSelectedOrders` handles all cases since it already consolidates multi-order settlements. `settleTableTabAndCreateOrder` remains available for any other callers.
