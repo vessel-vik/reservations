@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useOrganization } from "@clerk/nextjs";
 import { client } from "@/lib/appwrite-client";
-import { Databases, Query } from "appwrite";
+import { Databases } from "appwrite";
 import { toast } from "sonner";
 import { ThermalPrinterClient } from "@/lib/thermal-printer";
-import { getAuthContext } from "@/lib/auth.utils";
 
 interface PrintJob {
     $id: string;
@@ -39,6 +38,12 @@ export function PrintBridge() {
     const [jobQueue, setJobQueue] = useState<PrintJob[]>([]);
     const [isProcessing, setIsProcessing] = useState(false);
 
+    const businessId = membership?.organization?.id ?? null;
+    const businessIdRef = useRef<string | null>(businessId);
+    useEffect(() => {
+        businessIdRef.current = businessId;
+    }, [businessId]);
+
     // Always expose queuePrintJob globally (all devices — waiters and admin can queue)
     useEffect(() => {
         (window as any).queuePrintJob = queuePrintJob;
@@ -54,12 +59,21 @@ export function PrintBridge() {
         if (!membership) return; // Clerk org context not loaded yet
         if (membership.role !== 'org:admin') return; // Waiter — mount silently, never process
 
+        let cancelled = false;
         let unsubscribe: (() => void) | undefined;
+
         setupPrintListener().then((cleanup) => {
-            unsubscribe = cleanup;
+            if (cancelled) {
+                cleanup?.(); // component already unmounted — unsubscribe immediately
+            } else {
+                unsubscribe = cleanup;
+            }
         });
 
-        return () => unsubscribe?.();
+        return () => {
+            cancelled = true;
+            unsubscribe?.();
+        };
     }, [membership]);
 
     // Process job queue with 2-second delay to prevent thermal printer buffer overflow
@@ -87,7 +101,11 @@ export function PrintBridge() {
             }
 
             // Get business context for tenant isolation
-            const { businessId } = await getAuthContext();
+            const businessId = businessIdRef.current;
+            if (!businessId) {
+                toast.error('Print bridge: organisation context not loaded. Try reloading the page.');
+                return;
+            }
 
             // Subscribe to real-time updates on PRINT_JOBS collection (filtered by business)
             const unsubscribe = client.subscribe(
@@ -218,6 +236,11 @@ export function PrintBridge() {
                             lineWidth: printerConfig.lineWidth || 32,
                         }),
                     });
+                    if (!res.ok) {
+                        let msg = `Thermal API error ${res.status}`;
+                        try { msg = (await res.json()).error || msg; } catch {}
+                        throw new Error(msg);
+                    }
                     const data = await res.json();
                     if (data.commands) {
                         await printer.printRawCommands(data.commands as number[]);
@@ -244,6 +267,11 @@ export function PrintBridge() {
                             lineWidth: printerConfig.lineWidth || 32,
                         }),
                     });
+                    if (!res.ok) {
+                        let msg = `Thermal API error ${res.status}`;
+                        try { msg = (await res.json()).error || msg; } catch {}
+                        throw new Error(msg);
+                    }
                     const data = await res.json();
                     if (data.commands) {
                         await printer.printRawCommands(data.commands as number[]);
@@ -284,7 +312,11 @@ export function PrintBridge() {
             }
 
             // Get business context for tenant isolation
-            const { businessId } = await getAuthContext();
+            const businessId = businessIdRef.current;
+            if (!businessId) {
+                toast.error('Cannot queue print job — organisation not loaded.');
+                return;
+            }
 
             const jobData = {
                 status: "pending",
