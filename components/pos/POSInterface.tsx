@@ -1,30 +1,27 @@
 "use client";
 
-import { createOrder } from "@/lib/actions/pos.actions";
+import { createTabOrderFromCart, updateOrder, computeKitchenDeltaForOrder } from "@/lib/actions/pos.actions";
 
 import { useState, useMemo, useEffect } from "react";
-import { Product, CartItem, Category } from "@/types/pos.types";
+import { Product, CartItem, Category, Order } from "@/types/pos.types";
 import { ProductCard } from "./ProductCard";
 import { isOutOfStock } from "@/lib/stock-utils";
+import { printOrderDocket, printKitchenDelta } from "@/lib/print.utils";
 import { CartSidebar } from "./CartSidebar";
 import { MobileCart } from "./MobileCart";
 import { ServerDashboard } from "./ServerDashboard";
-import { ProcessingOverlay } from "./ProcessingOverlay";
 import { SettleTableTabModal } from "./SettleTableTabModal";
-import { AddToTabModal } from "./AddToTabModal";
-import { Search, Grid, List, LayoutDashboard, LogOut, Menu, X, CreditCard, AlertTriangle } from "lucide-react";
+import { OpenOrdersModal } from "./OpenOrdersModal";
+import { ClosedOrdersModal } from "./ClosedOrdersModal";
+import { OrderConfirmationModal } from "./OrderConfirmationModal";
+import { Search, Grid, LayoutDashboard, X, CreditCard, Receipt, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
-import dynamic from 'next/dynamic';
 import { usePOSStore } from "@/store/pos-store";
 import { ProductDetailsModal } from "./ProductDetailsModal";
 import { client } from "@/lib/appwrite-client";
 import { Button } from "@/components/ui/button";
 
-const PaymentModal = dynamic(
-    () => import('./PaymentModal').then((mod) => mod.PaymentModal),
-    { ssr: false }
-);
-import { cn, formatCurrency } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
 import { useUser, UserButton } from "@clerk/nextjs";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -44,10 +41,8 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
         cart,
         addToCart,
         updateQuantity,
-        removeFromCart,
         clearCart,
-        isPaymentModalOpen,
-        setPaymentModalOpen
+        setCart,
     } = usePOSStore();
 
     // Local UI State
@@ -58,10 +53,12 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
     const [selectedCategory, setSelectedCategory] = useState<string>(searchParams.get("category") || "all");
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [mounted, setMounted] = useState(false);
-    const [isProcessingPayment, setIsProcessingPayment] = useState(false);
-    const [processingStatus, setProcessingStatus] = useState<"processing" | "generating" | "complete">("processing");
     const [isSettleTabModalOpen, setIsSettleTabModalOpen] = useState(false);
-    const [isAddToTabModalOpen, setIsAddToTabModalOpen] = useState(false);
+    const [isOpenOrdersOpen, setIsOpenOrdersOpen] = useState(false);
+    const [isClosedOrdersOpen, setIsClosedOrdersOpen] = useState(false);
+    const [isRecentOrderModalOpen, setIsRecentOrderModalOpen] = useState(false);
+    const [recentOrder, setRecentOrder] = useState<any | null>(null);
+    const [editingOrder, setEditingOrder] = useState<any | null>(null);
     const [showOutOfStock, setShowOutOfStock] = useState(false);
     const [outOfStockItem, setOutOfStockItem] = useState<Product | null>(null);
 
@@ -190,109 +187,126 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
         ).length;
     }, [sorted]);
 
-    const handleCheckout = () => {
-        setPaymentModalOpen(true);
-    };
+    const handleAddToTab = async () => {
+        if (editingOrder) {
+            toast.error("Save or cancel the current order edit before creating a new tab.");
+            return;
+        }
 
-    const handleAddToTab = () => {
-        if (!cart.length) return;
-        setIsAddToTabModalOpen(true);
-    };
+        if (!Array.isArray(cart) || !cart.length) return;
 
-    const handlePaymentSuccess = async (reference: string, tableNumber: number, guestCount: number) => {
         try {
-            // INSTANT FEEDBACK - Show processing overlay immediately (< 3ms)
-            setIsProcessingPayment(true);
-            setProcessingStatus("processing");
-
-            // Close payment modal
-            setPaymentModalOpen(false);
-
-            // Calculate totals - prices are VAT-inclusive (16%)
-            const vatRate = 0.16;
-            const subtotalBeforeVat = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-            const subtotal = subtotalBeforeVat / (1 + vatRate);
-            const taxAmount = subtotal * vatRate;
-            const total = subtotalBeforeVat;
-
-            // Generate short order number (max 20 chars per schema)
-            const timestamp = Date.now().toString().slice(-10); // Last 10 digits
-            const random = Math.random().toString(36).substring(2, 6).toUpperCase(); // 4 chars
-            const shortOrderNumber = `ORD-${timestamp}-${random}`; // e.g., ORD-4012345678-A3B9 (19 chars)
-
-            // Update status to generating receipt
-            setProcessingStatus("generating");
-
-            // Order data matching ACTUAL Appwrite schema (verified)
-            const orderData = {
-                // Order identification (max 20 chars!)
-                orderNumber: shortOrderNumber,
-                type: 'dine_in',
-                status: 'paid',
-
-                // Customer information
-                customerName: "Walk-in Customer",
-                tableNumber: tableNumber,
-                guestCount: guestCount,
-
-                // Staff information
+            const newOrder = await createTabOrderFromCart({
+                items: cart,
                 waiterName: user?.fullName || "POS System",
-                waiterId: user?.id || "system", // Clerk user ID for dashboard filtering
-
-                // Financial details - VAT calculated from VAT-inclusive prices
-                subtotal: Math.round(subtotal * 100) / 100,
-                taxAmount: Math.round(taxAmount * 100) / 100,
-                serviceCharge: 0,
-                discountAmount: 0,
-                tipAmount: 0,
-                totalAmount: total,
-
-                // Payment status
-                paymentStatus: 'paid',
-
-                // Timing
-                orderTime: new Date().toISOString(),
-
-                // Priority and items
-                priority: 'normal',
-                items: cart, // Will be stringified by createOrder action
-
-                // Store Paystack reference in specialInstructions (optional field)
-                specialInstructions: `Paystack Ref: ${reference}`,
-            };
-
-            const newOrder = await createOrder(orderData);
-
-            // Clean up temporary metadata from localStorage
-            Object.keys(localStorage).forEach(key => {
-                if (key.startsWith('pos_metadata_temp-')) {
-                    localStorage.removeItem(key);
-                }
+                waiterId: user?.id || "system",
             });
 
-            // Mark as complete
-            setProcessingStatus("complete");
+            let parsedItems: unknown = newOrder.items;
+            if (typeof parsedItems === "string") {
+                try {
+                    parsedItems = JSON.parse(parsedItems);
+                } catch {
+                    parsedItems = [];
+                }
+            }
+            if (!Array.isArray(parsedItems)) {
+                parsedItems = [];
+            }
 
+            const normalizedOrder = {
+                ...newOrder,
+                items: parsedItems,
+            } as any;
 
-            // Clear cart
             clearCart();
-
-            // Small delay to show complete state, then navigate
-            setTimeout(() => {
-                setIsProcessingPayment(false);
-                router.push(`/pos/receipt/${newOrder.$id}`);
-            }, 500);
+            // Print the kitchen docket immediately — fire-and-forget so the modal opens instantly
+            void printOrderDocket(newOrder.$id);
+            setRecentOrder(normalizedOrder);
+            setIsRecentOrderModalOpen(true);
         } catch (error) {
-            console.error("Failed to create order:", error);
-            setIsProcessingPayment(false);
-            // Optionally show error toast
+            console.error("Failed to add to tab:", error);
+            const message =
+                error instanceof Error ? error.message : "Failed to add order to tab. Please try again.";
+            toast.error(message);
         }
     };
 
-    // Calculate total for payment modal (prices are VAT-inclusive)
-    const cartTotal = useMemo(() => {
-        return cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
-    }, [cart]);
+    const handleEditOrder = async (order: any) => {
+        let parsedItems: unknown;
+        try {
+            parsedItems = typeof order.items === "string" ? JSON.parse(order.items) : order.items;
+        } catch {
+            toast.error("Order items could not be loaded for editing.");
+            return;
+        }
+        if (!Array.isArray(parsedItems) || parsedItems.length === 0) {
+            toast.error("Order items could not be loaded for editing.");
+            return;
+        }
+
+        setEditingOrder(order);
+        setCart(parsedItems as CartItem[]);
+        setIsOpenOrdersOpen(false);
+        setIsClosedOrdersOpen(false);
+        setIsSettleTabModalOpen(false);
+        setIsRecentOrderModalOpen(false);
+
+        toast.success("Order loaded — adjust quantities or items, then tap Update Order.");
+    };
+
+    const handleSaveOrderChanges = async () => {
+        if (!editingOrder) return;
+
+        try {
+            const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+            const subtotal = total / (1 + 0.16);
+            const taxAmount = subtotal * 0.16;
+
+            const cartLines = cart.map((c) => ({
+                $id: c.$id,
+                quantity: c.quantity,
+                name: c.name,
+            }));
+
+            const { deltaItems, newSnapshotLines } = await computeKitchenDeltaForOrder(
+                editingOrder.$id,
+                cartLines
+            );
+
+            if (deltaItems.length > 0) {
+                const printRes = await printKitchenDelta(editingOrder.$id, deltaItems);
+                if (!printRes.success) {
+                    toast.error(
+                        "Kitchen addition did not print; order was not saved. Fix the printer and try Update Order again."
+                    );
+                    return;
+                }
+            }
+
+            await updateOrder(editingOrder.$id, {
+                items: cart,
+                subtotal: Math.round(subtotal * 100) / 100,
+                taxAmount: Math.round(taxAmount * 100) / 100,
+                totalAmount: total,
+                kitchenSnapshotLines: newSnapshotLines,
+            } as any);
+
+            toast.success("Order updated successfully.");
+            setEditingOrder(null);
+            clearCart();
+        } catch (error) {
+            console.error("Failed to save order changes:", error);
+            toast.error("Unable to save order updates.");
+        }
+    };
+
+    const handleCancelOrderEdit = () => {
+        setEditingOrder(null);
+        clearCart();
+        toast.success("Order edit canceled.");
+    };
+
 
     // Prevent hydration mismatch by waiting for mount
     if (!mounted || !isLoaded) return <div className="h-screen flex items-center justify-center bg-black text-white">Loading POS...</div>;
@@ -366,6 +380,24 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
                                         <LayoutDashboard className="w-4 h-4" />
                                         <span className="text-sm font-medium">Dashboard</span>
                                     </Link>
+
+                                    <Button
+                                        type="button"
+                                        onClick={() => setIsOpenOrdersOpen(true)}
+                                        className="hidden md:inline-flex items-center gap-2 bg-neutral-800 hover:bg-neutral-700 text-white px-4 py-2 rounded-lg"
+                                    >
+                                        <Grid className="w-4 h-4" />
+                                        <span className="text-sm font-medium">Open Orders</span>
+                                    </Button>
+
+                                    <Button
+                                        type="button"
+                                        onClick={() => setIsClosedOrdersOpen(true)}
+                                        className="hidden md:inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-500 text-white px-4 py-2 rounded-lg"
+                                    >
+                                        <Receipt className="w-4 h-4" />
+                                        <span className="text-sm font-medium">Closed Orders</span>
+                                    </Button>
 
                                     <Button
                                         type="button"
@@ -487,7 +519,8 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
                                             return;
                                         }
                                         if (p.stock !== undefined) {
-                                            const inCart = cart.find(c => c.$id === p.$id)?.quantity ?? 0;
+                                            const cartArray = Array.isArray(cart) ? cart : [];
+                                            const inCart = cartArray.find(c => c.$id === p.$id)?.quantity ?? 0;
                                             if (inCart >= p.stock) {
                                                 toast.error(`Only ${p.stock} available — already in cart`);
                                                 return;
@@ -516,9 +549,11 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
                 <CartSidebar
                     cart={cart}
                     onUpdateQuantity={updateQuantity}
-                    onRemove={removeFromCart}
-                    onCheckout={handleCheckout}
                     onAddToTab={handleAddToTab}
+                    editingOrderId={editingOrder?.$id}
+                    editingCustomerName={editingOrder?.customerName ?? null}
+                    onSaveOrderChanges={handleSaveOrderChanges}
+                    onCancelEdit={handleCancelOrderEdit}
                 />
             </div>
 
@@ -526,9 +561,11 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
             <MobileCart
                 cart={cart}
                 onUpdateQuantity={updateQuantity}
-                onRemove={removeFromCart}
-                onCheckout={handleCheckout}
                 onAddToTab={handleAddToTab}
+                editingOrderId={editingOrder?.$id}
+                editingCustomerName={editingOrder?.customerName ?? null}
+                onSaveOrderChanges={handleSaveOrderChanges}
+                onCancelEdit={handleCancelOrderEdit}
             />
 
             {/* Product Details Modal */}
@@ -540,22 +577,6 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
                     onAdd={(product, quantity) => addToCart(product, quantity)}
                 />
             )}
-
-            {/* Payment Modal */}
-            <PaymentModal
-                isOpen={isPaymentModalOpen}
-                onClose={() => setPaymentModalOpen(false)}
-                amount={cartTotal}
-                email={user?.primaryEmailAddress?.emailAddress || "customer@example.com"}
-                orderId={`temp-${Date.now()}`}
-                onSuccess={handlePaymentSuccess}
-            />
-
-            {/* Processing Overlay - Instant feedback after payment */}
-            <ProcessingOverlay
-                isVisible={isProcessingPayment}
-                status={processingStatus}
-            />
 
             {/* Out-of-Stock Warning Dialog */}
             {outOfStockItem && (
@@ -607,18 +628,46 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
             <SettleTableTabModal
                 isOpen={isSettleTabModalOpen}
                 onClose={() => setIsSettleTabModalOpen(false)}
+                onEdit={handleEditOrder}
             />
 
-            {/* Add To Tab Modal */}
-            <AddToTabModal
-                isOpen={isAddToTabModalOpen}
-                onClose={() => setIsAddToTabModalOpen(false)}
-                cart={cart as CartItem[]}
-                waiterName={user?.fullName || null}
-                waiterId={user?.id || null}
-                onSuccess={() => {
-                    clearCart();
+            <ClosedOrdersModal
+                isOpen={isClosedOrdersOpen}
+                onClose={() => setIsClosedOrdersOpen(false)}
+            />
+
+            {/* Open Orders Modal */}
+            <OpenOrdersModal
+                isOpen={isOpenOrdersOpen}
+                onClose={() => setIsOpenOrdersOpen(false)}
+                onPrint={async (order) => {
+                    await printOrderDocket(order.$id);
                 }}
+                onEdit={handleEditOrder}
+            />
+
+
+            {/* Recent Order Review Modal */}
+            <OrderConfirmationModal
+                isOpen={isRecentOrderModalOpen && recentOrder !== null}
+                onClose={() => {
+                    setIsRecentOrderModalOpen(false);
+                    setRecentOrder(null);
+                }}
+                items={recentOrder?.items || []}
+                total={recentOrder?.totalAmount || 0}
+                tableNumber={recentOrder?.tableNumber}
+                customerName={recentOrder?.customerName}
+                onEdit={() => {
+                    if (recentOrder) {
+                        handleEditOrder(recentOrder);
+                    }
+                }}
+                onConfirm={() => {
+                    setIsRecentOrderModalOpen(false);
+                    setRecentOrder(null);
+                }}
+                confirmLabel="Done"
             />
         </div>
     );

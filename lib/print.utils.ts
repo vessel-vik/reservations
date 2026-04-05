@@ -24,8 +24,14 @@ export async function printOrderDocket(
         toast.error(BRIDGE_NOT_READY_MSG);
         return { success: false, error: 'PrintBridge not mounted' };
     }
-    await queue('captain_docket', `orderId:${orderId}`);
-    return { success: true };
+    try {
+        await queue('captain_docket', `orderId:${orderId}`);
+        return { success: true };
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Unknown print error';
+        toast.error(msg);
+        return { success: false, error: msg };
+    }
 }
 
 /**
@@ -46,6 +52,12 @@ export async function printKitchenDelta(
         toast.error(BRIDGE_NOT_READY_MSG);
         return { success: false, error: 'PrintBridge not mounted' };
     }
-    await queue('kitchen_delta', JSON.stringify({ orderId, deltaItems }));
-    return { success: true };
+    try {
+        await queue('kitchen_delta', JSON.stringify({ orderId, deltaItems }));
+        return { success: true };
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Unknown print error';
+        toast.error(msg);
+        return { success: false, error: msg };
+    }
 }
