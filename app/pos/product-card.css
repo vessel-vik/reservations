@@ -9,26 +9,41 @@
     gap: 1.5rem; /* 24px */
 }
 
-/* Desktop: 4 columns max */
-@media (min-width: 1280px) {
+/* Desktop: 6 columns for extra-wide screens */
+@media (min-width: 1600px) {
     .product-grid {
-        grid-template-columns: repeat(4, 1fr);
-        gap: 1.5rem;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 0.9rem;
     }
 }
 
-/* Laptop: 3 columns */
+/* Desktop: more compact layout */
+@media (min-width: 1400px) and (max-width: 1599px) {
+    .product-grid {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 1rem;
+    }
+}
+
+@media (min-width: 1280px) and (max-width: 1399px) {
+    .product-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 0.95rem;
+    }
+}
+
+/* Laptop: 4 columns */
 @media (min-width: 1024px) and (max-width: 1279px) {
     .product-grid {
-        grid-template-columns: repeat(3, 1fr);
-        gap: 1.25rem;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 1rem;
     }
 }
 
 /* Tablet: 3 columns */
 @media (min-width: 768px) and (max-width: 1023px) {
     .product-grid {
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 1rem;
     }
 }
@@ -55,9 +70,29 @@
 }
 
 .product-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(16, 185, 129, 0.3);
+    transform: translateY(-3px);
+    box-shadow: 0 16px 32px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(16, 185, 129, 0.3);
     border-color: rgba(16, 185, 129, 0.5);
+}
+
+.product-card-info {
+    position: absolute;
+    top: 0.5rem;
+    left: 0.5rem;
+    width: 2.25rem;
+    height: 2.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(15, 23, 42, 0.8);
+    border-radius: 9999px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    z-index: 20;
+    transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.product-card-info:hover {
+    background: rgba(16, 185, 129, 0.95);
 }
 
 /* Image Container - Fixed aspect ratio */
@@ -289,4 +324,25 @@
     100% {
         background-position: 200% 0;
     }
+}
+
+/* Portrait tablet — 3 columns, full content width */
+@media (min-width: 768px) and (orientation: portrait) {
+  .product-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  /* Push content above the bottom tab bar */
+  .pos-main-content {
+    padding-bottom: 72px;
+  }
+  .tablet-portrait-only {
+    display: flex !important;
+  }
+}
+
+/* Landscape tablet — 3 columns (sidebar takes 150px) */
+@media (min-width: 768px) and (orientation: landscape) and (max-width: 1023px) {
+  .product-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }
