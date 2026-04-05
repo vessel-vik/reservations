@@ -30,6 +30,10 @@ The lock is removed entirely. Appwrite's atomic document writes make application
 |------|--------|
 | `lib/actions/pos.actions.ts` | Add `getOpenOrdersSummary()`. Fix `settleTableTabAndCreateOrder` (remove locking block). |
 | `components/pos/SettleTableTabModal.tsx` | Full rewrite — full-screen modal, auto-load, color codes, sticky bar. |
+| `components/pos/OrderReceiptModal.tsx` | New — digital receipt preview modal with auto-print on open. |
+| `lib/print.utils.ts` | Add `printReceipt(orderId)` helper. |
+| `components/pos/POSInterface.tsx` | Wire `receiptOrder` state; `onPrint` from OpenOrdersModal opens receipt modal. |
+| `components/pos/PayNowModal.tsx` | No changes to the component itself — parent handles receipt show on `onPaymentSuccess`. |
 | `vercel.json` | Cron schedule `30 3 * * *` → `30 4 * * *` |
 | `__tests__/pos/settle-tab.test.ts` | Unit tests for `getOpenOrdersSummary` and age-color logic |
 
@@ -228,6 +232,117 @@ const grandTotal = orders.reduce((s, o) => s + o.totalAmount, 0);
 
 ---
 
+---
+
+## Receipt Modal: `OrderReceiptModal`
+
+### Purpose
+
+A lightweight customer-facing receipt modal. Shown in two situations:
+1. **Staff clicks the print button** on a row in the Open Orders tab → preview the receipt before printing
+2. **Payment succeeds** (via PayNowModal or SettleTableTabModal settlement) → show the paid receipt
+
+### Props
+
+```typescript
+interface OrderReceiptModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  order: {
+    $id: string;
+    orderNumber?: string;
+    tableNumber?: number;
+    customerName?: string;
+    waiterName?: string;
+    orderTime: string;
+    items: any[];        // parsed with parseOrderItems
+    subtotal: number;
+    totalAmount: number;
+    paymentStatus: string;
+  };
+  paymentMethod?: string;    // "cash" | "pdq" | "mpesa" | "paystack" — shown when paid
+  paymentReference?: string; // shown when paid
+}
+```
+
+### Auto-print on open
+
+`useEffect` with `[isOpen]` dep: when `isOpen` becomes true, call `window.queuePrintJob('receipt', \`orderId:${order.$id}\`)`.
+
+This auto-queues the print job to the admin terminal without the staff pressing any button. A "Print Again" button allows re-queuing if needed.
+
+### Layout
+
+```
+Dialog: max-w-sm, dark background
+  ├── Header: order number + table + time
+  ├── PAID / UNPAID badge (emerald if paid, amber if unpaid)
+  ├── Items list: "Qty× Name — Ksh X" rows
+  ├── Dashed separator
+  ├── Subtotal row
+  ├── VAT (16%) row
+  ├── Total row (bold)
+  ├── [if paid] Payment method + reference line
+  └── Footer: "Print Again" (ghost, re-queues) | "Done" (closes)
+```
+
+VAT is computed client-side: `vat = totalAmount - subtotal`. If `subtotal === 0` or not set, fall back to `subtotal = totalAmount / 1.16` and `vat = totalAmount - subtotal`.
+
+### `printReceipt` helper in `lib/print.utils.ts`
+
+```typescript
+export async function printReceipt(
+  orderId: string
+): Promise<{ success: boolean; error?: string }> {
+  // mirrors printOrderDocket but queues jobType 'receipt'
+  const queue = getQueueFn();
+  if (!queue) { toast.error(BRIDGE_NOT_READY_MSG); return { success: false, error: 'PrintBridge not mounted' }; }
+  try {
+    await queue('receipt', `orderId:${orderId}`);
+    return { success: true };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown print error';
+    toast.error(msg);
+    return { success: false, error: msg };
+  }
+}
+```
+
+### Wiring in `POSInterface.tsx`
+
+Add state:
+```typescript
+const [receiptOrder, setReceiptOrder] = useState<Order | null>(null);
+```
+
+Change `onPrint` prop in `<OpenOrdersModal>` (currently calls `printOrderDocket(order.$id)` silently):
+```typescript
+onPrint={(order) => setReceiptOrder(order)}
+```
+
+Add `onPaymentSuccess` handler at the `<PayNowModal>` usage site — after settlement succeeds the parent already has the order; call `setReceiptOrder(order)` there.
+
+Render:
+```tsx
+{receiptOrder && (
+  <OrderReceiptModal
+    isOpen={!!receiptOrder}
+    onClose={() => setReceiptOrder(null)}
+    order={receiptOrder}
+    paymentMethod={lastPaymentMethod}  // from existing state
+    paymentReference={lastPaymentRef}  // from existing state
+  />
+)}
+```
+
+### Wiring in `SettleTableTabModal.tsx` (new modal, this spec)
+
+After a successful `settleSelectedOrders` / `settleSelectedOrders` call returns a `consolidatedOrderId`, construct a minimal order object from the settled orders and call `setReceiptOrder(consolidatedOrder)` on the parent, OR — simpler — pass an `onSettlementSuccess: (consolidatedOrderId: string) => void` callback and let `POSInterface` open the modal with a refetched or synthetic order.
+
+**Chosen approach:** Add `onSettlementSuccess?: (consolidatedOrderId: string, totalAmount: number) => void` prop to `SettleTableTabModal`. On success, call it. `POSInterface` opens `OrderReceiptModal` with a synthetic order object `{ $id: consolidatedOrderId, orderNumber: consolidatedOrderId, totalAmount, subtotal: totalAmount/1.16, items: [], paymentStatus: 'paid', orderTime: new Date().toISOString() }`.
+
+---
+
 ## Cron Reschedule
 
 **File:** `vercel.json`
@@ -272,4 +387,5 @@ describe('orderAgeColor', () => {
 - `getTableDailyTabSummary` / `getUnpaidOrdersForTableOnDate` — untouched
 - `/pos/receipt/[orderId]` page — untouched
 - Paystack flow helpers — untouched
+- `PayNowModal.tsx` — component logic untouched; receipt shown by parent on `onPaymentSuccess`
 - All other POS modals — untouched
