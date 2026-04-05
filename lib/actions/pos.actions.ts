@@ -266,7 +266,7 @@ const updateOrderDocumentSafe = async (orderId: string, updateData: Record<strin
             settlementType,
             settledOrderIds,
         });
-        payload.specialInstructions = `${base}${audit}`.slice(0, 9500);
+        payload.specialInstructions = `${base}${audit}`.slice(0, 950);
     } else if (incomingSpecial !== undefined) {
         payload.specialInstructions = incomingSpecial;
     }
