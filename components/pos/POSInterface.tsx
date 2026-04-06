@@ -347,7 +347,7 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
             <div className="flex-1 flex flex-col min-w-0">
 
                 {/* Optimized Header with Hamburger Menu */}
-                <div className="bg-neutral-900 border-b border-white/10 px-4 md:px-8 py-4 safe-area-top">
+                <div className="bg-neutral-900 border-b border-white/10 px-4 py-3 safe-area-top">
                     <div className="flex items-center justify-between gap-4">
                         {/* Left: Hamburger (mobile) + Logo */}
                         <div className="flex items-center gap-3">
@@ -371,8 +371,8 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
 
                         {/* Right: Search (desktop) + User */}
                         <div className="flex items-center gap-3">
-                            {/* Search - Desktop Only */}
-                            <div className="hidden md:block relative">
+                            {/* Search - Large desktop only */}
+                            <div className="hidden lg:block relative">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
                                 <input
                                     type="text"
@@ -383,12 +383,12 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
                                 />
                             </div>
 
-                            {/* Dashboard Link - Desktop Only */}
+                            {/* Action buttons — tablet: icon+label compact; desktop: full size */}
                             {user?.id && (
                                 <>
                                     <Link
                                         href={`/pos/dashboard/${user.id}`}
-                                        className="hidden md:flex items-center gap-2 bg-neutral-800 hover:bg-neutral-700 text-white px-4 py-2 rounded-lg transition-colors"
+                                        className="hidden lg:flex items-center gap-2 bg-neutral-800 hover:bg-neutral-700 text-white px-4 py-2 rounded-lg transition-colors"
                                     >
                                         <LayoutDashboard className="w-4 h-4" />
                                         <span className="text-sm font-medium">Dashboard</span>
@@ -397,28 +397,28 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
                                     <Button
                                         type="button"
                                         onClick={() => setIsOpenOrdersOpen(true)}
-                                        className="hidden md:inline-flex items-center gap-2 bg-neutral-800 hover:bg-neutral-700 text-white px-4 py-2 rounded-lg"
+                                        className="hidden md:inline-flex items-center gap-1.5 bg-neutral-800 hover:bg-neutral-700 text-white px-3 py-1.5 rounded-lg text-xs lg:text-sm lg:px-4 lg:py-2"
                                     >
-                                        <Grid className="w-4 h-4" />
-                                        <span className="text-sm font-medium">Open Orders</span>
+                                        <Grid className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
+                                        <span>Open Orders</span>
                                     </Button>
 
                                     <Button
                                         type="button"
                                         onClick={() => setIsClosedOrdersOpen(true)}
-                                        className="hidden md:inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-500 text-white px-4 py-2 rounded-lg"
+                                        className="hidden md:inline-flex items-center gap-1.5 bg-sky-600 hover:bg-sky-500 text-white px-3 py-1.5 rounded-lg text-xs lg:text-sm lg:px-4 lg:py-2"
                                     >
-                                        <Receipt className="w-4 h-4" />
-                                        <span className="text-sm font-medium">Closed Orders</span>
+                                        <Receipt className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
+                                        <span>Closed Orders</span>
                                     </Button>
 
                                     <Button
                                         type="button"
                                         onClick={() => setIsSettleTabModalOpen(true)}
-                                        className="hidden md:inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg"
+                                        className="hidden md:inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs lg:text-sm lg:px-4 lg:py-2"
                                     >
-                                        <CreditCard className="w-4 h-4" />
-                                        <span className="text-sm font-medium">Settle Table</span>
+                                        <CreditCard className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
+                                        <span>Settle Table</span>
                                     </Button>
                                 </>
                             )}
@@ -472,7 +472,7 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
                 </div>
 
                 {/* Desktop Category Tabs */}
-                <div className="hidden md:flex gap-1 px-4 md:px-8 py-3 overflow-x-auto scrollbar-hide border-b border-white/5 bg-neutral-900/50">
+                <div className="hidden md:flex gap-1 px-4 py-2 overflow-x-auto scrollbar-hide border-b border-white/5 bg-neutral-900/50">
                     {displayCategories.map(category => (
                         <button
                             key={category.slug}
@@ -508,7 +508,7 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
                 )}
 
                 {/* Products Grid - Optimized responsive layout */}
-                <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6 pb-24 md:pb-6 scrollbar-hide">
+                <div className="flex-1 overflow-y-auto px-3 md:px-4 py-4 pb-24 md:pb-4 scrollbar-hide">
                     {visibleProducts.length === 0 ? (
                         <div className="flex items-center justify-center h-full">
                             <div className="text-center space-y-3 max-w-xs">

@@ -31,7 +31,7 @@ export const CartSidebar = ({
     const total = subtotalBeforeVat;
 
     return (
-        <div className="flex h-full flex-col bg-[#0a0a0a] border-l border-white/10 w-[150px] lg:w-[400px]">
+        <div className="flex h-full flex-col bg-[#0a0a0a] border-l border-white/10 w-[240px] lg:w-[400px]">
             <div className="px-3 py-3 lg:px-6 lg:py-5 border-b border-white/10">
                 <div className="flex items-center justify-between">
                     <h2 className="text-lg font-bold text-white">Current Order</h2>
@@ -59,7 +59,7 @@ export const CartSidebar = ({
                 </div>
             )}
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            <div className="flex-1 overflow-y-auto p-2 lg:p-4 space-y-2 lg:space-y-3">
                 {cartArray.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full min-h-[200px] text-neutral-500 space-y-4">
                         <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center">
@@ -88,7 +88,7 @@ export const CartSidebar = ({
 
                             <div className="flex-1 min-w-0 py-0.5">
                                 <div className="flex justify-between items-start gap-2">
-                                    <h4 className="font-medium text-neutral-100 truncate text-sm max-w-[80px] lg:max-w-none">{item.name}</h4>
+                                    <h4 className="font-medium text-neutral-100 truncate text-sm max-w-[120px] lg:max-w-none">{item.name}</h4>
                                     <span className="font-bold text-emerald-400 whitespace-nowrap text-sm tabular-nums">
                                         {formatCurrency(item.price * item.quantity)}
                                     </span>
@@ -135,7 +135,7 @@ export const CartSidebar = ({
                 <div className="pt-4 border-t border-white/10 space-y-3">
                     <div className="flex justify-between items-end">
                         <span className="text-neutral-300">Total</span>
-                        <span className="text-3xl font-bold text-white tabular-nums">{formatCurrency(total)}</span>
+                        <span className="text-xl lg:text-3xl font-bold text-white tabular-nums">{formatCurrency(total)}</span>
                     </div>
 
                     {editingOrderId ? (
@@ -144,17 +144,17 @@ export const CartSidebar = ({
                                 type="button"
                                 onClick={onSaveOrderChanges}
                                 disabled={cart.length === 0}
-                                className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-neutral-700 disabled:cursor-not-allowed text-white text-lg font-bold py-3 rounded-lg shadow-lg shadow-emerald-900/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                                className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-neutral-700 disabled:cursor-not-allowed text-white text-sm lg:text-lg font-bold py-2.5 lg:py-3 rounded-lg shadow-lg shadow-emerald-900/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
                             >
-                                <Check className="w-5 h-5" />
+                                <Check className="w-4 h-4 lg:w-5 lg:h-5" />
                                 Update Order
                             </button>
                             <button
                                 type="button"
                                 onClick={onCancelEdit}
-                                className="w-full bg-neutral-800 hover:bg-neutral-700 text-white text-lg font-semibold py-3 rounded-lg border border-white/10 transition-all flex items-center justify-center gap-2"
+                                className="w-full bg-neutral-800 hover:bg-neutral-700 text-white text-sm lg:text-lg font-semibold py-2.5 lg:py-3 rounded-lg border border-white/10 transition-all flex items-center justify-center gap-2"
                             >
-                                <X className="w-5 h-5" />
+                                <X className="w-4 h-4 lg:w-5 lg:h-5" />
                                 Cancel
                             </button>
                         </div>
@@ -163,7 +163,7 @@ export const CartSidebar = ({
                             type="button"
                             onClick={onAddToTab}
                             disabled={cart.length === 0}
-                            className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-neutral-700 disabled:cursor-not-allowed text-white text-lg font-bold py-3 rounded-lg shadow-lg shadow-emerald-900/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                            className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-neutral-700 disabled:cursor-not-allowed text-white text-sm lg:text-lg font-bold py-2.5 lg:py-3 rounded-lg shadow-lg shadow-emerald-900/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
                         >
                             Add To Tab
                         </button>

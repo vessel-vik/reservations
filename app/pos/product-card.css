@@ -340,9 +340,33 @@
   }
 }
 
-/* Landscape tablet — 3 columns (sidebar takes 150px) */
+/* Landscape tablet — 4 columns (sidebar takes 240px, leaves ~560px+) */
 @media (min-width: 768px) and (orientation: landscape) and (max-width: 1023px) {
   .product-grid {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.6rem;
+  }
+}
+
+/* Tablet range (768–1023px) — compact card content */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .product-card-content {
+    padding: 0.625rem;
+    gap: 0.25rem;
+  }
+  .product-card-name {
+    font-size: 0.8125rem;
+    min-height: 2.1rem;
+  }
+  .product-card-description {
+    font-size: 0.6875rem;
+    min-height: 1.9rem;
+    -webkit-line-clamp: 1;
+  }
+  .product-card-price {
+    font-size: 1rem;
+  }
+  .product-card-image {
+    aspect-ratio: 4 / 3;
   }
 }

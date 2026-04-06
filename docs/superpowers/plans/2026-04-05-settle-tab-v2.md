@@ -986,8 +986,9 @@ export function SettleTableTabModal({
 
     const handlePaystackFlow = async (orderIds: string[], amount: number): Promise<string> => {
         const syntheticOrderId = `tab-multi-${Date.now()}`;
+        const uniqueEmail = `${syntheticOrderId}@ampm.co.ke`;
         const initResult = await initializePaystackTransaction({
-            email: "customer@example.com",
+            email: uniqueEmail,
             amount,
             orderId: syntheticOrderId,
             metadata: { type: "table_tab_multi", orderIds },
