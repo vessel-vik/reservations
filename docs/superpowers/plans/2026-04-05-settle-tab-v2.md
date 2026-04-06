@@ -14,15 +14,132 @@
 
 | File | Action | Responsibility |
 |------|--------|----------------|
-| `lib/actions/pos.actions.ts` | Modify | Add `getOpenOrdersSummary()`; remove settlement lock from `settleTableTabAndCreateOrder` |
+| `lib/actions/pos.actions.ts` | Modify | Add `getOpenOrdersSummary()`; add `getNextTabNumber()`; remove settlement lock from `settleTableTabAndCreateOrder` |
 | `types/pos.types.ts` | Modify | Add `OpenOrder` and `OpenOrdersSummary` interfaces |
-| `components/pos/SettleTableTabModal.tsx` | Rewrite | Full-screen modal, auto-load, color-coded cards, sticky bottom bar |
+| `components/pos/SettleTableTabModal.tsx` | Rewrite | Full-screen modal, auto-load, color-coded cards, sliding payment sub-views, sticky bottom bar |
 | `components/pos/OrderReceiptModal.tsx` | Create | Digital receipt preview, auto-queues receipt print job on open |
 | `lib/print.utils.ts` | Modify | Add `printReceipt(orderId)` helper |
 | `components/pos/POSInterface.tsx` | Modify | Wire `receiptOrder` state, `onPrint` → receipt modal, settlement → receipt modal |
 | `vercel.json` | Modify | Reschedule cron `30 3 * * *` → `30 4 * * *` |
 | `app/api/cron/stale-orders/route.ts` | Modify | Fix `specialInstructions` cap: `slice(0, 9500)` → `slice(0, 950)` |
-| `__tests__/pos/settle-tab.test.ts` | Create | Unit tests for `getOpenOrdersSummary` and `orderAgeColor` |
+| `__tests__/pos/settle-tab.test.ts` | Create | Unit tests for `getOpenOrdersSummary`, `getNextTabNumber`, and `orderAgeColor` |
+
+---
+
+## Task 0: Auto Tab Number Assignment in `createTabOrderFromCart`
+
+**Files:**
+- Modify: `lib/actions/pos.actions.ts` (add `getNextTabNumber` helper + use it in `createTabOrderFromCart`)
+- Modify: `__tests__/pos/settle-tab.test.ts` (add tests)
+
+### Background
+
+Currently `createTabOrderFromCart` does not assign a `tableNumber`. Waiters must remember or manually enter it. This task auto-assigns the next sequential tab number for the business day so the waiter can start taking orders immediately without friction.
+
+### Logic
+
+`getNextTabNumber(businessId: string): Promise<number>`:
+1. Query Appwrite for today's orders for this business (`orderTime >= startOfToday`)
+2. Reduce to find `max(tableNumber)` across all results
+3. Return `max + 1` (or `1` if no orders today)
+
+Then in `createTabOrderFromCart`, call `getNextTabNumber(businessId)` and include the result as `tableNumber` in `orderData`.
+
+- [ ] **Step 1: Write failing tests**
+
+Add to `__tests__/pos/settle-tab.test.ts`:
+
+```typescript
+describe('getNextTabNumber', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it('returns 1 when no orders exist today', async () => {
+    mockListDocuments.mockResolvedValue({ documents: [], total: 0 });
+    const { getNextTabNumber } = await import('@/lib/actions/pos.actions');
+    expect(await getNextTabNumber('biz-1')).toBe(1);
+  });
+
+  it('returns max tableNumber + 1 from today\'s orders', async () => {
+    mockListDocuments.mockResolvedValue({
+      documents: [
+        { tableNumber: 3 }, { tableNumber: 7 }, { tableNumber: 2 }
+      ],
+      total: 3,
+    });
+    const { getNextTabNumber } = await import('@/lib/actions/pos.actions');
+    expect(await getNextTabNumber('biz-1')).toBe(8);
+  });
+
+  it('skips orders with no tableNumber', async () => {
+    mockListDocuments.mockResolvedValue({
+      documents: [{ tableNumber: null }, { tableNumber: 4 }],
+      total: 2,
+    });
+    const { getNextTabNumber } = await import('@/lib/actions/pos.actions');
+    expect(await getNextTabNumber('biz-1')).toBe(5);
+  });
+});
+```
+
+- [ ] **Step 2: Run tests, expect FAIL**
+
+```bash
+source ~/.nvm/nvm.sh && nvm use 20 && npx vitest run __tests__/pos/settle-tab.test.ts
+```
+
+- [ ] **Step 3: Implement `getNextTabNumber` in `lib/actions/pos.actions.ts`**
+
+Add near the top exports (before `getOpenOrdersSummary`):
+
+```typescript
+/**
+ * Returns the next sequential tab number for today's business session.
+ * Used by createTabOrderFromCart to auto-assign a table/tab ID without waiter input.
+ */
+export const getNextTabNumber = async (businessId: string): Promise<number> => {
+    if (!DATABASE_ID || !ORDERS_COLLECTION_ID) return 1;
+
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    try {
+        const res = await databases.listDocuments(
+            DATABASE_ID,
+            ORDERS_COLLECTION_ID,
+            [
+                Query.equal("businessId", businessId),
+                Query.greaterThanEqual("orderTime", startOfToday.toISOString()),
+                Query.orderDesc("tableNumber"),
+                Query.limit(1),
+            ]
+        );
+        if (res.documents.length === 0) return 1;
+        const maxTable = (res.documents[0] as any).tableNumber as number | null;
+        return (maxTable ?? 0) + 1;
+    } catch {
+        return 1; // fallback — never block order creation
+    }
+};
+```
+
+Then find `createTabOrderFromCart` and in the `orderData` object, replace any hardcoded or missing `tableNumber` with:
+
+```typescript
+tableNumber: await getNextTabNumber(businessId),
+```
+
+- [ ] **Step 4: Run tests, expect PASS**
+
+```bash
+source ~/.nvm/nvm.sh && nvm use 20 && npx vitest run __tests__/pos/settle-tab.test.ts
+```
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add lib/actions/pos.actions.ts __tests__/pos/settle-tab.test.ts
+git commit -m "feat: auto-assign sequential tab number in createTabOrderFromCart"
+```
 
 ---
 
@@ -791,7 +908,62 @@ git commit -m "feat: add OrderReceiptModal — digital receipt preview with auto
 **Files:**
 - Rewrite: `components/pos/SettleTableTabModal.tsx`
 
-The existing component is replaced entirely. The new one auto-loads all unpaid orders on open, color-codes by age, has a scrollable list with expandable cards, and a sticky bottom bar with payment method chips and charge buttons.
+The existing component is replaced entirely. The new one auto-loads all unpaid orders on open, color-codes by age, has a scrollable list with expandable cards, and a sticky bottom bar with **sliding payment sub-views** and charge buttons.
+
+### Sliding payment sub-view architecture
+
+When the user taps "Charge Selected" or "Charge All", instead of immediately charging, the bottom bar slides to a payment-method sub-view. This keeps all context in one screen and prevents accidental charges.
+
+State:
+```typescript
+type PaymentSubview = {
+  type: "cash" | "pdq" | "mpesa";
+  amount: number;
+  orderIds: string[];
+} | null;
+const [paymentSubview, setPaymentSubview] = useState<PaymentSubview>(null);
+```
+
+When `paymentSubview` is not null, the order list area is replaced with the sub-view. Each method:
+
+**Cash sub-view:**
+```
+← Back  |  Cash Payment  |  Ksh X
+─────────────────────────────────
+Amount received: [         ]
+Change: Ksh Y              (live-computed)
+[Confirm Cash Payment]     (disabled if amount < total)
+```
+Reference: `CASH-${Date.now()}` auto-generated.
+
+**PDQ sub-view:**
+```
+← Back  |  Card Payment  |  Ksh X
+─────────────────────────────────
+Process card through PDQ terminal, then enter approval code:
+Approval code: [          ]
+[Confirm PDQ Payment]      (disabled until code entered)
+```
+Reference: `PDQ-${approvalCode}-${Date.now()}`.
+
+**M-Pesa sub-view:**
+```
+← Back  |  M-Pesa  |  Ksh X
+─────────────────────────────────
+Customer phone (254…): [          ]
+[Send STK Push / Confirm]  (disabled until phone entered)
+```
+Reference: `MPESA-${phone}-${Date.now()}`.
+
+**Paystack:** No sub-view — launches PopStack directly (existing `handlePaystackFlow`).
+
+Tapping "← Back" sets `paymentSubview = null` (returns to order list). Confirming calls `settle(orderIds)` with the generated reference injected via a `paymentRef` state.
+
+The `settle()` function signature extends to accept an optional `paymentReference` override:
+```typescript
+const settle = async (orderIds: string[], paymentReference?: string) => { ... }
+```
+If `paymentReference` is supplied (from sub-view), skip the `manual-${paymentMethod}-${Date.now()}` fallback.
 
 - [ ] **Step 1: Add `orderAgeColor` test cases to settle-tab.test.ts**
 
