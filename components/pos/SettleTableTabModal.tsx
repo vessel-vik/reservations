@@ -11,11 +11,7 @@ import {
     getOpenOrdersSummary,
     settleSelectedOrders,
 } from "@/lib/actions/pos.actions";
-import {
-    initializePaystackTransaction,
-    verifyPaystackTransaction,
-} from "@/lib/actions/paystack.actions";
-import { openPaystackWithAccessCode } from "@/lib/paystack-inline";
+import { initializePaystackTransaction } from "@/lib/actions/paystack.actions";
 import { Loader2, Search, X, ChevronDown, ChevronUp, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { useOrganization, useUser } from "@clerk/nextjs";
@@ -97,7 +93,6 @@ export function SettleTableTabModal({
     const [search, setSearch] = useState("");
     const [isProcessing, setIsProcessing] = useState(false);
     const [urgentOnly, setUrgentOnly] = useState(false);
-    const [isPaystackReady, setIsPaystackReady] = useState(false);
 
     // Payment sub-view state
     const [paymentSubview, setPaymentSubview] = useState<{
@@ -114,15 +109,6 @@ export function SettleTableTabModal({
         if (!isOpen) return;
         void loadOrders();
     }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
-
-    // Paystack readiness poll
-    useEffect(() => {
-        if (typeof window === "undefined") return;
-        const check = () => { if ((window as any).PaystackPop) setIsPaystackReady(true); };
-        check();
-        const id = window.setInterval(check, 250);
-        return () => window.clearInterval(id);
-    }, []);
 
     const loadOrders = async () => {
         setIsLoading(true);
@@ -170,44 +156,38 @@ export function SettleTableTabModal({
         );
     };
 
-    const handlePaystackFlow = async (orderIds: string[], amount: number): Promise<string> => {
+    /**
+     * Redirect-based Paystack flow — safe for tablet/mobile browsers.
+     * Stores pending settlement in sessionStorage, then sends the browser
+     * to Paystack's hosted page. On return, /pos/paystack-callback verifies
+     * and settles the orders server-side.
+     */
+    const handlePaystackRedirect = async (orderIds: string[], amount: number): Promise<void> => {
         const syntheticOrderId = `tab-multi-${Date.now()}`;
         const uniqueEmail = `${syntheticOrderId}@ampm.co.ke`;
+        const callbackUrl = `${window.location.origin}/pos/paystack-callback`;
+
         const initResult = await initializePaystackTransaction({
             email: uniqueEmail,
             amount,
             orderId: syntheticOrderId,
             metadata: { type: "table_tab_multi", orderIds },
+            callback_url: callbackUrl,
         });
 
-        if (!initResult.success || !initResult.access_code) {
+        if (!initResult.success || !initResult.authorization_url || !initResult.reference) {
             throw new Error(initResult.error || "Failed to initialize payment");
         }
 
-        return new Promise<string>((resolve, reject) => {
-            openPaystackWithAccessCode(initResult.access_code!, {
-                onSuccess: async (reference) => {
-                    try {
-                        const verifyResult = await verifyPaystackTransaction(reference);
-                        if (!verifyResult.success || verifyResult.data?.status !== "success") {
-                            reject(new Error("Payment verification failed."));
-                            return;
-                        }
-                        const expectedKobo = Math.round(amount * 100);
-                        const paidKobo = Math.round((verifyResult.data.amount || 0) * 100);
-                        if (Math.abs(paidKobo - expectedKobo) > 2) {
-                            reject(new Error("Payment amount mismatch."));
-                            return;
-                        }
-                        resolve(reference);
-                    } catch (err) {
-                        reject(err instanceof Error ? err : new Error("Verification failed"));
-                    }
-                },
-                onCancel: () => reject(new Error("Payment cancelled.")),
-                onError: (msg) => reject(new Error(msg)),
-            });
-        });
+        // Persist settlement context so the callback page can complete the job
+        sessionStorage.setItem("paystack_pending_settlement", JSON.stringify({
+            orderIds,
+            amount,
+            reference: initResult.reference,
+        }));
+
+        // Full-page redirect — Paystack's mobile-optimised payment interface
+        window.location.href = initResult.authorization_url;
     };
 
     const settle = async (orderIds: string[], explicitRef?: string) => {
@@ -221,11 +201,6 @@ export function SettleTableTabModal({
                 .reduce((s, o) => s + o.totalAmount, 0);
 
             let paymentReference = explicitRef ?? `manual-${paymentMethod}-${Date.now()}`;
-
-            if (paymentMethod === "paystack" && !explicitRef) {
-                if (!isPaystackReady) throw new Error("Paystack is still loading. Please wait.");
-                paymentReference = await handlePaystackFlow(orderIds, amount);
-            }
 
             const result = await settleSelectedOrders({
                 orderIds,
@@ -253,7 +228,7 @@ export function SettleTableTabModal({
         }
     };
 
-    /** Open the appropriate payment sub-view instead of settling immediately. */
+    /** Open the appropriate payment sub-view, or redirect to Paystack for card/mobile-money. */
     const handleCharge = (orderIds: string[]) => {
         if (!orderIds.length) return;
         const amount = orders
@@ -261,11 +236,18 @@ export function SettleTableTabModal({
             .reduce((s, o) => s + o.totalAmount, 0);
 
         if (paymentMethod === "paystack") {
-            void settle(orderIds);
+            setIsProcessing(true);
+            setError(null);
+            handlePaystackRedirect(orderIds, amount).catch((err) => {
+                const msg = err instanceof Error ? err.message : "Failed to start payment.";
+                setError(msg);
+                toast.error(msg);
+                setIsProcessing(false);
+            });
             return;
         }
 
-        // Reset sub-view fields
+        // Non-Paystack: open local sub-view for manual reference capture
         setCashReceived(amount.toFixed(2));
         setPdqCode("");
         setMpesaRef("");

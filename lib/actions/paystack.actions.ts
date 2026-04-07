@@ -10,6 +10,8 @@ interface InitializeTransactionParams {
     amount: number; // Amount in KES
     orderId: string;
     metadata?: Record<string, any>;
+    /** Where Paystack should redirect after payment (used for redirect flow on mobile/tablet) */
+    callback_url?: string;
 }
 
 interface InitializeTransactionResponse {
@@ -41,7 +43,8 @@ export async function initializePaystackTransaction({
     email,
     amount,
     orderId,
-    metadata = {}
+    metadata = {},
+    callback_url,
 }: InitializeTransactionParams): Promise<InitializeTransactionResponse> {
     try {
         if (!PAYSTACK_SECRET_KEY) {
@@ -54,7 +57,7 @@ export async function initializePaystackTransaction({
         // Convert KES to cents (Paystack expects smallest currency unit)
         const amountInCents = Math.round(amount * 100);
 
-        const payload = {
+        const payload: Record<string, unknown> = {
             email,
             amount: amountInCents,
             currency: "KES",
@@ -62,9 +65,10 @@ export async function initializePaystackTransaction({
             metadata: {
                 businessId,
                 orderId,
-                ...metadata
+                ...metadata,
             },
-            channels: ["mobile_money", "card"]
+            channels: ["mobile_money", "card"],
+            ...(callback_url ? { callback_url } : {}),
         };
 
         const response = await fetch(`${PAYSTACK_BASE_URL}/transaction/initialize`, {
