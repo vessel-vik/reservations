@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Script from "next/script";
 import "./globals.css";
 import { Plus_Jakarta_Sans as FontSans } from "next/font/google";
 import { ThemeProvider } from "next-themes";
@@ -53,7 +52,6 @@ export default function RootLayout({
           <PrintBridge />
           {children}
           <Analytics />
-          <Script src="https://js.paystack.co/v2/inline.js" strategy="afterInteractive" />
           </ThemeProvider>
         </body>
       </html>
