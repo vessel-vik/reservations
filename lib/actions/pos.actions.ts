@@ -730,19 +730,32 @@ export const settleSelectedOrders = async ({
         };
     }
 
-    const fetchedOrders = await Promise.all(
-        orderIds.map(async (orderId) => {
-            try {
-                const order = await databases.getDocument(DATABASE_ID!, ORDERS_COLLECTION_ID!, orderId);
-                return parseStringify(order) as any;
-            } catch (error) {
-                console.warn(`Order ${orderId} could not be fetched during settlement:`, error);
-                return null;
-            }
-        })
-    );
+    // Hard cap: prevent abuse and Appwrite rate-limit exhaustion
+    const BATCH_SIZE = 10;
+    const cappedIds = orderIds.slice(0, 200);
 
-    const validOrders = fetchedOrders.filter((order): order is any => order !== null);
+    // Chunked sequential fetch — avoids flooding Appwrite with 50+ concurrent requests
+    const fetchedOrders: any[] = [];
+    for (let i = 0; i < cappedIds.length; i += BATCH_SIZE) {
+        const chunk = cappedIds.slice(i, i + BATCH_SIZE);
+        const results = await Promise.all(
+            chunk.map(async (orderId) => {
+                try {
+                    const order = await databases.getDocument(DATABASE_ID!, ORDERS_COLLECTION_ID!, orderId);
+                    return parseStringify(order) as any;
+                } catch (error) {
+                    console.warn(`Order ${orderId} not found during settlement:`, error);
+                    return null;
+                }
+            })
+        );
+        fetchedOrders.push(...results);
+    }
+
+    // Ownership check: all fetched orders must belong to this business
+    const validOrders = fetchedOrders.filter(
+        (order): order is any => order !== null && order.businessId === businessId
+    );
     const missingCount = orderIds.length - validOrders.length;
 
     if (!validOrders.length) {
@@ -774,7 +787,6 @@ export const settleSelectedOrders = async ({
     }
 
     const totalAmount = unpaidOrders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
-    const orderNumbers = unpaidOrders.map((order) => order.orderNumber || order.$id);
     const paymentRef = paymentReference || `manual-${paymentMethod}-${Date.now()}`;
 
     if (unpaidOrders.length === 1) {
@@ -855,7 +867,7 @@ export const settleSelectedOrders = async ({
         orderTime: new Date().toISOString(),
         priority: "normal",
         items: allItems,
-        specialInstructions: `GROUP SETTLEMENT - Table ${firstOrder.tableNumber} | Orders: ${orderNumbers.join(", ")} | Ref: ${paymentRef}`,
+        specialInstructions: `GROUP SETTLEMENT - Table ${firstOrder.tableNumber} - ${unpaidOrders.length} orders`,
         settlementType: "table_tab_master",
         settledOrderIds: unpaidOrders.map((o: any) => o.$id),
         paymentMethods: [
@@ -870,26 +882,27 @@ export const settleSelectedOrders = async ({
 
     const consolidatedOrder = await createOrder(consolidatedOrderData);
 
-    const updatePromises = unpaidOrders.map((order) => {
-        const existingMethods: any[] = Array.isArray(order.paymentMethods) ? order.paymentMethods : [];
-        const updatedMethods = [
-            ...existingMethods,
-            {
-                method: paymentMethod,
-                amount: order.totalAmount,
-                reference: paymentRef,
-                settledAt: new Date().toISOString(),
-            },
-        ];
-        return updateOrderDocumentSafe(order.$id, {
-            paymentStatus: "settled",
-            status: "paid",
-            settlementParentOrderId: consolidatedOrder.$id,
-            paymentMethods: updatedMethods,
-        });
-    });
-
-    const results = await Promise.allSettled(updatePromises);
+    // Chunked updates — same batch size to stay within Appwrite rate limits
+    const settledAt = new Date().toISOString();
+    const results: PromiseSettledResult<any>[] = [];
+    for (let i = 0; i < unpaidOrders.length; i += BATCH_SIZE) {
+        const chunk = unpaidOrders.slice(i, i + BATCH_SIZE);
+        const chunkResults = await Promise.allSettled(
+            chunk.map((order) => {
+                const existingMethods: any[] = Array.isArray(order.paymentMethods) ? order.paymentMethods : [];
+                return updateOrderDocumentSafe(order.$id, {
+                    paymentStatus: "settled",
+                    status: "paid",
+                    settlementParentOrderId: consolidatedOrder.$id,
+                    paymentMethods: [
+                        ...existingMethods,
+                        { method: paymentMethod, amount: order.totalAmount, reference: paymentRef, settledAt },
+                    ],
+                });
+            })
+        );
+        results.push(...chunkResults);
+    }
     const updatedCount = results.filter((r) => r.status === "fulfilled" && r.value !== null).length;
 
     return {
