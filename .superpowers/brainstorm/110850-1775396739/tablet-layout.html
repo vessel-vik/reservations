@@ -1,0 +1,266 @@
+<h2>Tablet POS Layout — Which approach?</h2>
+<p class="subtitle">All three give waiters full access to every feature on 768–1180px screens. Pick the one that feels right for a busy bar/restaurant floor.</p>
+
+<style>
+.mockup-frame {
+  background: #0a0a0a;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #333;
+  font-family: system-ui, sans-serif;
+  color: #fff;
+  font-size: 11px;
+}
+.mock-topbar {
+  background: #111;
+  border-bottom: 1px solid #222;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.mock-logo { font-weight: 800; font-size: 13px; color: #10b981; }
+.mock-btn {
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  padding: 4px 8px;
+  color: #d1d5db;
+  font-size: 10px;
+  white-space: nowrap;
+}
+.mock-btn.green { background: #065f46; border-color: #10b981; color: #6ee7b7; }
+.mock-btn.blue { background: #1e3a5f; border-color: #3b82f6; color: #93c5fd; }
+.mock-search {
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  padding: 4px 10px;
+  color: #9ca3af;
+  font-size: 10px;
+  flex: 1;
+  max-width: 160px;
+}
+.mock-cats {
+  display: flex;
+  gap: 6px;
+  padding: 6px 12px;
+  background: #111;
+  border-bottom: 1px solid #222;
+  overflow: hidden;
+}
+.mock-cat {
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 20px;
+  padding: 3px 10px;
+  font-size: 10px;
+  color: #9ca3af;
+  white-space: nowrap;
+}
+.mock-cat.active { background: #065f46; border-color: #10b981; color: #6ee7b7; }
+.mock-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  padding: 8px;
+}
+.mock-card {
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  padding: 8px;
+  aspect-ratio: 3/2;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+.mock-card-img { flex: 1; background: #2a2a2a; border-radius: 4px; margin-bottom: 4px; }
+.mock-card-name { font-size: 10px; font-weight: 600; }
+.mock-card-price { font-size: 9px; color: #10b981; }
+.mock-sidebar {
+  background: #111;
+  border-left: 1px solid #222;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.mock-sidebar-title { font-weight: 700; font-size: 11px; padding: 4px 0; border-bottom: 1px solid #222; margin-bottom: 4px; }
+.mock-order-item { background: #1a1a1a; border-radius: 6px; padding: 5px 7px; font-size: 10px; color: #d1d5db; }
+.mock-total { background: #065f46; border-radius: 6px; padding: 6px 8px; font-weight: 700; color: #6ee7b7; font-size: 11px; margin-top: 4px; }
+.mock-add-btn { background: #065f46; border: 1px solid #10b981; border-radius: 6px; padding: 5px; font-weight: 700; color: #6ee7b7; font-size: 10px; text-align: center; margin-top: 4px; }
+.mock-bottom-bar {
+  background: #111;
+  border-top: 1px solid #222;
+  display: flex;
+  justify-content: space-around;
+  padding: 6px 0;
+}
+.mock-tab { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 12px; border-radius: 8px; }
+.mock-tab.active { background: #065f46; }
+.mock-tab-icon { font-size: 14px; }
+.mock-tab-label { font-size: 9px; color: #9ca3af; }
+.mock-tab.active .mock-tab-label { color: #6ee7b7; }
+.mock-fab {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  background: #10b981;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  box-shadow: 0 4px 12px rgba(16,185,129,0.4);
+}
+.frame-wrap { position: relative; }
+</style>
+
+<div class="cards">
+
+  <!-- Option A: Compact Sidebar -->
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:0; overflow:hidden; background:#0a0a0a;">
+      <div class="mockup-frame" style="height:280px; display:flex; flex-direction:column;">
+        <div class="mock-topbar">
+          <span class="mock-logo">AM|PM</span>
+          <input class="mock-search" placeholder="🔍 Search menu…" readonly>
+          <span class="mock-btn">Orders</span>
+          <span class="mock-btn blue">Closed</span>
+          <span class="mock-btn green">Settle</span>
+        </div>
+        <div class="mock-cats">
+          <span class="mock-cat active">All</span>
+          <span class="mock-cat">Beers</span>
+          <span class="mock-cat">Spirits</span>
+          <span class="mock-cat">Food</span>
+          <span class="mock-cat">Soft</span>
+        </div>
+        <div style="display:flex; flex:1; overflow:hidden;">
+          <div style="flex:1; overflow:hidden;">
+            <div class="mock-grid">
+              <div class="mock-card"><div class="mock-card-img"></div><div class="mock-card-name">Savanna</div><div class="mock-card-price">Ksh 350</div></div>
+              <div class="mock-card"><div class="mock-card-img"></div><div class="mock-card-name">Pilsner</div><div class="mock-card-price">Ksh 300</div></div>
+              <div class="mock-card"><div class="mock-card-img"></div><div class="mock-card-name">Guinness</div><div class="mock-card-price">Ksh 350</div></div>
+              <div class="mock-card"><div class="mock-card-img"></div><div class="mock-card-name">Tusker</div><div class="mock-card-price">Ksh 280</div></div>
+              <div class="mock-card"><div class="mock-card-img"></div><div class="mock-card-name">Smirnoff</div><div class="mock-card-price">Ksh 400</div></div>
+              <div class="mock-card"><div class="mock-card-img"></div><div class="mock-card-name">Jameson</div><div class="mock-card-price">Ksh 550</div></div>
+            </div>
+          </div>
+          <div class="mock-sidebar" style="width:130px; min-width:130px;">
+            <div class="mock-sidebar-title">🛒 Order (3)</div>
+            <div class="mock-order-item">1× Savanna — 350</div>
+            <div class="mock-order-item">2× Pilsner — 600</div>
+            <div class="mock-order-item">1× Guinness — 350</div>
+            <div class="mock-total">Total: Ksh 1,300</div>
+            <div class="mock-add-btn">➕ Add to Tab</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Compact Sidebar</h3>
+      <p>Full desktop-style layout adapted for tablet. Sidebar narrows to 140px on 768–1024px. All header actions visible at top. Familiar for anyone who's used the desktop POS.</p>
+    </div>
+  </div>
+
+  <!-- Option B: Bottom Tab Bar -->
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:0; overflow:hidden; background:#0a0a0a;">
+      <div class="mockup-frame" style="height:280px; display:flex; flex-direction:column;">
+        <div class="mock-topbar">
+          <span class="mock-logo">AM|PM POS</span>
+          <input class="mock-search" placeholder="🔍 Search…" readonly>
+          <span style="background:#065f46;border:1px solid #10b981;border-radius:20px;padding:3px 10px;font-size:10px;color:#6ee7b7;">Beers ▾</span>
+        </div>
+        <div style="flex:1; overflow:hidden;">
+          <div class="mock-grid">
+            <div class="mock-card"><div class="mock-card-img"></div><div class="mock-card-name">Savanna</div><div class="mock-card-price">Ksh 350</div></div>
+            <div class="mock-card"><div class="mock-card-img"></div><div class="mock-card-name">Pilsner</div><div class="mock-card-price">Ksh 300</div></div>
+            <div class="mock-card"><div class="mock-card-img"></div><div class="mock-card-name">Guinness</div><div class="mock-card-price">Ksh 350</div></div>
+            <div class="mock-card"><div class="mock-card-img"></div><div class="mock-card-name">Tusker</div><div class="mock-card-price">Ksh 280</div></div>
+            <div class="mock-card"><div class="mock-card-img"></div><div class="mock-card-name">Smirnoff</div><div class="mock-card-price">Ksh 400</div></div>
+            <div class="mock-card"><div class="mock-card-img"></div><div class="mock-card-name">Jameson</div><div class="mock-card-price">Ksh 550</div></div>
+          </div>
+        </div>
+        <div class="mock-bottom-bar">
+          <div class="mock-tab active">
+            <div class="mock-tab-icon">🍽️</div>
+            <div class="mock-tab-label" style="color:#6ee7b7;">Menu</div>
+          </div>
+          <div class="mock-tab">
+            <div class="mock-tab-icon">🛒</div>
+            <div class="mock-tab-label">Cart (3)</div>
+          </div>
+          <div class="mock-tab">
+            <div class="mock-tab-icon">📋</div>
+            <div class="mock-tab-label">Orders</div>
+          </div>
+          <div class="mock-tab">
+            <div class="mock-tab-icon">💳</div>
+            <div class="mock-tab-label">Settle</div>
+          </div>
+          <div class="mock-tab">
+            <div class="mock-tab-icon">👤</div>
+            <div class="mock-tab-label">Me</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Bottom Tab Bar</h3>
+      <p>Mobile-app style. Product grid takes the full screen. Cart, Orders, Settle Tab, and Profile live in a persistent bottom bar. Tapping Cart slides up a panel. Clean and thumb-friendly for portrait tablets.</p>
+    </div>
+  </div>
+
+  <!-- Option C: Split Header + Action Row -->
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:0; overflow:hidden; background:#0a0a0a;">
+      <div class="mockup-frame" style="height:280px; display:flex; flex-direction:column;">
+        <div class="mock-topbar" style="flex-wrap:wrap; gap:4px;">
+          <span class="mock-logo">AM|PM</span>
+          <input class="mock-search" placeholder="🔍 Search…" readonly style="flex:1; min-width:80px;">
+          <span style="font-size:9px;color:#6ee7b7;background:#065f46;border:1px solid #10b981;padding:3px 6px;border-radius:4px;">🛒 3 items</span>
+        </div>
+        <div style="display:flex; gap:4px; padding:5px 10px; background:#0f0f0f; border-bottom:1px solid #222;">
+          <span class="mock-btn">📋 Open Orders</span>
+          <span class="mock-btn blue">🧾 Closed</span>
+          <span class="mock-btn green">💳 Settle Table</span>
+          <span style="flex:1;"></span>
+          <span style="font-size:10px;color:#9ca3af;">Table auto-assigned</span>
+        </div>
+        <div class="mock-cats" style="padding:4px 10px;">
+          <span class="mock-cat active">All</span>
+          <span class="mock-cat">Beers</span>
+          <span class="mock-cat">Spirits</span>
+          <span class="mock-cat">Food</span>
+          <span class="mock-cat">Wine</span>
+          <span class="mock-cat">Soft</span>
+        </div>
+        <div style="flex:1; overflow:hidden;">
+          <div class="mock-grid" style="grid-template-columns: repeat(4, 1fr);">
+            <div class="mock-card"><div class="mock-card-img"></div><div class="mock-card-name">Savanna</div><div class="mock-card-price">Ksh 350</div></div>
+            <div class="mock-card"><div class="mock-card-img"></div><div class="mock-card-name">Pilsner</div><div class="mock-card-price">Ksh 300</div></div>
+            <div class="mock-card"><div class="mock-card-img"></div><div class="mock-card-name">Guinness</div><div class="mock-card-price">Ksh 350</div></div>
+            <div class="mock-card"><div class="mock-card-img"></div><div class="mock-card-name">Tusker</div><div class="mock-card-price">Ksh 280</div></div>
+          </div>
+        </div>
+        <div style="background:#111; border-top:1px solid #222; padding:6px 10px; display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-size:10px; color:#9ca3af;">3 items · Ksh 1,300</span>
+          <span class="mock-btn green" style="padding:5px 14px; font-weight:700;">➕ Add to Tab & Print</span>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Action Bar + Persistent Footer Cart</h3>
+      <p>Dedicated action row below the header exposes all key buttons always. Category row scrolls horizontally. Cart summary lives in a sticky footer bar — tap "Add to Tab" and it prints instantly. Best for landscape orientation.</p>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:16px; text-align:center;">Click to select your preferred direction (you can pick more than one). Then tell me in the terminal.</p>

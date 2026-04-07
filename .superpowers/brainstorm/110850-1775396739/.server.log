@@ -1,0 +1,16 @@
+{"type":"server-started","port":61648,"host":"127.0.0.1","url_host":"localhost","url":"http://localhost:61648","screen_dir":"/home/elyees/D/reservations/reservations/.superpowers/brainstorm/110850-1775396739"}
+{"type":"screen-added","file":"/home/elyees/D/reservations/reservations/.superpowers/brainstorm/110850-1775396739/tablet-layout.html"}
+{"source":"user-event","type":"click","text":"AM|PM\n          \n          Orders\n          Closed\n          Settle\n        \n        \n          All\n          Beers\n          Spirits\n          Food\n          Soft\n        \n        \n          \n            \n              SavannaKsh 350\n              PilsnerKsh 300\n              GuinnessKsh 350\n              TuskerKsh 280\n              SmirnoffKsh 400\n              JamesonKsh 550\n            \n          \n          \n            🛒 Order (3)\n            1× Savanna — 350\n            2× Pilsner — 600\n            1× Guinness — 350\n            Total: Ksh 1,300\n            ➕ Add to Tab\n          \n        \n      \n    \n    \n      A — Compact Sidebar\n      Full desktop-style layout adapted for tablet. Sidebar narrows to 140px on 768–1024px. All header actions visible at top. Familiar for anyone who's used the desktop POS.","choice":"a","id":null,"timestamp":1775396845372}
+{"type":"screen-added","file":"/home/elyees/D/reservations/reservations/.superpowers/brainstorm/110850-1775396739/tablet-layout-a2.html"}
+{"type":"screen-added","file":"/home/elyees/D/reservations/reservations/.superpowers/brainstorm/110850-1775396739/tablet-blended.html"}
+{"source":"user-event","type":"click","text":"✓\n    \n      Approved — build this\n      Move on to the print & org-routing design","choice":"approve","id":null,"timestamp":1775397233894}
+{"source":"user-event","type":"click","text":"✓\n    \n      Approved — build this\n      Move on to the print & org-routing design","choice":"approve","id":null,"timestamp":1775397246207}
+{"source":"user-event","type":"click","text":"✓\n    \n      Approved — build this\n      Move on to the print & org-routing design","choice":"approve","id":null,"timestamp":1775397246410}
+{"source":"user-event","type":"click","text":"✓\n    \n      Approved — build this\n      Move on to the print & org-routing design","choice":"approve","id":null,"timestamp":1775397247347}
+{"source":"user-event","type":"click","text":"✓\n    \n      Approved — build this\n      Move on to the print & org-routing design","choice":"approve","id":null,"timestamp":1775397247527}
+{"type":"screen-added","file":"/home/elyees/D/reservations/reservations/.superpowers/brainstorm/110850-1775396739/waiting-1.html"}
+{"type":"screen-added","file":"/home/elyees/D/reservations/reservations/.superpowers/brainstorm/110850-1775396739/print-architecture.html"}
+{"type":"screen-added","file":"/home/elyees/D/reservations/reservations/.superpowers/brainstorm/110850-1775396739/waiting-2.html"}
+{"type":"screen-added","file":"/home/elyees/D/reservations/reservations/.superpowers/brainstorm/110850-1775396739/docket-preview.html"}
+{"type":"screen-added","file":"/home/elyees/D/reservations/reservations/.superpowers/brainstorm/110850-1775396739/waiting-3.html"}
+{"type":"server-stopped","reason":"idle timeout"}

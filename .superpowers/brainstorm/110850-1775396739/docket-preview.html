@@ -1,0 +1,223 @@
+<h2>Digital Docket Modal — Two states</h2>
+<p class="subtitle">Left: new order (full). Right: order updated (additions only). Same format as the physical receipt.</p>
+
+<style>
+.docket-modal {
+  background: rgba(0,0,0,0.85);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  max-width: 320px;
+  margin: 0 auto;
+}
+.docket-paper {
+  background: #fff;
+  border-radius: 4px;
+  width: 100%;
+  padding: 16px 14px 20px;
+  font-family: 'Courier New', 'Lucida Console', monospace;
+  font-size: 11px;
+  color: #111;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  /* Torn paper top effect */
+  position: relative;
+}
+.docket-paper::before {
+  content: '';
+  position: absolute;
+  top: -6px; left: 0; right: 0;
+  height: 6px;
+  background: repeating-linear-gradient(90deg, #fff 0px, #fff 8px, transparent 8px, transparent 12px);
+}
+.docket-paper::after {
+  content: '';
+  position: absolute;
+  bottom: -6px; left: 0; right: 0;
+  height: 6px;
+  background: repeating-linear-gradient(90deg, #fff 0px, #fff 8px, transparent 8px, transparent 12px);
+}
+.dkt-center { text-align: center; }
+.dkt-bold { font-weight: 900; }
+.dkt-lg { font-size: 14px; letter-spacing: 1px; }
+.dkt-md { font-size: 12px; }
+.dkt-sm { font-size: 10px; }
+.dkt-dash { border: none; border-top: 1px dashed #888; margin: 7px 0; }
+.dkt-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 11px; padding: 2px 0; }
+.dkt-row-hdr { display: flex; justify-content: space-between; font-size: 10px; font-weight: 700; padding: 2px 0; }
+.dkt-item-name { flex: 1; padding-left: 4px; }
+.dkt-total-row { display: flex; justify-content: space-between; font-size: 13px; font-weight: 900; padding: 3px 0; }
+.dkt-addition-banner {
+  background: #111;
+  color: #ffd700;
+  font-weight: 900;
+  font-size: 10px;
+  text-align: center;
+  letter-spacing: 2px;
+  padding: 3px;
+  border-radius: 2px;
+  margin-bottom: 4px;
+}
+/* Modal action buttons */
+.modal-btns { display: flex; gap: 10px; width: 100%; }
+.btn-edit {
+  flex: 1;
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  padding: 10px;
+  color: #d1d5db;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+.btn-done {
+  flex: 1;
+  background: #10b981;
+  border: none;
+  border-radius: 8px;
+  padding: 10px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+.status-pill {
+  font-size: 10px;
+  border-radius: 20px;
+  padding: 3px 10px;
+  font-weight: 600;
+}
+.status-queued { background: #052e1c; color: #34d399; border: 1px solid #065f46; }
+.status-printing { background: #1e3a5f; color: #93c5fd; border: 1px solid #1d4ed8; }
+</style>
+
+<div class="split" style="gap:24px; align-items:flex-start;">
+
+  <!-- STATE 1: New order — full docket -->
+  <div class="mockup" style="flex:1;">
+    <div class="mockup-header">New order — "Add to Tab" tapped</div>
+    <div class="mockup-body" style="background:#050505; padding:20px;">
+      <div class="docket-modal">
+        <div class="docket-paper">
+          <div class="dkt-center dkt-bold dkt-lg">AM | PM</div>
+          <div class="dkt-center dkt-bold dkt-md">CAPTAIN ORDER</div>
+          <div class="dkt-center dkt-sm" style="color:#555;">Terminal: Main Counter</div>
+          <hr class="dkt-dash">
+          <div class="dkt-sm">Order #: KITCHEN-8244</div>
+          <div class="dkt-sm">Date: 05/04/2026</div>
+          <div class="dkt-sm">Time: 13:57:58</div>
+          <div class="dkt-sm">Server: Ham Chulo</div>
+          <div class="dkt-sm">Type: dine_in &nbsp;|&nbsp; Table: #71</div>
+          <hr class="dkt-dash">
+          <div class="dkt-row-hdr">
+            <span>Qty &nbsp;Item</span>
+            <span>Price</span>
+          </div>
+          <hr class="dkt-dash">
+          <div class="dkt-row"><span>1x</span><span class="dkt-item-name">Savanna</span><span>350.00</span></div>
+          <div class="dkt-row"><span>2x</span><span class="dkt-item-name">Pilsner</span><span>600.00</span></div>
+          <div class="dkt-row"><span>1x</span><span class="dkt-item-name">Guinness Lager</span><span>350.00</span></div>
+          <hr class="dkt-dash">
+          <div class="dkt-total-row"><span>TOTAL:</span><span>1,300.00</span></div>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="status-pill status-queued">✓ Sent to printer</span>
+          <span style="font-size:10px; color:#4b5563;">Admin terminal printing…</span>
+        </div>
+
+        <div class="modal-btns">
+          <div class="btn-edit">✏️ Edit Order</div>
+          <div class="btn-done">✓ Done</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STATE 2: Order update — delta only -->
+  <div class="mockup" style="flex:1;">
+    <div class="mockup-header">Order updated — only NEW items added</div>
+    <div class="mockup-body" style="background:#050505; padding:20px;">
+      <div class="docket-modal">
+        <div class="docket-paper">
+          <div class="dkt-center dkt-bold dkt-lg">AM | PM</div>
+          <div class="dkt-center dkt-bold dkt-md">CAPTAIN ORDER</div>
+          <div class="dkt-center dkt-sm" style="color:#555;">Terminal: Main Counter</div>
+          <hr class="dkt-dash">
+          <div class="dkt-addition-banner">⚡ ADDITION — NOT A FULL ORDER ⚡</div>
+          <div class="dkt-sm">Order #: KITCHEN-8244</div>
+          <div class="dkt-sm">Date: 05/04/2026</div>
+          <div class="dkt-sm">Time: 14:12:05</div>
+          <div class="dkt-sm">Server: Ham Chulo</div>
+          <div class="dkt-sm">Type: dine_in &nbsp;|&nbsp; Table: #71</div>
+          <hr class="dkt-dash">
+          <div class="dkt-row-hdr">
+            <span>Qty &nbsp;Item</span>
+            <span>Price</span>
+          </div>
+          <hr class="dkt-dash">
+          <div class="dkt-row"><span>1x</span><span class="dkt-item-name">Jameson 50ml</span><span>550.00</span></div>
+          <div class="dkt-row"><span>2x</span><span class="dkt-item-name">Wings (6pc)</span><span>1,600.00</span></div>
+          <hr class="dkt-dash">
+          <div class="dkt-total-row"><span>ADDITION:</span><span>2,150.00</span></div>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="status-pill status-queued">✓ Sent to printer</span>
+          <span style="font-size:10px; color:#4b5563;">Admin terminal printing…</span>
+        </div>
+
+        <div class="modal-btns">
+          <div class="btn-edit">✏️ Edit Again</div>
+          <div class="btn-done">✓ Done</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div style="margin-top:20px; background:#111; border:1px solid #1e1e1e; border-radius:10px; padding:16px;">
+  <h3 style="margin:0 0 10px; font-size:13px; color:#e5e7eb;">Print trigger rules</h3>
+  <table style="width:100%; border-collapse:collapse; font-size:10px; color:#d1d5db;">
+    <tr style="border-bottom:1px solid #222;">
+      <th style="text-align:left; padding:5px 8px; color:#9ca3af;">Action</th>
+      <th style="text-align:left; padding:5px 8px; color:#9ca3af;">Docket type</th>
+      <th style="text-align:left; padding:5px 8px; color:#9ca3af;">Contents</th>
+      <th style="text-align:left; padding:5px 8px; color:#9ca3af;">Digital modal shows</th>
+    </tr>
+    <tr style="border-bottom:1px solid #1a1a1a; background:#0c1a0c;">
+      <td style="padding:5px 8px; color:#34d399; font-weight:600;">Add to Tab</td>
+      <td style="padding:5px 8px;">captain_docket</td>
+      <td style="padding:5px 8px;">All items in the order</td>
+      <td style="padding:5px 8px; color:#34d399;">Full docket (left)</td>
+    </tr>
+    <tr style="background:#0c1a0c;">
+      <td style="padding:5px 8px; color:#34d399; font-weight:600;">Update Order (save edit)</td>
+      <td style="padding:5px 8px;">kitchen_delta</td>
+      <td style="padding:5px 8px;">Only newly added items (qty increase or new lines)</td>
+      <td style="padding:5px 8px; color:#34d399;">Addition docket (right)</td>
+    </tr>
+  </table>
+</div>
+
+<div class="options" style="margin-top:16px;">
+  <div class="option" data-choice="approve-docket" onclick="toggleSelect(this)">
+    <div class="letter">✓</div>
+    <div class="content">
+      <h3>Approve — write the spec</h3>
+      <p>This docket format and the two-state logic is correct</p>
+    </div>
+  </div>
+  <div class="option" data-choice="tweak-docket" onclick="toggleSelect(this)">
+    <div class="letter">↺</div>
+    <div class="content">
+      <h3>Needs a tweak</h3>
+      <p>Something in the format or the trigger rules needs adjusting</p>
+    </div>
+  </div>
+</div>

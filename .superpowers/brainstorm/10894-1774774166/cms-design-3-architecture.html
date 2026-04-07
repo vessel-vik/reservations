@@ -1,0 +1,274 @@
+<h2>Menu & Stock CMS — Architecture & TDD Plan</h2>
+<p class="subtitle">Section 3 of 3 — Component tree, Appwrite schema, stock decrement flow, test plan</p>
+
+<div class="section" style="max-width:960px;margin:0 auto">
+  <h3>Component Tree</h3>
+</div>
+
+<div class="mockup" style="max-width:960px;margin:0 auto">
+  <div class="mockup-header">New file structure</div>
+  <div class="mockup-body" style="padding:16px;font-family:monospace;font-size:11px;line-height:1.9;color:#94a3b8">
+
+    <div style="color:#fbbf24;margin-bottom:4px">components/admin/menu/</div>
+    <div style="padding-left:16px">
+      <div><span style="color:#34d399">MenuCMS.tsx</span> <span style="color:#475569">← top-level, owns activeSection ('items'|'categories'|'modifiers')</span></div>
+      <div style="padding-left:16px">
+        <div><span style="color:#60a5fa">LowStockAlertStrip.tsx</span> <span style="color:#475569">← pinned banner listing items below threshold</span></div>
+        <div><span style="color:#60a5fa">MenuSectionNav.tsx</span> <span style="color:#475569">← Items | Categories | Modifiers + Add + Import CSV</span></div>
+        <div style="margin-top:4px;color:#94a3b8">── Items section ──</div>
+        <div><span style="color:#60a5fa">MenuItemsSection.tsx</span> <span style="color:#475569">← search, filter, sortable table</span></div>
+        <div style="padding-left:16px">
+          <div><span style="color:#60a5fa">MenuItemRow.tsx</span> <span style="color:#475569">← single inline-editable row</span></div>
+          <div style="padding-left:16px">
+            <div><span style="color:#60a5fa">InlineStockInput.tsx</span> <span style="color:#475569">← click-to-edit, colour by threshold</span></div>
+            <div><span style="color:#60a5fa">InlinePriceInput.tsx</span> <span style="color:#475569">← click-to-edit, amber colour</span></div>
+            <div><span style="color:#60a5fa">AvailabilityToggle.tsx</span> <span style="color:#475569">← instant-save, disabled when stock=0</span></div>
+          </div>
+        </div>
+        <div><span style="color:#60a5fa">MenuItemDrawer.tsx</span> <span style="color:#475569">← full editor (create + edit)</span></div>
+        <div style="padding-left:16px">
+          <div><span style="color:#60a5fa">ImageUploadField.tsx</span> <span style="color:#475569">← drag-drop → Appwrite Storage OR url paste</span></div>
+          <div><span style="color:#60a5fa">TagInput.tsx</span> <span style="color:#475569">← reusable tag input (ingredients + allergens)</span></div>
+          <div><span style="color:#60a5fa">DietaryFlagPills.tsx</span> <span style="color:#475569">← isVegetarian / isVegan / isGlutenFree toggles</span></div>
+          <div><span style="color:#60a5fa">ModifierGroupSelector.tsx</span> <span style="color:#475569">← attach/detach modifier groups to item</span></div>
+        </div>
+        <div style="margin-top:4px;color:#94a3b8">── Categories section ──</div>
+        <div><span style="color:#60a5fa">CategoriesSection.tsx</span> <span style="color:#475569">← draggable list with inline name/icon edit</span></div>
+        <div style="padding-left:16px">
+          <div><span style="color:#60a5fa">CategoryRow.tsx</span> <span style="color:#475569">← drag handle, inline name input, active toggle</span></div>
+        </div>
+        <div style="margin-top:4px;color:#94a3b8">── Modifiers section ──</div>
+        <div><span style="color:#60a5fa">ModifiersSection.tsx</span> <span style="color:#475569">← list of modifier groups</span></div>
+        <div style="padding-left:16px">
+          <div><span style="color:#60a5fa">ModifierGroupCard.tsx</span> <span style="color:#475569">← expandable group with options list</span></div>
+          <div><span style="color:#60a5fa">ModifierGroupDrawer.tsx</span> <span style="color:#475569">← create/edit group + options</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="color:#fbbf24;margin-top:12px;margin-bottom:4px">app/api/menu/</div>
+    <div style="padding-left:16px">
+      <div><span style="color:#34d399">items/route.ts</span> <span style="color:#475569">← GET (list, search, filter) + POST (create)</span></div>
+      <div><span style="color:#34d399">items/[id]/route.ts</span> <span style="color:#475569">← GET (single) + PATCH (partial update) + DELETE</span></div>
+      <div><span style="color:#34d399">items/[id]/image/route.ts</span> <span style="color:#475569">← POST: multipart upload → Appwrite Storage → imageUrl</span></div>
+      <div><span style="color:#34d399">categories/route.ts</span> <span style="color:#475569">← GET + POST</span></div>
+      <div><span style="color:#34d399">categories/[id]/route.ts</span> <span style="color:#475569">← PATCH (name, icon, index, isActive) + DELETE</span></div>
+      <div><span style="color:#34d399">modifiers/route.ts</span> <span style="color:#475569">← GET + POST</span></div>
+      <div><span style="color:#34d399">modifiers/[id]/route.ts</span> <span style="color:#475569">← PATCH + DELETE</span></div>
+      <div><span style="color:#94a3b8">import/route.ts</span> <span style="color:#475569">← existing MenuImport, kept unchanged</span></div>
+    </div>
+
+    <div style="color:#fbbf24;margin-top:12px;margin-bottom:4px">lib/actions/</div>
+    <div style="padding-left:16px">
+      <div><span style="color:#34d399">menu.actions.ts</span> <span style="color:#475569">← extend existing: getMenuItems, createMenuItem, updateMenuItem, deleteMenuItem</span></div>
+      <div><span style="color:#34d399">modifier.actions.ts</span> <span style="color:#475569">← NEW: getModifierGroups, createModifierGroup, updateModifierGroup, deleteModifierGroup</span></div>
+      <div><span style="color:#94a3b8">pos.actions.ts</span> <span style="color:#475569">← MODIFIED: createOrder decrements stock per item quantity</span></div>
+    </div>
+
+    <div style="color:#fbbf24;margin-top:12px;margin-bottom:4px">lib/</div>
+    <div style="padding-left:16px">
+      <div><span style="color:#34d399">stock-utils.ts</span> <span style="color:#475569">← NEW: getStockStatus(stock, threshold), isLowStock(), isOutOfStock()</span></div>
+    </div>
+
+    <div style="color:#fbbf24;margin-top:12px;margin-bottom:4px">__tests__/menu/</div>
+    <div style="padding-left:16px">
+      <div><span style="color:#f87171">stock-utils.test.ts</span></div>
+      <div><span style="color:#f87171">inline-stock-input.test.tsx</span></div>
+      <div><span style="color:#f87171">availability-toggle.test.tsx</span></div>
+      <div><span style="color:#f87171">menu-item-drawer.test.tsx</span></div>
+      <div><span style="color:#f87171">api-menu-items.test.ts</span></div>
+      <div><span style="color:#f87171">api-menu-modifiers.test.ts</span></div>
+      <div><span style="color:#f87171">stock-decrement.test.ts</span></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- APPWRITE SCHEMA CHANGES -->
+<div class="section" style="max-width:960px;margin:20px auto 0">
+  <h3>Appwrite Schema Changes</h3>
+</div>
+
+<div class="mockup" style="max-width:960px;margin:0 auto">
+  <div class="mockup-header">New fields and collections</div>
+  <div class="mockup-body" style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:16px">
+
+    <div>
+      <div style="font-size:10px;font-weight:600;color:#fbbf24;margin-bottom:8px;text-transform:uppercase">MENU_ITEMS — new fields only</div>
+      <div style="font-size:10px;color:#94a3b8;line-height:2">
+        <div style="display:grid;grid-template-columns:1fr 80px 50px;gap:4px;color:#475569;font-size:9px;text-transform:uppercase;margin-bottom:4px"><div>Field</div><div>Type</div><div>Req.</div></div>
+        <div style="display:grid;grid-template-columns:1fr 80px 50px;gap:4px"><div style="color:#34d399">stock</div><div>integer ≥ 0</div><div>yes</div></div>
+        <div style="display:grid;grid-template-columns:1fr 80px 50px;gap:4px"><div style="color:#34d399">lowStockThreshold</div><div>integer</div><div>no (def: 5)</div></div>
+        <div style="display:grid;grid-template-columns:1fr 80px 50px;gap:4px"><div style="color:#34d399">modifierGroupIds</div><div>string[]</div><div>no</div></div>
+        <div style="margin-top:4px;font-size:9px;color:#64748b">imageUrl already exists — no schema change needed, URL source is transparent to Appwrite</div>
+      </div>
+    </div>
+
+    <div>
+      <div style="font-size:10px;font-weight:600;color:#fbbf24;margin-bottom:8px;text-transform:uppercase">MODIFIER_GROUPS — new collection</div>
+      <div style="font-size:10px;color:#94a3b8;line-height:2">
+        <div style="display:grid;grid-template-columns:1fr 80px 50px;gap:4px;color:#475569;font-size:9px;text-transform:uppercase;margin-bottom:4px"><div>Field</div><div>Type</div><div>Req.</div></div>
+        <div style="display:grid;grid-template-columns:1fr 80px 50px;gap:4px"><div style="color:#34d399">name</div><div>string</div><div>yes</div></div>
+        <div style="display:grid;grid-template-columns:1fr 80px 50px;gap:4px"><div style="color:#34d399">isRequired</div><div>boolean</div><div>yes</div></div>
+        <div style="display:grid;grid-template-columns:1fr 80px 50px;gap:4px"><div style="color:#34d399">maxSelections</div><div>integer</div><div>yes (def: 1)</div></div>
+        <div style="display:grid;grid-template-columns:1fr 80px 50px;gap:4px"><div style="color:#34d399">options</div><div>string[]</div><div>yes</div></div>
+        <div style="margin-top:4px;font-size:9px;color:#64748b">options stored as JSON strings: <code style="color:#fbbf24">"Peri-Peri:0"</code> or <code style="color:#fbbf24">"Extra Chilli:100"</code> — parsed client-side</div>
+      </div>
+    </div>
+
+    <div>
+      <div style="font-size:10px;font-weight:600;color:#fbbf24;margin-bottom:8px;text-transform:uppercase">CATEGORIES — no schema changes</div>
+      <div style="font-size:10px;color:#64748b;line-height:1.7">All required fields already exist: name, label, slug, icon, index, isActive. Only behaviour changes (drag-to-reorder updates index field via PATCH).</div>
+    </div>
+
+    <div>
+      <div style="font-size:10px;font-weight:600;color:#fbbf24;margin-bottom:8px;text-transform:uppercase">New env vars required</div>
+      <div style="font-family:monospace;font-size:10px;color:#34d399;line-height:1.9">
+        <div>MODIFIER_GROUPS_COLLECTION_ID=</div>
+        <div>MENU_IMAGES_BUCKET_ID=</div>
+      </div>
+      <div style="font-size:9px;color:#64748b;margin-top:4px">MENU_IMAGES_BUCKET_ID is separate from RECEIPTS_BUCKET_ID (Finance Hub) to keep access policies clean.</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- STOCK DECREMENT FLOW -->
+<div class="section" style="max-width:960px;margin:20px auto 0">
+  <h3>Stock Auto-Decrement Flow (POS → Admin)</h3>
+</div>
+
+<div class="mockup" style="max-width:960px;margin:0 auto">
+  <div class="mockup-header">What happens when a POS order is confirmed</div>
+  <div class="mockup-body" style="padding:16px">
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:0;align-items:start">
+
+      <div style="text-align:center;padding:12px 8px">
+        <div style="width:40px;height:40px;background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.3);border-radius:10px;margin:0 auto 8px;display:flex;align-items:center;justify-content:center;font-size:18px">🧾</div>
+        <div style="font-size:10px;font-weight:600;color:#e2e8f0">1. Order confirmed</div>
+        <div style="font-size:9px;color:#64748b;margin-top:4px">Staff taps "Confirm" in POS — <code>createOrder()</code> called with cart items</div>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:center;padding-top:20px">
+        <div style="font-size:18px;color:#475569">→</div>
+      </div>
+
+      <div style="text-align:center;padding:12px 8px">
+        <div style="width:40px;height:40px;background:rgba(96,165,250,0.15);border:1px solid rgba(96,165,250,0.3);border-radius:10px;margin:0 auto 8px;display:flex;align-items:center;justify-content:center;font-size:18px">📦</div>
+        <div style="font-size:10px;font-weight:600;color:#e2e8f0">2. Stock decremented</div>
+        <div style="font-size:9px;color:#64748b;margin-top:4px">For each cart item: <code>stock -= quantity</code> via Appwrite PATCH. If stock hits 0: <code>isAvailable = false</code> also set</div>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:center;padding-top:20px">
+        <div style="font-size:18px;color:#475569">→</div>
+      </div>
+
+      <div style="text-align:center;padding:12px 8px">
+        <div style="width:40px;height:40px;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);border-radius:10px;margin:0 auto 8px;display:flex;align-items:center;justify-content:center;font-size:18px">⚠️</div>
+        <div style="font-size:10px;font-weight:600;color:#e2e8f0">3. Low-stock strip updates</div>
+        <div style="font-size:9px;color:#64748b;margin-top:4px">Admin's Menu & Stock tab refetches items. Low-stock strip shows newly at-risk items. POS hides unavailable items (Sub-project 3)</div>
+      </div>
+
+    </div>
+
+    <div style="margin-top:12px;padding:10px 14px;background:rgba(245,158,11,0.05);border:1px solid rgba(245,158,11,0.15);border-radius:8px;font-size:10px;color:#94a3b8;line-height:1.7">
+      <strong style="color:#fbbf24">Decrement is best-effort:</strong> if Appwrite fails during stock update, the order is still saved (order creation is not rolled back). A failed decrement is logged to console — full transactional rollback is v2 scope.
+    </div>
+  </div>
+</div>
+
+<!-- TDD PLAN -->
+<div class="section" style="max-width:960px;margin:20px auto 0">
+  <h3>TDD Test Plan</h3>
+</div>
+
+<div class="mockup" style="max-width:960px;margin:0 auto">
+  <div class="mockup-header">RED before GREEN — all tests written first</div>
+  <div class="mockup-body" style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+
+    <div style="background:rgba(239,68,68,0.05);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:12px">
+      <div style="font-size:10px;font-weight:700;color:#f87171;margin-bottom:8px">stock-utils.test.ts</div>
+      <div style="font-size:10px;color:#94a3b8;line-height:1.9">
+        <div>✗ getStockStatus returns 'healthy' when stock &gt; threshold</div>
+        <div>✗ returns 'low' when stock &gt; 0 and ≤ threshold</div>
+        <div>✗ returns 'out' when stock = 0</div>
+        <div>✗ uses item-level threshold when provided</div>
+        <div>✗ defaults to threshold=5 when not provided</div>
+        <div>✗ isLowStock returns false when out of stock</div>
+        <div>✗ isOutOfStock returns true only when stock=0</div>
+      </div>
+    </div>
+
+    <div style="background:rgba(239,68,68,0.05);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:12px">
+      <div style="font-size:10px;font-weight:700;color:#f87171;margin-bottom:8px">inline-stock-input.test.tsx</div>
+      <div style="font-size:10px;color:#94a3b8;line-height:1.9">
+        <div>✗ renders current stock value</div>
+        <div>✗ applies green border when stock is healthy</div>
+        <div>✗ applies amber border when stock is low</div>
+        <div>✗ applies red border when stock is 0</div>
+        <div>✗ clicking enables edit mode (input appears)</div>
+        <div>✗ pressing Enter saves via PATCH /api/menu/items/[id]</div>
+        <div>✗ pressing Escape cancels without saving</div>
+        <div>✗ rejects negative values — shows error</div>
+        <div>✗ shows saving indicator while request is in flight</div>
+      </div>
+    </div>
+
+    <div style="background:rgba(239,68,68,0.05);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:12px">
+      <div style="font-size:10px;font-weight:700;color:#f87171;margin-bottom:8px">availability-toggle.test.tsx</div>
+      <div style="font-size:10px;color:#94a3b8;line-height:1.9">
+        <div>✗ renders as ON when isAvailable=true</div>
+        <div>✗ renders as OFF when isAvailable=false</div>
+        <div>✗ is disabled (unclickable) when stock=0</div>
+        <div>✗ clicking calls PATCH /api/menu/items/[id] with new value</div>
+        <div>✗ optimistic update — flips immediately, reverts on error</div>
+        <div>✗ shows toast on save error</div>
+      </div>
+    </div>
+
+    <div style="background:rgba(239,68,68,0.05);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:12px">
+      <div style="font-size:10px;font-weight:700;color:#f87171;margin-bottom:8px">menu-item-drawer.test.tsx</div>
+      <div style="font-size:10px;color:#94a3b8;line-height:1.9">
+        <div>✗ shows error when name is empty on submit</div>
+        <div>✗ shows error when price is 0 or negative</div>
+        <div>✗ shows error when stock is negative</div>
+        <div>✗ shows error when category is not selected</div>
+        <div>✗ pre-fills all fields in edit mode</div>
+        <div>✗ disables submit while saving</div>
+        <div>✗ shows success toast on 200</div>
+        <div>✗ shows error toast on 4xx/5xx</div>
+        <div>✗ TagInput adds tag on Enter, removes on ×</div>
+        <div>✗ DietaryFlagPills toggle flags on click</div>
+      </div>
+    </div>
+
+    <div style="background:rgba(239,68,68,0.05);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:12px">
+      <div style="font-size:10px;font-weight:700;color:#f87171;margin-bottom:8px">stock-decrement.test.ts</div>
+      <div style="font-size:10px;color:#94a3b8;line-height:1.9">
+        <div>✗ createOrder decrements stock by ordered quantity</div>
+        <div>✗ decrements multiple items independently</div>
+        <div>✗ sets isAvailable=false when stock reaches 0</div>
+        <div>✗ does not decrement below 0</div>
+        <div>✗ order is still created if stock update fails</div>
+      </div>
+    </div>
+
+    <div style="background:rgba(239,68,68,0.05);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:12px">
+      <div style="font-size:10px;font-weight:700;color:#f87171;margin-bottom:8px">api-menu-items.test.ts</div>
+      <div style="font-size:10px;color:#94a3b8;line-height:1.9">
+        <div>✗ GET returns paginated item list</div>
+        <div>✗ GET filters by category</div>
+        <div>✗ GET filters by search query</div>
+        <div>✗ POST creates item with required fields</div>
+        <div>✗ POST returns 400 when name missing</div>
+        <div>✗ POST returns 400 when price ≤ 0</div>
+        <div>✗ PATCH updates single field (stock)</div>
+        <div>✗ PATCH sets isAvailable=false when stock patched to 0</div>
+        <div>✗ DELETE removes item by id</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<p class="subtitle" style="max-width:960px;margin:16px auto 0">That's the complete CMS design. Does everything look right? Reply yes and I'll write the spec doc, run the review loop, then we move to writing implementation plans for both Sub-projects 1 and 2.</p>

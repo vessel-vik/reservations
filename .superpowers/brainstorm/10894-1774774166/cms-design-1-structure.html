@@ -1,0 +1,158 @@
+<h2>Menu & Stock CMS — Overall Structure</h2>
+<p class="subtitle">Section 1 of 3 — Tab layout, inline editing, low-stock alerts, sub-navigation</p>
+
+<div class="mockup" style="max-width:900px;margin:0 auto">
+  <div class="mockup-header" style="display:flex;align-items:center;justify-content:space-between">
+    <span>Admin Panel — Menu & Stock Tab (replaces Import tab)</span>
+    <span style="font-size:10px;color:#94a3b8">Admin tabs: Dashboard · Sales · Finance · <strong style="color:#fbbf24">Menu & Stock</strong></span>
+  </div>
+  <div class="mockup-body" style="padding:0">
+
+    <!-- LOW STOCK ALERT STRIP -->
+    <div style="background:rgba(239,68,68,0.07);border-bottom:1px solid rgba(239,68,68,0.18);padding:8px 18px;display:flex;align-items:center;gap:10px">
+      <span style="font-size:12px">⚠️</span>
+      <span style="font-size:11px;color:#fca5a5"><strong>3 items low on stock:</strong> Cheesecake Slice (3) · Tiramisu (2) · Beef Burger (4)</span>
+      <span style="margin-left:auto;font-size:10px;color:#94a3b8;cursor:pointer;text-decoration:underline">Jump to items →</span>
+    </div>
+
+    <!-- SUB-NAV + ACTIONS -->
+    <div style="display:flex;align-items:center;gap:8px;padding:12px 18px;border-bottom:1px solid rgba(255,255,255,0.06)">
+      <div style="display:flex;gap:3px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:3px">
+        <div style="padding:5px 14px;background:#f59e0b;color:#0f172a;border-radius:5px;font-size:11px;font-weight:600">Items</div>
+        <div style="padding:5px 14px;color:#64748b;font-size:11px">Categories</div>
+        <div style="padding:5px 14px;color:#64748b;font-size:11px">Modifiers</div>
+      </div>
+
+      <!-- Search -->
+      <div style="flex:1;max-width:260px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:6px 12px;font-size:11px;color:#64748b;display:flex;align-items:center;gap:6px">
+        <span>🔍</span><span>Search items...</span>
+      </div>
+
+      <!-- Category filter -->
+      <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:6px 12px;font-size:11px;color:#64748b;display:flex;align-items:center;gap:4px">
+        All Categories <span style="color:#64748b">▾</span>
+      </div>
+
+      <div style="margin-left:auto;display:flex;gap:6px">
+        <div style="padding:6px 12px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#94a3b8;border-radius:8px;font-size:11px;cursor:pointer">↑ Import CSV</div>
+        <div style="padding:6px 14px;background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.3);color:#fbbf24;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer">+ Add Item</div>
+      </div>
+    </div>
+
+    <!-- INLINE TABLE -->
+    <div style="padding:12px 18px">
+
+      <!-- Table header -->
+      <div style="display:grid;grid-template-columns:40px 1fr 90px 80px 80px 70px 80px 90px;gap:0;padding:6px 10px;margin-bottom:2px">
+        <div style="font-size:9px;color:#475569;text-transform:uppercase"></div>
+        <div style="font-size:9px;color:#475569;text-transform:uppercase">Item</div>
+        <div style="font-size:9px;color:#475569;text-transform:uppercase">Category</div>
+        <div style="font-size:9px;color:#475569;text-transform:uppercase;text-align:center">Price (KSh)</div>
+        <div style="font-size:9px;color:#475569;text-transform:uppercase;text-align:center">Stock</div>
+        <div style="font-size:9px;color:#475569;text-transform:uppercase;text-align:center">Avail.</div>
+        <div style="font-size:9px;color:#475569;text-transform:uppercase;text-align:center">VAT</div>
+        <div style="font-size:9px;color:#475569;text-transform:uppercase;text-align:center">Actions</div>
+      </div>
+
+      <!-- Row 1: normal item -->
+      <div style="display:grid;grid-template-columns:40px 1fr 90px 80px 80px 70px 80px 90px;gap:0;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:8px 10px;margin-bottom:4px;align-items:center">
+        <div style="width:30px;height:30px;border-radius:6px;overflow:hidden;background:rgba(245,158,11,0.1)"><div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:16px">🍗</div></div>
+        <div>
+          <div style="font-size:11px;color:#e2e8f0;font-weight:500">Grilled Chicken</div>
+          <div style="font-size:9px;color:#64748b">Mains · 25 min prep</div>
+        </div>
+        <div>
+          <span style="background:rgba(245,158,11,0.1);color:#fbbf24;border-radius:4px;padding:2px 7px;font-size:9px">Mains</span>
+        </div>
+        <!-- Inline price input -->
+        <div style="text-align:center">
+          <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(245,158,11,0.35);border-radius:5px;padding:4px 6px;font-size:11px;color:#fbbf24;text-align:center;cursor:text">1,850</div>
+        </div>
+        <!-- Inline stock input - green (healthy) -->
+        <div style="text-align:center">
+          <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(16,185,129,0.35);border-radius:5px;padding:4px 6px;font-size:11px;color:#34d399;text-align:center;cursor:text">24</div>
+        </div>
+        <!-- Availability toggle - ON -->
+        <div style="display:flex;justify-content:center">
+          <div style="width:32px;height:18px;background:#34d399;border-radius:9px;position:relative;cursor:pointer">
+            <div style="width:14px;height:14px;background:white;border-radius:7px;position:absolute;right:2px;top:2px;transition:all 0.2s"></div>
+          </div>
+        </div>
+        <!-- VAT badge -->
+        <div style="text-align:center"><span style="background:rgba(96,165,250,0.1);color:#60a5fa;border-radius:4px;padding:2px 6px;font-size:9px">16%</span></div>
+        <!-- Actions -->
+        <div style="display:flex;gap:6px;justify-content:center">
+          <span style="font-size:10px;color:#94a3b8;cursor:pointer;padding:3px 6px;border:1px solid rgba(255,255,255,0.08);border-radius:4px">✏ Edit</span>
+          <span style="font-size:10px;color:#f87171;cursor:pointer">✕</span>
+        </div>
+      </div>
+
+      <!-- Row 2: LOW STOCK item -->
+      <div style="display:grid;grid-template-columns:40px 1fr 90px 80px 80px 70px 80px 90px;gap:0;background:rgba(239,68,68,0.04);border:1px solid rgba(239,68,68,0.18);border-radius:8px;padding:8px 10px;margin-bottom:4px;align-items:center">
+        <div style="width:30px;height:30px;border-radius:6px;overflow:hidden;background:rgba(239,68,68,0.1)"><div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:16px">🍰</div></div>
+        <div>
+          <div style="font-size:11px;color:#fca5a5;font-weight:500">Cheesecake Slice</div>
+          <div style="font-size:9px;color:#f87171">⚠ Low stock — restock soon</div>
+        </div>
+        <div><span style="background:rgba(168,85,247,0.1);color:#c084fc;border-radius:4px;padding:2px 7px;font-size:9px">Desserts</span></div>
+        <div style="text-align:center">
+          <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(245,158,11,0.35);border-radius:5px;padding:4px 6px;font-size:11px;color:#fbbf24;text-align:center;cursor:text">650</div>
+        </div>
+        <!-- Stock input - RED (low) -->
+        <div style="text-align:center">
+          <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.5);border-radius:5px;padding:4px 6px;font-size:11px;color:#f87171;text-align:center;cursor:text">3</div>
+        </div>
+        <div style="display:flex;justify-content:center">
+          <div style="width:32px;height:18px;background:#34d399;border-radius:9px;position:relative;cursor:pointer">
+            <div style="width:14px;height:14px;background:white;border-radius:7px;position:absolute;right:2px;top:2px"></div>
+          </div>
+        </div>
+        <div style="text-align:center"><span style="background:rgba(96,165,250,0.1);color:#60a5fa;border-radius:4px;padding:2px 6px;font-size:9px">16%</span></div>
+        <div style="display:flex;gap:6px;justify-content:center">
+          <span style="font-size:10px;color:#94a3b8;cursor:pointer;padding:3px 6px;border:1px solid rgba(255,255,255,0.08);border-radius:4px">✏ Edit</span>
+          <span style="font-size:10px;color:#f87171;cursor:pointer">✕</span>
+        </div>
+      </div>
+
+      <!-- Row 3: OUT OF STOCK item -->
+      <div style="display:grid;grid-template-columns:40px 1fr 90px 80px 80px 70px 80px 90px;gap:0;background:rgba(255,255,255,0.01);border:1px solid rgba(255,255,255,0.05);border-radius:8px;padding:8px 10px;margin-bottom:4px;align-items:center;opacity:0.65">
+        <div style="width:30px;height:30px;border-radius:6px;overflow:hidden;background:rgba(100,116,139,0.1)"><div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:16px">🥩</div></div>
+        <div>
+          <div style="font-size:11px;color:#94a3b8;font-weight:500">Beef Tenderloin</div>
+          <div style="font-size:9px;color:#64748b">Out of stock</div>
+        </div>
+        <div><span style="background:rgba(245,158,11,0.08);color:#92400e;border-radius:4px;padding:2px 7px;font-size:9px">Mains</span></div>
+        <div style="text-align:center"><div style="background:rgba(255,255,255,0.04);border:1px solid rgba(245,158,11,0.2);border-radius:5px;padding:4px 6px;font-size:11px;color:#92400e;text-align:center">3,200</div></div>
+        <!-- Stock = 0, auto-toggled unavailable -->
+        <div style="text-align:center"><div style="background:rgba(100,116,139,0.08);border:1px solid rgba(100,116,139,0.3);border-radius:5px;padding:4px 6px;font-size:11px;color:#94a3b8;text-align:center">0</div></div>
+        <!-- Toggle OFF auto -->
+        <div style="display:flex;justify-content:center">
+          <div style="width:32px;height:18px;background:#334155;border-radius:9px;position:relative;cursor:pointer">
+            <div style="width:14px;height:14px;background:#94a3b8;border-radius:7px;position:absolute;left:2px;top:2px"></div>
+          </div>
+        </div>
+        <div style="text-align:center"><span style="background:rgba(96,165,250,0.08);color:#475569;border-radius:4px;padding:2px 6px;font-size:9px">16%</span></div>
+        <div style="display:flex;gap:6px;justify-content:center">
+          <span style="font-size:10px;color:#64748b;cursor:pointer;padding:3px 6px;border:1px solid rgba(255,255,255,0.06);border-radius:4px">✏ Edit</span>
+          <span style="font-size:10px;color:#64748b;cursor:pointer">✕</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="section" style="max-width:900px;margin:16px auto 0">
+  <h3>Key behaviours in this view</h3>
+  <ul>
+    <li><strong>Inline price edit</strong> — click the amber number, type new value, press Enter or blur to auto-save via <code>PATCH /api/menu/[id]</code></li>
+    <li><strong>Inline stock edit</strong> — same pattern. Colour: green ≥ 6, amber 1–5 (low), red = 0 (auto-marks unavailable)</li>
+    <li><strong>Stock = 0 auto-disables</strong> — when stock hits 0, availability toggle flips to OFF automatically. Staff must restock to re-enable</li>
+    <li><strong>Low-stock strip</strong> — pinned at top, lists every item below the threshold (default: 5). Clicking "Jump to items" filters the table to show only low-stock rows</li>
+    <li><strong>Availability toggle</strong> — instant save, no drawer needed. Disabled (greyed out) when stock = 0</li>
+    <li><strong>Import CSV</strong> — the existing MenuImport component moves here as a button. Opens a modal, unchanged functionality</li>
+    <li><strong>Stock auto-decrement</strong> — when a POS order is confirmed (<code>createOrder</code>), each ordered item's stock decrements by quantity. Handled in <code>pos.actions.ts</code></li>
+  </ul>
+</div>
+
+<p class="subtitle" style="max-width:900px;margin:12px auto 0">Does this structure look right? Reply yes and I'll show section 2 — the full item editor drawer (images, ingredients, allergens, modifiers) and the Categories + Modifiers management panels.</p>

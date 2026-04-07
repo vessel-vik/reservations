@@ -1,0 +1,168 @@
+<h2>Print Architecture — 3 approaches</h2>
+<p class="subtitle">All three fix the print bugs and add the digital docket modal. They differ only in how the admin/central printer terminal is identified.</p>
+
+<style>
+.flow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 10px 0;
+}
+.node {
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 10px;
+  color: #d1d5db;
+  white-space: nowrap;
+}
+.node.green { background: #052e1c; border-color: #065f46; color: #34d399; }
+.node.blue  { background: #0c1d3a; border-color: #1d4ed8; color: #93c5fd; }
+.node.amber { background: #2d1a00; border-color: #92400e; color: #fcd34d; }
+.node.red   { background: #2d0a0a; border-color: #7f1d1d; color: #fca5a5; }
+.arrow { color: #4b5563; font-size: 12px; }
+.tag  { display: inline-block; border-radius: 4px; padding: 1px 6px; font-size: 9px; font-weight: 600; margin-left: 4px; }
+.tag-green { background:#065f46; color:#6ee7b7; }
+.tag-amber { background:#92400e; color:#fcd34d; }
+.tag-red   { background:#7f1d1d; color:#fca5a5; }
+
+/* Docket preview */
+.docket {
+  background: #fafafa;
+  border-radius: 6px;
+  padding: 12px;
+  font-family: 'Courier New', monospace;
+  font-size: 10px;
+  color: #111;
+  width: 160px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+.docket hr { border: none; border-top: 1px dashed #aaa; margin: 6px 0; }
+.docket .hdr { font-weight: 800; font-size: 11px; letter-spacing: 1px; }
+.docket .sub { font-size: 8px; color: #555; }
+.docket .item { text-align: left; font-size: 9px; padding: 1px 0; }
+.docket .footer { font-size: 8px; color: #777; font-style: italic; }
+</style>
+
+<!-- Digital docket preview (same for all approaches) -->
+<div class="section">
+  <h3>Digital Docket Modal — same across all approaches</h3>
+  <p class="subtitle">Appears on the waiter's tablet immediately after "Add to Tab". Waiter sees a preview of exactly what the kitchen/bar will receive. Auto-routes the print job in the background.</p>
+  <div style="display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap; margin-top:10px;">
+    <div class="docket">
+      <div class="hdr">AM | PM LOUNGE</div>
+      <div class="sub">Northern Bypass, Thome</div>
+      <hr>
+      <div class="hdr" style="font-size:12px;">★ KITCHEN DOCKET ★</div>
+      <div class="sub">NOT A RECEIPT</div>
+      <hr>
+      <div style="text-align:left; font-size:9px; margin:4px 0;">
+        <div><b>Table:</b> #71</div>
+        <div><b>Server:</b> Elyees</div>
+        <div><b>Time:</b> 14:32</div>
+      </div>
+      <hr>
+      <div class="item">1× Savanna</div>
+      <div class="item">2× Pilsner</div>
+      <div class="item">1× Guinness Lager</div>
+      <hr>
+      <div style="font-size:9px; font-weight:700;">Total: Ksh 1,050</div>
+      <hr>
+      <div class="footer">PLEASE SETTLE AT COUNTER</div>
+    </div>
+    <div style="flex:1; min-width:200px;">
+      <p style="font-size:10px; color:#9ca3af; margin:0 0 10px;">The modal wraps this docket preview in a dark overlay with two buttons:</p>
+      <div style="background:#111; border:1px solid #222; border-radius:10px; padding:12px; display:flex; flex-direction:column; gap:8px;">
+        <div style="background:#1a1a1a; border:1px solid #222; border-radius:6px; padding:8px; text-align:center; font-size:10px; color:#d1d5db;">📄 Docket preview (above)</div>
+        <div style="display:flex; gap:8px;">
+          <div style="flex:1; background:#1f2937; border:1px solid #374151; border-radius:6px; padding:6px; text-align:center; font-size:10px; color:#d1d5db;">✏️ Edit Order</div>
+          <div style="flex:1; background:#065f46; border:1px solid #10b981; border-radius:6px; padding:6px; text-align:center; font-size:10px; color:#6ee7b7; font-weight:700;">✓ Done</div>
+        </div>
+        <div style="font-size:9px; color:#4b5563; text-align:center;">Print job routed to central printer automatically</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr style="border-color:#1e1e1e; margin:20px 0;">
+
+<!-- 3 approaches -->
+<div class="options">
+
+  <!-- A: Role-based -->
+  <div class="option" data-choice="role-based" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Role-based <span class="tag tag-green">Recommended</span></h3>
+      <div class="flow">
+        <span class="node amber">Waiter (org:member)</span>
+        <span class="arrow">→</span>
+        <span class="node">Queue job in Appwrite</span>
+        <span class="arrow">→</span>
+        <span class="node green">Admin (org:admin) PrintBridge processes it</span>
+        <span class="arrow">→</span>
+        <span class="node blue">USB Thermal Printer</span>
+      </div>
+      <p style="font-size:10px; color:#9ca3af; margin:6px 0 4px;">How it works: PrintBridge reads the Clerk role on startup. If <code style="background:#1a1a1a;padding:1px 4px;border-radius:3px;">org:admin</code> → process jobs. If <code style="background:#1a1a1a;padding:1px 4px;border-radius:3px;">org:member</code> → queue only, never process.</p>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; font-size:9px; margin-top:6px;">
+        <span style="color:#34d399;">✓ Zero setup — roles already exist in Clerk</span><br>
+        <span style="color:#34d399;">✓ Any admin tab = automatic printer terminal</span><br>
+        <span style="color:#fcd34d;">⚠ Admin must keep a browser tab open with POS</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- B: Terminal registration -->
+  <div class="option" data-choice="terminal-reg" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Terminal Registration</h3>
+      <div class="flow">
+        <span class="node amber">Any waiter</span>
+        <span class="arrow">→</span>
+        <span class="node">Queue job with <code style="background:#1a1a1a;padding:1px 4px;border-radius:3px;">targetTerminalId</code></span>
+        <span class="arrow">→</span>
+        <span class="node green">Registered terminal (any account) processes it</span>
+        <span class="arrow">→</span>
+        <span class="node blue">USB Printer</span>
+      </div>
+      <p style="font-size:10px; color:#9ca3af; margin:6px 0 4px;">Admin goes to POS Settings → "Register this device as printer terminal". Saves a UUID to Clerk org <code style="background:#1a1a1a;padding:1px 4px;border-radius:3px;">publicMetadata</code>. PrintBridge matches its own UUID against the org setting.</p>
+      <div style="font-size:9px; margin-top:6px;">
+        <span style="color:#34d399;">✓ Explicit — any device can be the printer</span><br>
+        <span style="color:#34d399;">✓ Survives account changes (role-independent)</span><br>
+        <span style="color:#fcd34d;">⚠ Requires one-time setup UI in POS settings</span><br>
+        <span style="color:#fca5a5;">✗ Slightly more complex — extra Clerk metadata read on job creation</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- C: Always-queue (simplest) -->
+  <div class="option" data-choice="always-queue" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Always Queue, Admin Processes All</h3>
+      <div class="flow">
+        <span class="node amber">Any waiter</span>
+        <span class="arrow">→</span>
+        <span class="node">Queue job (no targeting)</span>
+        <span class="arrow">→</span>
+        <span class="node green">First PrintBridge with USB config processes it</span>
+        <span class="arrow">→</span>
+        <span class="node blue">USB Printer</span>
+      </div>
+      <p style="font-size:10px; color:#9ca3af; margin:6px 0 4px;">Simplest. All devices queue jobs via Appwrite. Only the admin device has a USB printer configured in localStorage. It naturally becomes the sole processor — no role check needed.</p>
+      <div style="font-size:9px; margin-top:6px;">
+        <span style="color:#34d399;">✓ Fewest moving parts</span><br>
+        <span style="color:#34d399;">✓ No Clerk metadata reads</span><br>
+        <span style="color:#fcd34d;">⚠ Race condition if two devices accidentally have a printer configured</span><br>
+        <span style="color:#fca5a5;">✗ No explicit guarantee of which terminal prints</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:16px; text-align:center;">Click to select, then confirm in the terminal.</p>

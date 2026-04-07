@@ -1,0 +1,11 @@
+{"type":"server-started","port":58714,"host":"127.0.0.1","url_host":"localhost","url":"http://localhost:58714","screen_dir":"/home/elyees/D/reservations/reservations/.superpowers/brainstorm/210743-1775406418"}
+{"type":"screen-added","file":"/home/elyees/D/reservations/reservations/.superpowers/brainstorm/210743-1775406418/cross-table-question.html"}
+{"source":"user-event","type":"click","text":"B\n    \n      Browse all open orders\n      A panel shows every unpaid order across all tables. Waiter taps any order to include it. Best for bar seating or when tables aren't numbered clearly.","choice":"browse-all","id":null,"timestamp":1775406634586}
+{"source":"user-event","type":"click","text":"B\n    \n      Browse all open orders\n      A panel shows every unpaid order across all tables. Waiter taps any order to include it. Best for bar seating or when tables aren't numbered clearly.","choice":"browse-all","id":null,"timestamp":1775406635546}
+{"source":"user-event","type":"click","text":"B\n    \n      Browse all open orders\n      A panel shows every unpaid order across all tables. Waiter taps any order to include it. Best for bar seating or when tables aren't numbered clearly.","choice":"browse-all","id":null,"timestamp":1775406635943}
+{"type":"screen-added","file":"/home/elyees/D/reservations/reservations/.superpowers/brainstorm/210743-1775406418/waiting-1.html"}
+{"type":"screen-added","file":"/home/elyees/D/reservations/reservations/.superpowers/brainstorm/210743-1775406418/layout-options.html"}
+{"source":"user-event","type":"click","text":"A\n    \n      Full-screen modal\n      Single scrollable list, sticky Pay buttons at the bottom. Simpler, great for phones too.","choice":"full-screen","id":null,"timestamp":1775406846224}
+{"type":"screen-added","file":"/home/elyees/D/reservations/reservations/.superpowers/brainstorm/210743-1775406418/waiting-2.html"}
+{"type":"screen-added","file":"/home/elyees/D/reservations/reservations/.superpowers/brainstorm/210743-1775406418/settle-modal-mockup.html"}
+{"type":"server-stopped","reason":"idle timeout"}

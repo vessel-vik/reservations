@@ -1,0 +1,26 @@
+<h2>Cross-table order combining — how should it work?</h2>
+<p class="subtitle">When a customer wants to pay for friends at another table, how does the waiter find those orders?</p>
+
+<div class="options">
+  <div class="option" data-choice="pull-by-table" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Pull by table number</h3>
+      <p>Waiter types "Table 5" → that table's unpaid orders get added to the current bill. Fast when the waiter knows exactly where the friends are sitting.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="browse-all" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Browse all open orders</h3>
+      <p>A panel shows every unpaid order across all tables. Waiter taps any order to include it. Best for bar seating or when tables aren't numbered clearly.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="both" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Both — table lookup + open orders browser</h3>
+      <p>Start from a table as usual, then tap "Add from another table" to either type a table number OR browse all open orders. Most flexible.</p>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,170 @@
+<h2>Finance Hub — Expense Drawer &amp; Receipt Upload</h2>
+<p class="subtitle">Section 2 of 4 — Rebuilt expense form, replacing the broken modal</p>
+
+<div class="split" style="max-width:900px;margin:0 auto;align-items:flex-start">
+
+  <!-- LEFT: the page behind the drawer -->
+  <div class="mockup" style="flex:1.2">
+    <div class="mockup-header">Finance · Expenses (behind drawer)</div>
+    <div class="mockup-body" style="padding:12px;filter:brightness(0.5)">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px">
+        <div style="background:rgba(16,185,129,0.1);border-radius:6px;padding:8px;text-align:center">
+          <div style="font-size:8px;color:#64748b">Revenue</div>
+          <div style="font-size:13px;font-weight:700;color:#34d399">KSh 1.28M</div>
+        </div>
+        <div style="background:rgba(239,68,68,0.1);border-radius:6px;padding:8px;text-align:center">
+          <div style="font-size:8px;color:#64748b">Expenses</div>
+          <div style="font-size:13px;font-weight:700;color:#f87171">KSh 384k</div>
+        </div>
+        <div style="background:rgba(245,158,11,0.1);border-radius:6px;padding:8px;text-align:center">
+          <div style="font-size:8px;color:#64748b">Profit</div>
+          <div style="font-size:13px;font-weight:700;color:#fbbf24">KSh 900k</div>
+        </div>
+      </div>
+      <div style="height:80px;background:rgba(255,255,255,0.03);border-radius:6px;display:flex;align-items:center;justify-content:center;color:#475569;font-size:10px">Expense list</div>
+    </div>
+  </div>
+
+  <!-- RIGHT: the drawer itself -->
+  <div class="mockup" style="flex:1;border-left:2px solid rgba(245,158,11,0.3)">
+    <div class="mockup-header" style="display:flex;justify-content:space-between;align-items:center">
+      <span>Add Expense</span>
+      <span style="font-size:18px;color:#64748b;cursor:pointer">✕</span>
+    </div>
+    <div class="mockup-body" style="padding:14px;display:flex;flex-direction:column;gap:12px">
+
+      <!-- Supplier -->
+      <div>
+        <div style="font-size:9px;color:#94a3b8;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em">Supplier Name <span style="color:#f87171">*</span></div>
+        <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(245,158,11,0.4);border-radius:6px;padding:7px 10px;font-size:11px;color:#e2e8f0">Nairobi Produce Co.</div>
+      </div>
+
+      <!-- TIN + Invoice # side by side -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div>
+          <div style="font-size:9px;color:#94a3b8;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em">Supplier TIN</div>
+          <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:7px 10px;font-size:11px;color:#94a3b8">P051234567A</div>
+        </div>
+        <div>
+          <div style="font-size:9px;color:#94a3b8;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em">Invoice No.</div>
+          <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:7px 10px;font-size:11px;color:#94a3b8">INV-2026-0142</div>
+        </div>
+      </div>
+
+      <!-- Category + VAT -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div>
+          <div style="font-size:9px;color:#94a3b8;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em">Category <span style="color:#f87171">*</span></div>
+          <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:7px 10px;font-size:11px;color:#e2e8f0;display:flex;justify-content:space-between">
+            <span>Supplies</span><span style="color:#64748b">▾</span>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:9px;color:#94a3b8;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em">VAT Type</div>
+          <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:7px 10px;font-size:11px;color:#e2e8f0;display:flex;justify-content:space-between">
+            <span>Standard 16%</span><span style="color:#64748b">▾</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Amount + live VAT preview -->
+      <div>
+        <div style="font-size:9px;color:#94a3b8;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em">Amount (excl. VAT) <span style="color:#f87171">*</span></div>
+        <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:7px 10px;font-size:11px;color:#e2e8f0;display:flex;align-items:center;gap:4px">
+          <span style="color:#64748b">KSh</span>
+          <span>8,400.00</span>
+        </div>
+        <!-- Live VAT calculation preview -->
+        <div style="margin-top:6px;background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.15);border-radius:6px;padding:8px 10px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px">
+          <div style="text-align:center">
+            <div style="font-size:8px;color:#64748b">Ex-VAT</div>
+            <div style="font-size:11px;font-weight:600;color:#e2e8f0">KSh 8,400</div>
+          </div>
+          <div style="text-align:center">
+            <div style="font-size:8px;color:#64748b">VAT (16%)</div>
+            <div style="font-size:11px;font-weight:600;color:#fbbf24">KSh 1,344</div>
+          </div>
+          <div style="text-align:center">
+            <div style="font-size:8px;color:#64748b">Total</div>
+            <div style="font-size:11px;font-weight:700;color:#34d399">KSh 9,744</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Invoice date + due date -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div>
+          <div style="font-size:9px;color:#94a3b8;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em">Invoice Date <span style="color:#f87171">*</span></div>
+          <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:7px 10px;font-size:11px;color:#e2e8f0">27 Mar 2026</div>
+        </div>
+        <div>
+          <div style="font-size:9px;color:#94a3b8;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em">Due Date</div>
+          <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:7px 10px;font-size:11px;color:#94a3b8">10 Apr 2026</div>
+        </div>
+      </div>
+
+      <!-- Receipt upload -->
+      <div>
+        <div style="font-size:9px;color:#94a3b8;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em">Receipt / Invoice Image</div>
+        <div style="border:2px dashed rgba(245,158,11,0.3);border-radius:8px;padding:12px;display:flex;align-items:center;gap:12px;background:rgba(245,158,11,0.03);cursor:pointer">
+          <!-- Already uploaded preview -->
+          <div style="width:48px;height:48px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">🧾</div>
+          <div>
+            <div style="font-size:11px;color:#e2e8f0;font-weight:500">invoice_nairobi_produce_0142.jpg</div>
+            <div style="font-size:9px;color:#34d399;margin-top:2px">✓ Uploaded · 284 KB</div>
+            <div style="font-size:9px;color:#64748b;margin-top:1px">Click to replace · drag &amp; drop supported</div>
+          </div>
+          <div style="margin-left:auto;font-size:10px;color:#94a3b8;padding:4px 8px;border:1px solid rgba(255,255,255,0.08);border-radius:4px;cursor:pointer">View</div>
+        </div>
+      </div>
+
+      <!-- Description -->
+      <div>
+        <div style="font-size:9px;color:#94a3b8;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em">Description <span style="color:#f87171">*</span></div>
+        <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:7px 10px;font-size:11px;color:#94a3b8;min-height:42px">Fresh produce delivery — weekly order</div>
+      </div>
+
+      <!-- Action buttons -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px">
+        <div style="padding:9px;border:1px solid rgba(255,255,255,0.1);border-radius:8px;text-align:center;font-size:11px;color:#94a3b8;cursor:pointer">Cancel</div>
+        <div style="padding:9px;background:#f59e0b;border-radius:8px;text-align:center;font-size:11px;font-weight:700;color:#0f172a;cursor:pointer">Save Expense</div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<div class="section" style="max-width:900px;margin:16px auto 0">
+  <h3>What's new vs the broken modal</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div>
+      <div class="label" style="color:#f87171;margin-bottom:8px">Current (broken)</div>
+      <ul style="margin:0;padding-left:16px;font-size:12px;line-height:1.8;color:#94a3b8">
+        <li>Submit does nothing — errors are silent</li>
+        <li>No loading state on button</li>
+        <li>Edit button imported but never rendered</li>
+        <li>Amount defaults to 0, passes validation</li>
+        <li>No receipt attachment</li>
+        <li>No VAT preview while typing</li>
+        <li>Mismatched styles (gray-800 vs slate-800)</li>
+      </ul>
+    </div>
+    <div>
+      <div class="label" style="color:#34d399;margin-bottom:8px">Rebuilt drawer</div>
+      <ul style="margin:0;padding-left:16px;font-size:12px;line-height:1.8;color:#94a3b8">
+        <li>Zod validation — inline field errors</li>
+        <li>Button shows spinner + disables during submit</li>
+        <li>Toast on success ("Expense saved") or error</li>
+        <li>Edit pre-fills all fields including image</li>
+        <li>Amount must be &gt; 0 with clear error</li>
+        <li>Live VAT breakdown as you type the amount</li>
+        <li>Receipt upload via Appwrite Storage</li>
+        <li>Slide-in drawer — page stays visible behind it</li>
+        <li>Due date field (was hidden before)</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="max-width:900px;margin:16px auto 0">Does the drawer design look right? Reply yes and I'll show section 3 — the Reports view (trend chart + P&L export) and the Set Budgets flow.</p>

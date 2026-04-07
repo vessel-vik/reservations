@@ -1,0 +1,198 @@
+<h2>Finance Hub — Architecture &amp; TDD Test Plan</h2>
+<p class="subtitle">Section 4 of 4 — Component tree, data flow, new files, and what gets tested first</p>
+
+<div class="section" style="max-width:900px;margin:0 auto">
+  <h3>Component Tree</h3>
+</div>
+
+<div class="mockup" style="max-width:900px;margin:0 auto">
+  <div class="mockup-header">New file structure</div>
+  <div class="mockup-body" style="padding:16px;font-family:monospace;font-size:11px;line-height:1.9;color:#94a3b8">
+
+    <div style="color:#fbbf24;margin-bottom:4px">components/reports/</div>
+    <div style="padding-left:16px">
+      <div><span style="color:#34d399">FinanceHub.tsx</span> <span style="color:#475569">← new top-level component replacing 3 tabs</span></div>
+      <div style="padding-left:16px">
+        <div><span style="color:#60a5fa">FinanceKPIStrip.tsx</span> <span style="color:#475569">← persistent strip (Revenue/Expenses/Profit/VAT)</span></div>
+        <div><span style="color:#60a5fa">BudgetAlertBanner.tsx</span> <span style="color:#475569">← contextual over-budget banner</span></div>
+        <div><span style="color:#60a5fa">FinanceSectionNav.tsx</span> <span style="color:#475569">← Expenses | VAT | Reports segmented control</span></div>
+        <div style="margin-top:4px;color:#94a3b8">── Expenses section ──</div>
+        <div><span style="color:#60a5fa">ExpenseList.tsx</span> <span style="color:#475569">← rebuilt table with receipt col + edit/pay/delete</span></div>
+        <div><span style="color:#60a5fa">ExpenseDrawer.tsx</span> <span style="color:#475569">← slide-in form, Zod validation, toast feedback</span></div>
+        <div><span style="color:#60a5fa">BudgetMeters.tsx</span> <span style="color:#475569">← category progress bars (green/amber/red)</span></div>
+        <div><span style="color:#60a5fa">BudgetManager.tsx</span> <span style="color:#475569">← "Set Budgets" panel (edit limits, save)</span></div>
+        <div><span style="color:#60a5fa">ReceiptUpload.tsx</span> <span style="color:#475569">← drag-drop, Appwrite Storage, thumbnail preview</span></div>
+        <div style="margin-top:4px;color:#94a3b8">── VAT section ──</div>
+        <div><span style="color:#94a3b8">VATDashboard.tsx</span> <span style="color:#475569">← existing, integrated as-is</span></div>
+        <div style="margin-top:4px;color:#94a3b8">── Reports section ──</div>
+        <div><span style="color:#60a5fa">RevenueExpenseChart.tsx</span> <span style="color:#475569">← bar + line chart (Recharts)</span></div>
+        <div><span style="color:#60a5fa">PLSummaryTable.tsx</span> <span style="color:#475569">← Revenue / Expenses / Profit / VAT row</span></div>
+        <div><span style="color:#60a5fa">ExportButtons.tsx</span> <span style="color:#475569">← CSV and PDF export</span></div>
+      </div>
+    </div>
+
+    <div style="color:#fbbf24;margin-top:12px;margin-bottom:4px">app/api/</div>
+    <div style="padding-left:16px">
+      <div><span style="color:#94a3b8">expenses/route.ts</span> <span style="color:#475569">← existing (no changes to GET/POST/PUT/DELETE)</span></div>
+      <div><span style="color:#34d399">expenses/upload/route.ts</span> <span style="color:#475569">← NEW: multipart upload → Appwrite Storage</span></div>
+      <div><span style="color:#34d399">budgets/route.ts</span> <span style="color:#475569">← NEW: GET/POST/PUT budget documents</span></div>
+      <div><span style="color:#94a3b8">reports/accounting/route.ts</span> <span style="color:#475569">← existing P&amp;L data, used by Reports section</span></div>
+    </div>
+
+    <div style="color:#fbbf24;margin-top:12px;margin-bottom:4px">lib/actions/</div>
+    <div style="padding-left:16px">
+      <div><span style="color:#94a3b8">expense.actions.ts</span> <span style="color:#475569">← existing (add receiptUrl field support)</span></div>
+      <div><span style="color:#34d399">budget.actions.ts</span> <span style="color:#475569">← NEW: getBudgets, setBudget, getMonthBudgets</span></div>
+    </div>
+
+    <div style="color:#fbbf24;margin-top:12px;margin-bottom:4px">lib/</div>
+    <div style="padding-left:16px">
+      <div><span style="color:#34d399">budget-utils.ts</span> <span style="color:#475569">← NEW: compareBudgetToActual(), getOverBudgetCategories()</span></div>
+    </div>
+
+    <div style="color:#fbbf24;margin-top:12px;margin-bottom:4px">__tests__/finance/</div>
+    <div style="padding-left:16px">
+      <div><span style="color:#f87171">budget-utils.test.ts</span> <span style="color:#475569">← RED first: budget comparison logic</span></div>
+      <div><span style="color:#f87171">expense-drawer.test.tsx</span> <span style="color:#475569">← RED first: form validation, submit, toast</span></div>
+      <div><span style="color:#f87171">finance-kpi-strip.test.tsx</span> <span style="color:#475569">← RED first: KPI calculations, period switching</span></div>
+      <div><span style="color:#f87171">api-budgets.test.ts</span> <span style="color:#475569">← RED first: GET/POST/PUT budget route</span></div>
+      <div><span style="color:#f87171">api-expenses-upload.test.ts</span> <span style="color:#475569">← RED first: file upload route</span></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- DATA FLOW -->
+<div class="section" style="max-width:900px;margin:20px auto 0">
+  <h3>Data Flow</h3>
+</div>
+
+<div class="mockup" style="max-width:900px;margin:0 auto">
+  <div class="mockup-header">How data moves through the Finance Hub</div>
+  <div class="mockup-body" style="padding:16px">
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+
+      <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:12px">
+        <div style="font-size:10px;font-weight:600;color:#fbbf24;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em">KPI Strip</div>
+        <div style="font-size:10px;color:#94a3b8;line-height:1.7">
+          <div>→ <span style="color:#e2e8f0">/api/reports/accounting</span> (existing)</div>
+          <div style="padding-left:10px;color:#64748b">Returns totalIncome, totalExpenses, netProfit, netVat</div>
+          <div>→ <span style="color:#e2e8f0">/api/budgets?month=2026-03</span> (new)</div>
+          <div style="padding-left:10px;color:#64748b">Returns category limits for over-budget detection</div>
+          <div style="margin-top:6px">Re-fetches on period toggle (Today/Week/Month/Quarter)</div>
+        </div>
+      </div>
+
+      <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:12px">
+        <div style="font-size:10px;font-weight:600;color:#fbbf24;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em">Expense Drawer (create)</div>
+        <div style="font-size:10px;color:#94a3b8;line-height:1.7">
+          <div>1. Zod validates locally — shows inline errors</div>
+          <div>2. If receipt: <span style="color:#e2e8f0">POST /api/expenses/upload</span> (multipart)</div>
+          <div style="padding-left:10px;color:#64748b">→ Appwrite Storage → returns receiptUrl</div>
+          <div>3. <span style="color:#e2e8f0">POST /api/expenses</span> with receiptUrl in body</div>
+          <div>4. Toast success → close drawer → refetch list</div>
+          <div>5. If error → toast error → drawer stays open</div>
+        </div>
+      </div>
+
+      <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:12px">
+        <div style="font-size:10px;font-weight:600;color:#fbbf24;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em">Budget Meters</div>
+        <div style="font-size:10px;color:#94a3b8;line-height:1.7">
+          <div>→ <span style="color:#e2e8f0">GET /api/expenses</span> (existing) — actuals per category</div>
+          <div>→ <span style="color:#e2e8f0">GET /api/budgets</span> (new) — limits per category</div>
+          <div>→ <span style="color:#e2e8f0">budget-utils.compareBudgetToActual()</span></div>
+          <div style="padding-left:10px;color:#64748b">Returns % used, overage amount, status (ok/warn/over)</div>
+          <div>Color: green &lt;80% · amber 80–100% · red &gt;100%</div>
+        </div>
+      </div>
+
+      <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:12px">
+        <div style="font-size:10px;font-weight:600;color:#fbbf24;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em">Reports Chart</div>
+        <div style="font-size:10px;color:#94a3b8;line-height:1.7">
+          <div>→ <span style="color:#e2e8f0">GET /api/admin/analytics</span> (existing)</div>
+          <div style="padding-left:10px;color:#64748b">Returns daily revenue breakdown</div>
+          <div>→ <span style="color:#e2e8f0">GET /api/expenses</span> grouped by invoiceDate</div>
+          <div>→ Merged into daily [ date, revenue, expenses, profit ]</div>
+          <div>CSV export: client-side string build, Blob download</div>
+          <div>PDF export: <span style="color:#e2e8f0">window.print()</span> with print stylesheet</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- TDD PLAN -->
+<div class="section" style="max-width:900px;margin:20px auto 0">
+  <h3>TDD Test Plan — RED before any code</h3>
+</div>
+
+<div class="mockup" style="max-width:900px;margin:0 auto">
+  <div class="mockup-header">Test files written first, watched to fail, then implementation follows</div>
+  <div class="mockup-body" style="padding:16px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+
+      <div style="background:rgba(239,68,68,0.05);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:12px">
+        <div style="font-size:10px;font-weight:700;color:#f87171;margin-bottom:8px">budget-utils.test.ts</div>
+        <div style="font-size:10px;color:#94a3b8;line-height:1.8">
+          <div>✗ compareBudgetToActual returns ok when under 80%</div>
+          <div>✗ returns warn when between 80–100%</div>
+          <div>✗ returns over when exceeding limit</div>
+          <div>✗ getOverBudgetCategories filters correctly</div>
+          <div>✗ handles zero budget limit gracefully</div>
+          <div>✗ handles missing category in budgets map</div>
+        </div>
+      </div>
+
+      <div style="background:rgba(239,68,68,0.05);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:12px">
+        <div style="font-size:10px;font-weight:700;color:#f87171;margin-bottom:8px">expense-drawer.test.tsx</div>
+        <div style="font-size:10px;color:#94a3b8;line-height:1.8">
+          <div>✗ shows inline error when supplierName is empty</div>
+          <div>✗ shows inline error when amount is 0 or negative</div>
+          <div>✗ shows inline error when description is empty</div>
+          <div>✗ disables submit button while submitting</div>
+          <div>✗ shows success toast on 200 response</div>
+          <div>✗ shows error toast on 400/500 response</div>
+          <div>✗ pre-fills all fields when editing existing expense</div>
+          <div>✗ live VAT preview updates as amount changes</div>
+        </div>
+      </div>
+
+      <div style="background:rgba(239,68,68,0.05);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:12px">
+        <div style="font-size:10px;font-weight:700;color:#f87171;margin-bottom:8px">finance-kpi-strip.test.tsx</div>
+        <div style="font-size:10px;color:#94a3b8;line-height:1.8">
+          <div>✗ renders Revenue, Expenses, Profit, VAT values</div>
+          <div>✗ profit shows green when positive</div>
+          <div>✗ profit shows red when negative</div>
+          <div>✗ period buttons trigger refetch with correct params</div>
+          <div>✗ shows loading skeleton during fetch</div>
+        </div>
+      </div>
+
+      <div style="background:rgba(239,68,68,0.05);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:12px">
+        <div style="font-size:10px;font-weight:700;color:#f87171;margin-bottom:8px">api-budgets.test.ts</div>
+        <div style="font-size:10px;color:#94a3b8;line-height:1.8">
+          <div>✗ GET returns budgets for given month/year</div>
+          <div>✗ GET returns empty array when no budgets set</div>
+          <div>✗ POST creates budget document in Appwrite</div>
+          <div>✗ PUT updates existing budget limit</div>
+          <div>✗ GET auto-carries from previous month when empty</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="section" style="max-width:900px;margin:16px auto 0">
+  <h3>What stays the same</h3>
+  <ul>
+    <li><strong>Expense API routes</strong> (GET/POST/PUT/DELETE) — no changes, only adding the upload route</li>
+    <li><strong>VAT Dashboard</strong> — integrated as-is, no changes</li>
+    <li><strong>Expense data model</strong> — only adding <code>receiptUrl?: string</code> field</li>
+    <li><strong>Admin tab count</strong> — goes from 6 tabs to 4 (Dashboard · Sales · Finance · Import)</li>
+  </ul>
+</div>
+
+<p class="subtitle" style="max-width:900px;margin:12px auto 0">That's the complete design for Sub-project 1. Does this look right? Reply yes and I'll write the spec document and move to implementation planning.</p>

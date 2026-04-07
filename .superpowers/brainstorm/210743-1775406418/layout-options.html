@@ -1,0 +1,220 @@
+<h2>Settle Tab — layout options</h2>
+<p class="subtitle">The current dialog is too cramped for tablets and can't scroll. Which layout replaces it?</p>
+
+<style>
+.mock-modal {
+  background: #0f172a;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 16px;
+  overflow: hidden;
+  font-size: 11px;
+  color: #e2e8f0;
+  height: 320px;
+  display: flex;
+  flex-direction: column;
+}
+.mock-modal-header {
+  background: #1e293b;
+  padding: 10px 14px;
+  font-weight: 700;
+  font-size: 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  flex-shrink: 0;
+}
+.mock-scroll-area {
+  overflow-y: auto;
+  flex: 1;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.mock-order-card {
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10px;
+  border: 1px solid rgba(255,255,255,0.06);
+}
+.card-green { background: rgba(16,185,129,0.12); border-color: rgba(16,185,129,0.3); }
+.card-amber { background: rgba(245,158,11,0.12); border-color: rgba(245,158,11,0.3); }
+.card-red   { background: rgba(239,68,68,0.12);  border-color: rgba(239,68,68,0.3); }
+.mock-sticky-footer {
+  background: #1e293b;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  padding: 10px 14px;
+  flex-shrink: 0;
+}
+.mock-btn {
+  display: inline-block;
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 10px;
+  font-weight: 700;
+  margin-right: 4px;
+}
+.btn-green { background: #10b981; color: #fff; }
+.btn-sky   { background: #0ea5e9; color: #fff; }
+.btn-gray  { background: rgba(255,255,255,0.08); color: #94a3b8; border: 1px solid rgba(255,255,255,0.1); }
+.mock-sidebar {
+  width: 130px;
+  flex-shrink: 0;
+  background: #1e293b;
+  border-left: 1px solid rgba(255,255,255,0.08);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mock-sidebar .total-line {
+  font-size: 13px;
+  font-weight: 800;
+  color: #10b981;
+}
+.split-layout {
+  display: flex;
+  height: 320px;
+  background: #0f172a;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 16px;
+  overflow: hidden;
+}
+.split-left {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.mock-tag {
+  font-size: 9px;
+  border-radius: 20px;
+  padding: 2px 6px;
+  font-weight: 600;
+}
+.tag-green { background: rgba(16,185,129,0.2); color: #34d399; }
+.tag-amber { background: rgba(245,158,11,0.2); color: #fbbf24; }
+.tag-red   { background: rgba(239,68,68,0.2);  color: #f87171; }
+.dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+.dot-green { background: #10b981; }
+.dot-amber { background: #f59e0b; }
+.dot-red   { background: #ef4444; }
+</style>
+
+<div class="split" style="gap: 20px; align-items: flex-start;">
+
+  <!-- Option A: Full-screen modal -->
+  <div class="mockup" style="flex:1;">
+    <div class="mockup-header">A — Full-screen modal (scrollable)</div>
+    <div class="mockup-body" style="padding: 12px;">
+      <div class="mock-modal">
+        <div class="mock-modal-header">
+          Settle Tab &nbsp;·&nbsp; <span style="color:#94a3b8;font-weight:400;">All tables</span>
+          &nbsp;&nbsp;
+          <span style="float:right; color:#94a3b8;">✕</span>
+        </div>
+        <div class="mock-scroll-area">
+          <div style="font-size:9px; color:#64748b; text-transform:uppercase; letter-spacing:.1em; padding: 2px 0;">Unpaid orders · All tables · Today</div>
+          <div class="mock-order-card card-green">
+            <div><span class="dot dot-green"></span><b>T3 — #ORD-1234</b><br><span style="color:#64748b;">Walk-in · 5:58 AM &nbsp; <span class="mock-tag tag-green">22 min</span></span></div>
+            <div style="text-align:right;"><b style="color:#10b981;">Ksh 10,100</b><br><input type="checkbox" checked style="margin-top:3px;"/></div>
+          </div>
+          <div class="mock-order-card card-amber">
+            <div><span class="dot dot-amber"></span><b>T7 — #ORD-5678</b><br><span style="color:#64748b;">John · 4:10 AM &nbsp; <span class="mock-tag tag-amber">1h 50m</span></span></div>
+            <div style="text-align:right;"><b style="color:#fbbf24;">Ksh 6,400</b><br><input type="checkbox" style="margin-top:3px;"/></div>
+          </div>
+          <div class="mock-order-card card-red">
+            <div><span class="dot dot-red"></span><b>T1 — #ORD-9012</b><br><span style="color:#64748b;">Walk-in · 1:30 AM &nbsp; <span class="mock-tag tag-red">4h 30m</span></span></div>
+            <div style="text-align:right;"><b style="color:#f87171;">Ksh 3,200</b><br><input type="checkbox" style="margin-top:3px;"/></div>
+          </div>
+          <div class="mock-order-card card-green">
+            <div><span class="dot dot-green"></span><b>Bar — #ORD-3456</b><br><span style="color:#64748b;">Walk-in · 5:45 AM &nbsp; <span class="mock-tag tag-green">35 min</span></span></div>
+            <div style="text-align:right;"><b style="color:#10b981;">Ksh 1,800</b><br><input type="checkbox" style="margin-top:3px;"/></div>
+          </div>
+        </div>
+        <div class="mock-sticky-footer">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="color:#64748b;">Selected: 1 · <b style="color:#fff;">Ksh 10,100</b></span>
+            <div>
+              <span class="mock-btn btn-sky">Charge Selected</span>
+              <span class="mock-btn btn-green">Charge All</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p style="font-size:10px; color:#64748b; margin-top:8px;">Modal fills 90% of screen. Orders list scrolls. Payment buttons always visible at bottom.</p>
+    </div>
+  </div>
+
+  <!-- Option B: Split panel -->
+  <div class="mockup" style="flex:1;">
+    <div class="mockup-header">B — Split panel (orders left, actions right sticky)</div>
+    <div class="mockup-body" style="padding: 12px;">
+      <div class="split-layout">
+        <div class="split-left">
+          <div class="mock-modal-header" style="font-size:11px;">
+            Unpaid Orders &nbsp;<span style="color:#64748b;">· All tables</span>
+          </div>
+          <div class="mock-scroll-area">
+            <div class="mock-order-card card-green">
+              <div><span class="dot dot-green"></span><b>T3 #1234</b> <span class="mock-tag tag-green">22 min</span><br><span style="color:#64748b;">Ksh 10,100</span></div>
+              <input type="checkbox" checked/>
+            </div>
+            <div class="mock-order-card card-amber">
+              <div><span class="dot dot-amber"></span><b>T7 #5678</b> <span class="mock-tag tag-amber">1h 50m</span><br><span style="color:#64748b;">Ksh 6,400</span></div>
+              <input type="checkbox"/>
+            </div>
+            <div class="mock-order-card card-red">
+              <div><span class="dot dot-red"></span><b>T1 #9012</b> <span class="mock-tag tag-red">4h 30m</span><br><span style="color:#64748b;">Ksh 3,200</span></div>
+              <input type="checkbox"/>
+            </div>
+            <div class="mock-order-card card-green">
+              <div><span class="dot dot-green"></span><b>Bar #3456</b> <span class="mock-tag tag-green">35 min</span><br><span style="color:#64748b;">Ksh 1,800</span></div>
+              <input type="checkbox"/>
+            </div>
+          </div>
+        </div>
+        <div class="mock-sidebar">
+          <div style="font-size:9px; text-transform:uppercase; letter-spacing:.1em; color:#64748b;">Summary</div>
+          <div>
+            <div style="font-size:9px; color:#94a3b8;">Selected</div>
+            <div class="total-line">Ksh 10,100</div>
+          </div>
+          <div style="border-top:1px solid rgba(255,255,255,0.06); padding-top:6px;">
+            <div style="font-size:9px; color:#94a3b8; margin-bottom:4px;">Payment</div>
+            <div style="display:flex; flex-wrap:wrap; gap:3px;">
+              <span style="background:#10b981;color:#fff;border-radius:20px;padding:2px 6px;font-size:9px;font-weight:700;">PDQ</span>
+              <span style="background:rgba(255,255,255,0.05);color:#94a3b8;border-radius:20px;padding:2px 6px;font-size:9px;">Cash</span>
+              <span style="background:rgba(255,255,255,0.05);color:#94a3b8;border-radius:20px;padding:2px 6px;font-size:9px;">M-Pesa</span>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:5px;margin-top:auto;">
+            <span class="mock-btn btn-sky" style="text-align:center;display:block;">Charge Selected</span>
+            <span class="mock-btn btn-green" style="text-align:center;display:block;">Charge All</span>
+            <span class="mock-btn btn-gray" style="text-align:center;display:block;">Select All</span>
+          </div>
+        </div>
+      </div>
+      <p style="font-size:10px; color:#64748b; margin-top:8px;">Orders list scrolls on the left. Action panel on the right is always visible — no need to scroll to find the Pay button.</p>
+    </div>
+  </div>
+
+</div>
+
+<div class="options" style="margin-top: 20px;">
+  <div class="option" data-choice="full-screen" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Full-screen modal</h3>
+      <p>Single scrollable list, sticky Pay buttons at the bottom. Simpler, great for phones too.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="split-panel" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Split panel</h3>
+      <p>Scrollable orders on the left, always-visible actions on the right. Optimised for tablet landscape.</p>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,174 @@
+<h2>Finance Hub — Which layout approach?</h2>
+<p class="subtitle">Three ways to structure the unified Accounting + VAT + Expenses hub</p>
+
+<div class="options">
+
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Inner-Tab Finance Hub</h3>
+      <p>Classic sub-navigation inside the Finance tab. Overview | Expenses | VAT | Reports each fill the full view. Budget alerts appear as a banner inside the Expenses section.</p>
+      <div class="mockup" style="margin-top:12px">
+        <div class="mockup-header">Finance</div>
+        <div class="mockup-body" style="padding:0">
+          <div style="display:flex;border-bottom:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04)">
+            <div style="padding:8px 16px;font-size:11px;border-bottom:2px solid #f59e0b;color:#f59e0b">Overview</div>
+            <div style="padding:8px 16px;font-size:11px;color:#94a3b8">Expenses</div>
+            <div style="padding:8px 16px;font-size:11px;color:#94a3b8">VAT</div>
+            <div style="padding:8px 16px;font-size:11px;color:#94a3b8">Reports</div>
+          </div>
+          <div style="padding:12px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+            <div style="background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.2);border-radius:8px;padding:10px">
+              <div style="font-size:10px;color:#94a3b8">Revenue Today</div>
+              <div style="font-size:16px;font-weight:700;color:#34d399">KSh 48,200</div>
+            </div>
+            <div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:10px">
+              <div style="font-size:10px;color:#94a3b8">Expenses Today</div>
+              <div style="font-size:16px;font-weight:700;color:#f87171">KSh 12,800</div>
+            </div>
+            <div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.2);border-radius:8px;padding:10px">
+              <div style="font-size:10px;color:#94a3b8">Net Profit</div>
+              <div style="font-size:16px;font-weight:700;color:#fbbf24">KSh 35,400</div>
+            </div>
+          </div>
+          <div style="padding:0 12px 12px;height:60px;background:rgba(255,255,255,0.02);border-radius:8px;margin:0 12px;display:flex;align-items:center;justify-content:center;color:#475569;font-size:11px">
+            📈 Revenue vs Expenses trend chart (7 days)
+          </div>
+        </div>
+      </div>
+      <div class="pros-cons" style="margin-top:8px">
+        <div class="pros"><h4>Pros</h4><ul><li>Familiar, clean navigation</li><li>Each section has full space</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Lose P&L context when in Expenses</li><li>Must click back to Overview</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Overview-First Finance Hub ⭐ Recommended</h3>
+      <p>A persistent KPI strip stays pinned at the top in all sections. Below it, a segmented control switches between Expenses / VAT / Reports. The admin always sees P&L while working.</p>
+      <div class="mockup" style="margin-top:12px">
+        <div class="mockup-header">Finance</div>
+        <div class="mockup-body" style="padding:0">
+          <div style="background:rgba(15,23,42,0.8);border-bottom:1px solid rgba(245,158,11,0.2);padding:10px 12px;display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
+            <div style="text-align:center">
+              <div style="font-size:9px;color:#94a3b8">Revenue</div>
+              <div style="font-size:13px;font-weight:700;color:#34d399">KSh 48.2k</div>
+            </div>
+            <div style="text-align:center">
+              <div style="font-size:9px;color:#94a3b8">Expenses</div>
+              <div style="font-size:13px;font-weight:700;color:#f87171">KSh 12.8k</div>
+            </div>
+            <div style="text-align:center">
+              <div style="font-size:9px;color:#94a3b8">Profit</div>
+              <div style="font-size:13px;font-weight:700;color:#fbbf24">KSh 35.4k</div>
+            </div>
+            <div style="text-align:center">
+              <div style="font-size:9px;color:#94a3b8">VAT Due</div>
+              <div style="font-size:13px;font-weight:700;color:#60a5fa">KSh 5.2k</div>
+            </div>
+          </div>
+          <div style="padding:8px 12px;display:flex;gap:6px;background:rgba(255,255,255,0.02)">
+            <div style="padding:5px 12px;background:#f59e0b;color:#0f172a;border-radius:20px;font-size:10px;font-weight:600">Expenses</div>
+            <div style="padding:5px 12px;background:rgba(255,255,255,0.06);color:#94a3b8;border-radius:20px;font-size:10px">VAT</div>
+            <div style="padding:5px 12px;background:rgba(255,255,255,0.06);color:#94a3b8;border-radius:20px;font-size:10px">Reports</div>
+            <div style="margin-left:auto;padding:5px 12px;background:rgba(16,185,129,0.15);color:#34d399;border-radius:20px;font-size:10px">+ Add Expense</div>
+          </div>
+          <div style="padding:8px 12px">
+            <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:6px;padding:6px 10px;font-size:10px;color:#f87171;margin-bottom:6px">
+              ⚠️ Supplies over budget by KSh 3,200 this month
+            </div>
+            <div style="display:grid;grid-template-columns:1fr;gap:4px">
+              <div style="background:rgba(255,255,255,0.03);border-radius:6px;padding:6px 8px;display:flex;justify-content:space-between;align-items:center;font-size:10px">
+                <span style="color:#e2e8f0">Nairobi Produce Co.</span>
+                <span style="color:#94a3b8">Supplies</span>
+                <span style="color:#f87171">KSh 8,400</span>
+                <span style="background:rgba(245,158,11,0.15);color:#fbbf24;padding:2px 6px;border-radius:10px">Pending</span>
+              </div>
+              <div style="background:rgba(255,255,255,0.03);border-radius:6px;padding:6px 8px;display:flex;justify-content:space-between;align-items:center;font-size:10px">
+                <span style="color:#e2e8f0">Kenya Power</span>
+                <span style="color:#94a3b8">Utilities</span>
+                <span style="color:#f87171">KSh 14,200</span>
+                <span style="background:rgba(16,185,129,0.15);color:#34d399;padding:2px 6px;border-radius:10px">Paid</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="pros-cons" style="margin-top:8px">
+        <div class="pros"><h4>Pros</h4><ul><li>P&L always visible — financial context never lost</li><li>Budget alerts float above any section</li><li>Feels like a command centre</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Less vertical space for content below</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Command Centre (All-in-One)</h3>
+      <p>No sub-navigation at all. Overview KPIs + trend chart on the left column. Expense entry + list on the right. VAT summary and budget meters inline below. One scroll, everything visible.</p>
+      <div class="mockup" style="margin-top:12px">
+        <div class="mockup-header">Finance</div>
+        <div class="mockup-body" style="padding:8px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div>
+              <div style="font-size:9px;color:#94a3b8;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em">P&L This Month</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:6px">
+                <div style="background:rgba(16,185,129,0.1);border-radius:6px;padding:6px;text-align:center">
+                  <div style="font-size:9px;color:#94a3b8">Revenue</div>
+                  <div style="font-size:12px;font-weight:700;color:#34d399">1.2M</div>
+                </div>
+                <div style="background:rgba(239,68,68,0.1);border-radius:6px;padding:6px;text-align:center">
+                  <div style="font-size:9px;color:#94a3b8">Expenses</div>
+                  <div style="font-size:12px;font-weight:700;color:#f87171">380k</div>
+                </div>
+              </div>
+              <div style="background:rgba(255,255,255,0.03);border-radius:6px;height:50px;display:flex;align-items:center;justify-content:center;color:#475569;font-size:10px">
+                Trend chart
+              </div>
+              <div style="margin-top:6px;font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em">Budget Meters</div>
+              <div style="margin-top:4px;display:grid;gap:3px">
+                <div style="display:flex;align-items:center;gap:4px">
+                  <span style="font-size:9px;color:#94a3b8;width:40px">Rent</span>
+                  <div style="flex:1;height:4px;background:rgba(255,255,255,0.1);border-radius:2px"><div style="width:70%;height:100%;background:#34d399;border-radius:2px"></div></div>
+                  <span style="font-size:9px;color:#94a3b8">70%</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:4px">
+                  <span style="font-size:9px;color:#f87171;width:40px">Supplies</span>
+                  <div style="flex:1;height:4px;background:rgba(255,255,255,0.1);border-radius:2px"><div style="width:110%;height:100%;background:#ef4444;border-radius:2px"></div></div>
+                  <span style="font-size:9px;color:#f87171">110%</span>
+                </div>
+              </div>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                <div style="font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em">Expenses</div>
+                <div style="font-size:9px;background:rgba(245,158,11,0.15);color:#fbbf24;padding:2px 6px;border-radius:10px">+ Add</div>
+              </div>
+              <div style="display:grid;gap:3px">
+                <div style="background:rgba(255,255,255,0.03);border-radius:4px;padding:5px 7px;font-size:9px;display:flex;justify-content:space-between">
+                  <span style="color:#e2e8f0">Nairobi Produce Co.</span>
+                  <span style="color:#f87171">KSh 8,400</span>
+                </div>
+                <div style="background:rgba(255,255,255,0.03);border-radius:4px;padding:5px 7px;font-size:9px;display:flex;justify-content:space-between">
+                  <span style="color:#e2e8f0">Kenya Power</span>
+                  <span style="color:#34d399">KSh 14,200</span>
+                </div>
+                <div style="background:rgba(255,255,255,0.03);border-radius:4px;padding:5px 7px;font-size:9px;display:flex;justify-content:space-between">
+                  <span style="color:#e2e8f0">Safaricom Airtel</span>
+                  <span style="color:#fbbf24">KSh 2,100</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="pros-cons" style="margin-top:8px">
+        <div class="pros"><h4>Pros</h4><ul><li>Everything visible at once</li><li>Zero navigation clicks</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Gets crowded on smaller screens</li><li>Less space for expense list and VAT detail</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+</div>

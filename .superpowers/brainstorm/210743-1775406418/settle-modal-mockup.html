@@ -1,0 +1,340 @@
+<h2>Settle Tab — redesigned full-screen modal</h2>
+<p class="subtitle">Scrollable order list, color-coded urgency, sticky payment bar. Click to approve or flag anything.</p>
+
+<style>
+* { box-sizing: border-box; }
+.modal-shell {
+  background: #0a0a0f;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 20px;
+  overflow: hidden;
+  max-width: 680px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  height: 520px;
+  font-family: inherit;
+  font-size: 12px;
+  color: #e2e8f0;
+}
+.modal-topbar {
+  background: #111827;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  flex-shrink: 0;
+}
+.modal-topbar h3 { font-size: 15px; font-weight: 700; margin: 0; }
+.modal-topbar .sub { font-size: 11px; color: #64748b; margin-top: 1px; }
+.close-btn { width: 28px; height: 28px; border-radius: 50%; background: rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center; font-size: 13px; cursor: pointer; color: #94a3b8; }
+
+/* Stats row */
+.stats-row {
+  display: flex;
+  gap: 10px;
+  padding: 12px 20px;
+  background: #0f172a;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  flex-shrink: 0;
+}
+.stat-pill {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  padding: 6px 12px;
+  font-size: 11px;
+}
+.stat-pill .val { font-size: 14px; font-weight: 700; color: #fff; }
+.stat-pill .lbl { font-size: 9px; color: #64748b; text-transform: uppercase; letter-spacing: .1em; }
+.stat-green .val { color: #10b981; }
+.stat-amber .val { color: #f59e0b; }
+.stat-red .val   { color: #ef4444; }
+
+/* Search/filter bar */
+.filter-bar {
+  padding: 10px 20px;
+  background: #0f172a;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.search-input {
+  flex: 1;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  padding: 7px 12px;
+  color: #e2e8f0;
+  font-size: 11px;
+}
+.filter-chip {
+  border-radius: 20px;
+  padding: 5px 12px;
+  font-size: 10px;
+  font-weight: 600;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04);
+  color: #94a3b8;
+  cursor: pointer;
+}
+.filter-chip.active { background: rgba(16,185,129,0.15); border-color: rgba(16,185,129,0.4); color: #34d399; }
+
+/* Order list */
+.order-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.order-card {
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.02);
+  overflow: hidden;
+}
+.order-card.green { border-color: rgba(16,185,129,0.25); background: rgba(16,185,129,0.04); }
+.order-card.amber { border-color: rgba(245,158,11,0.25); background: rgba(245,158,11,0.04); }
+.order-card.red   { border-color: rgba(239,68,68,0.25);  background: rgba(239,68,68,0.04); }
+.order-card.selected { box-shadow: 0 0 0 2px #10b981; }
+
+.card-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+.check-box {
+  width: 22px; height: 22px;
+  border-radius: 7px;
+  border: 1.5px solid rgba(255,255,255,0.15);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; flex-shrink: 0;
+  background: rgba(255,255,255,0.04);
+}
+.check-box.checked { background: #10b981; border-color: #10b981; color: #fff; }
+.age-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.card-info { flex: 1; min-width: 0; }
+.card-info .title { font-weight: 600; font-size: 12px; }
+.card-info .sub { font-size: 10px; color: #64748b; margin-top: 1px; }
+.age-badge {
+  border-radius: 20px;
+  padding: 2px 7px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .03em;
+}
+.badge-green { background: rgba(16,185,129,0.15); color: #34d399; }
+.badge-amber { background: rgba(245,158,11,0.15); color: #fbbf24; }
+.badge-red   { background: rgba(239,68,68,0.15);  color: #f87171; }
+.card-amount { text-align: right; flex-shrink: 0; }
+.card-amount .amount { font-size: 13px; font-weight: 700; }
+.g { color: #10b981; } .a { color: #f59e0b; } .r { color: #ef4444; }
+.expand-icon { font-size: 10px; color: #64748b; flex-shrink: 0; }
+
+/* Expanded items */
+.card-items {
+  border-top: 1px solid rgba(255,255,255,0.06);
+  padding: 8px 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.item-row { display: flex; justify-content: space-between; font-size: 10px; color: #94a3b8; padding: 2px 0; }
+
+/* Sticky bottom bar */
+.sticky-bar {
+  background: #111827;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  padding: 12px 20px;
+  flex-shrink: 0;
+}
+.bar-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.selected-count { font-size: 11px; color: #64748b; }
+.selected-amount { font-size: 18px; font-weight: 800; color: #fff; }
+.payment-chips { display: flex; gap: 6px; }
+.pchip {
+  border-radius: 20px;
+  padding: 4px 10px;
+  font-size: 10px;
+  font-weight: 600;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04);
+  color: #94a3b8;
+}
+.pchip.active { background: #10b981; border-color: #10b981; color: #fff; }
+.bar-btns { display: flex; gap: 8px; }
+.cta {
+  flex: 1;
+  border-radius: 12px;
+  padding: 10px 0;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  cursor: pointer;
+}
+.cta-selected { background: #0ea5e9; color: #fff; }
+.cta-all      { background: #10b981; color: #fff; }
+.cta-outline  { background: transparent; color: #94a3b8; border: 1px solid rgba(255,255,255,0.1); }
+</style>
+
+<div class="modal-shell">
+
+  <!-- Top bar -->
+  <div class="modal-topbar">
+    <div>
+      <h3>Settle Tab</h3>
+      <div class="sub">All open orders · Today · 4 unpaid</div>
+    </div>
+    <div class="close-btn">✕</div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-row">
+    <div class="stat-pill stat-green">
+      <div class="lbl">Fresh &lt; 1hr</div>
+      <div class="val">2</div>
+    </div>
+    <div class="stat-pill stat-amber">
+      <div class="lbl">Ageing 1–3hr</div>
+      <div class="val">1</div>
+    </div>
+    <div class="stat-pill stat-red">
+      <div class="lbl">Urgent &gt; 3hr</div>
+      <div class="val">1</div>
+    </div>
+    <div class="stat-pill" style="margin-left:auto;">
+      <div class="lbl">Total outstanding</div>
+      <div class="val">Ksh 21,500</div>
+    </div>
+  </div>
+
+  <!-- Filter bar -->
+  <div class="filter-bar">
+    <input class="search-input" placeholder="🔍  Search by table, order #, name…" />
+    <span class="filter-chip active">All</span>
+    <span class="filter-chip">🔴 Urgent</span>
+    <span class="filter-chip">T3</span>
+  </div>
+
+  <!-- Order list -->
+  <div class="order-list">
+
+    <!-- Red — urgent -->
+    <div class="order-card red">
+      <div class="card-row">
+        <div class="check-box"></div>
+        <div class="age-dot" style="background:#ef4444;"></div>
+        <div class="card-info">
+          <div class="title">Table 1 &nbsp;·&nbsp; #ORD-9012</div>
+          <div class="sub">Walk-in &nbsp;·&nbsp; 1:30 AM &nbsp;<span class="age-badge badge-red">4h 32m</span></div>
+        </div>
+        <div class="card-amount"><div class="amount r">Ksh 3,200</div></div>
+        <div class="expand-icon">▼</div>
+      </div>
+    </div>
+
+    <!-- Amber -->
+    <div class="order-card amber">
+      <div class="card-row">
+        <div class="check-box"></div>
+        <div class="age-dot" style="background:#f59e0b;"></div>
+        <div class="card-info">
+          <div class="title">Table 7 &nbsp;·&nbsp; #ORD-5678</div>
+          <div class="sub">John M. &nbsp;·&nbsp; 4:10 AM &nbsp;<span class="age-badge badge-amber">1h 52m</span></div>
+        </div>
+        <div class="card-amount"><div class="amount a">Ksh 6,400</div></div>
+        <div class="expand-icon">▼</div>
+      </div>
+    </div>
+
+    <!-- Green — selected, expanded -->
+    <div class="order-card green selected">
+      <div class="card-row">
+        <div class="check-box checked">✓</div>
+        <div class="age-dot" style="background:#10b981;"></div>
+        <div class="card-info">
+          <div class="title">Table 3 &nbsp;·&nbsp; #ORD-5357916621-RQ18</div>
+          <div class="sub">Walk-in &nbsp;·&nbsp; 5:58 AM &nbsp;<span class="age-badge badge-green">4m</span></div>
+        </div>
+        <div class="card-amount"><div class="amount g">Ksh 10,100</div></div>
+        <div class="expand-icon">▲</div>
+      </div>
+      <div class="card-items">
+        <div class="item-row"><span>1× Smirnoff Black Ice</span><span>Ksh 300</span></div>
+        <div class="item-row"><span>1× Heineken</span><span>Ksh 350</span></div>
+        <div class="item-row"><span>1× Guinness Lager</span><span>Ksh 350</span></div>
+        <div class="item-row"><span>1× Gordons 1L</span><span>Ksh 4,500</span></div>
+        <div class="item-row" style="border-top:1px dashed rgba(255,255,255,0.08); margin-top:4px; padding-top:4px; color:#10b981; font-weight:700;"><span>Total</span><span>Ksh 10,100</span></div>
+      </div>
+    </div>
+
+    <!-- Green -->
+    <div class="order-card green">
+      <div class="card-row">
+        <div class="check-box"></div>
+        <div class="age-dot" style="background:#10b981;"></div>
+        <div class="card-info">
+          <div class="title">Bar &nbsp;·&nbsp; #ORD-3456</div>
+          <div class="sub">Walk-in &nbsp;·&nbsp; 5:45 AM &nbsp;<span class="age-badge badge-green">17m</span></div>
+        </div>
+        <div class="card-amount"><div class="amount g">Ksh 1,800</div></div>
+        <div class="expand-icon">▼</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Sticky bottom bar -->
+  <div class="sticky-bar">
+    <div class="bar-top">
+      <div>
+        <div class="selected-count">1 order selected</div>
+        <div class="selected-amount">Ksh 10,100</div>
+      </div>
+      <div class="payment-chips">
+        <span class="pchip">Cash</span>
+        <span class="pchip active">PDQ</span>
+        <span class="pchip">M-Pesa</span>
+        <span class="pchip">Paystack</span>
+      </div>
+    </div>
+    <div class="bar-btns">
+      <div class="cta cta-outline">Select All</div>
+      <div class="cta cta-selected">Charge Selected · Ksh 10,100</div>
+      <div class="cta cta-all">Charge All · Ksh 21,500</div>
+    </div>
+  </div>
+
+</div>
+
+<div class="options" style="margin-top: 20px;">
+  <div class="option" data-choice="approve" onclick="toggleSelect(this)">
+    <div class="letter">✓</div>
+    <div class="content">
+      <h3>Approve this design</h3>
+      <p>Stats row, color-coded cards, expandable items, sticky bar with payment chips and charge buttons</p>
+    </div>
+  </div>
+  <div class="option" data-choice="tweak" onclick="toggleSelect(this)">
+    <div class="letter">↺</div>
+    <div class="content">
+      <h3>Needs a tweak</h3>
+      <p>Something's off — let me know what to change</p>
+    </div>
+  </div>
+</div>

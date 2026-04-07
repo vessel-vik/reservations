@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls /home/elyees/D/reservations/reservations/app/api/menu/items/[id]/versions/)",
+      "Bash(claude mcp:*)",
+      "Read(//home/elyees/.claude/**)",
+      "Read(//usr/local/bin/**)",
+      "Bash(claude-code mcp:*)",
+      "Bash(sed -i '26s/Query\\\\.limit\\(200\\)/Query.limit\\(500\\)/' /home/elyees/D/reservations/reservations/lib/actions/admin.actions.ts)",
+      "Bash(sed -i '72s/Query\\\\.limit\\(300\\)/Query.limit\\(1000\\)/' /home/elyees/D/reservations/reservations/lib/actions/admin.actions.ts)",
+      "Bash(sed -i '120s/Query\\\\.limit\\(200\\)/Query.limit\\(500\\)/' /home/elyees/D/reservations/reservations/lib/actions/admin.actions.ts)",
+      "Bash(sed -i '191s/Query\\\\.limit\\(200\\)/Query.limit\\(500\\)/' /home/elyees/D/reservations/reservations/lib/actions/admin.actions.ts)",
+      "Bash(sed -i '252s/Query\\\\.limit\\(200\\)/Query.limit\\(500\\)/' /home/elyees/D/reservations/reservations/lib/actions/admin.actions.ts)",
+      "Bash(curl -LsSf https://astral.sh/uv/install.sh)",
+      "Bash(sh)",
+      "Read(//home/elyees/snap/code/231/.local/bin/**)",
+      "Read(//home/elyees/**)",
+      "mcp__appwrite-api__databases_list_collections",
+      "mcp__appwrite-api__databases_create_index",
+      "mcp__appwrite-api__databases_create_collection",
+      "mcp__appwrite-api__databases_create_string_attribute",
+      "mcp__appwrite-api__databases_create_boolean_attribute",
+      "mcp__appwrite-api__databases_create_integer_attribute",
+      "Bash(npx next:*)",
+      "Bash(node_modules/.bin/next build:*)",
+      "Bash(node -e ':*)"
+    ]
+  }
+}

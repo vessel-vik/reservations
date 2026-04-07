@@ -1,0 +1,281 @@
+<h2>Refined Tablet Layout — Option A</h2>
+<p class="subtitle">Compact sidebar, all actions in header, person icon opens dashboard. Does this feel right?</p>
+
+<style>
+.mockup-frame {
+  background: #0a0a0a;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #333;
+  font-family: system-ui, sans-serif;
+  color: #fff;
+  font-size: 11px;
+}
+.mock-topbar {
+  background: #111;
+  border-bottom: 1px solid #222;
+  padding: 8px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mock-logo { font-weight: 800; font-size: 14px; color: #10b981; letter-spacing: -0.5px; white-space: nowrap; }
+.mock-tagline { font-size: 9px; color: #4b5563; white-space: nowrap; display: block; margin-top: 1px; }
+.mock-btn {
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  padding: 5px 9px;
+  color: #d1d5db;
+  font-size: 10px;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.mock-btn.green { background: #065f46; border-color: #10b981; color: #6ee7b7; }
+.mock-btn.blue { background: #1e3a5f; border-color: #3b82f6; color: #93c5fd; }
+.mock-btn.icon-only {
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+.mock-search {
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  padding: 5px 10px;
+  color: #9ca3af;
+  font-size: 10px;
+  flex: 1;
+  min-width: 0;
+}
+.mock-cats {
+  display: flex;
+  gap: 6px;
+  padding: 7px 14px;
+  background: #0d0d0d;
+  border-bottom: 1px solid #1a1a1a;
+  overflow: hidden;
+}
+.mock-cat {
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 20px;
+  padding: 4px 12px;
+  font-size: 10px;
+  color: #6b7280;
+  white-space: nowrap;
+}
+.mock-cat.active { background: #065f46; border-color: #10b981; color: #6ee7b7; font-weight: 600; }
+.mock-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+  padding: 8px;
+}
+.mock-card {
+  background: #141414;
+  border: 1px solid #222;
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.mock-card-img { height: 52px; background: linear-gradient(135deg, #1a2a1a, #0f1f0f); display: flex; align-items: center; justify-content: center; font-size: 18px; }
+.mock-card-body { padding: 6px 7px; }
+.mock-card-name { font-size: 10px; font-weight: 600; color: #e5e7eb; }
+.mock-card-price { font-size: 9px; color: #10b981; margin-top: 1px; }
+.mock-sidebar {
+  background: #0d0d0d;
+  border-left: 1px solid #1e1e1e;
+  width: 150px;
+  min-width: 150px;
+  display: flex;
+  flex-direction: column;
+}
+.mock-sidebar-header { padding: 8px 10px; border-bottom: 1px solid #1e1e1e; display: flex; align-items: center; justify-content: space-between; }
+.mock-sidebar-title { font-weight: 700; font-size: 11px; color: #e5e7eb; }
+.mock-sidebar-badge { background: #065f46; color: #6ee7b7; border-radius: 10px; padding: 1px 6px; font-size: 9px; font-weight: 700; }
+.mock-sidebar-items { flex: 1; padding: 7px; display: flex; flex-direction: column; gap: 4px; overflow: hidden; }
+.mock-order-item { background: #141414; border: 1px solid #222; border-radius: 6px; padding: 5px 7px; }
+.mock-order-item-name { font-size: 10px; color: #d1d5db; }
+.mock-order-item-price { font-size: 9px; color: #6b7280; margin-top: 1px; }
+.mock-sidebar-footer { padding: 8px; border-top: 1px solid #1e1e1e; }
+.mock-total { background: #065f46; border-radius: 8px; padding: 6px 8px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+.mock-total-label { font-size: 9px; color: #a7f3d0; }
+.mock-total-amount { font-size: 12px; font-weight: 800; color: #6ee7b7; }
+.mock-add-btn { background: #10b981; border-radius: 7px; padding: 7px; text-align: center; font-weight: 700; color: #fff; font-size: 10px; }
+
+/* Callout labels */
+.callout {
+  background: #1e3a5f;
+  border: 1px solid #3b82f6;
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 9px;
+  color: #93c5fd;
+  white-space: nowrap;
+}
+.arrow-row { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
+.arrow { color: #6b7280; font-size: 11px; }
+</style>
+
+<div class="mockup">
+  <div class="mockup-header">Tablet view · 900px wide (e.g. iPad landscape)</div>
+  <div class="mockup-body" style="padding:0; background:#0a0a0a;">
+    <div class="mockup-frame" style="height:320px; display:flex; flex-direction:column;">
+
+      <!-- Header -->
+      <div class="mock-topbar">
+        <div>
+          <span class="mock-logo">AM | PM</span>
+          <span class="mock-tagline">Point of Sale</span>
+        </div>
+        <input class="mock-search" placeholder="🔍  Search menu…" readonly>
+        <span class="mock-btn">📋 Open Orders</span>
+        <span class="mock-btn blue">🧾 Closed</span>
+        <span class="mock-btn green">💳 Settle</span>
+        <!-- Person icon replacing Dashboard link -->
+        <span class="mock-btn icon-only" title="Dashboard">👤</span>
+      </div>
+
+      <!-- Category strip -->
+      <div class="mock-cats">
+        <span class="mock-cat active">All Items</span>
+        <span class="mock-cat">🍺 Beers</span>
+        <span class="mock-cat">🥃 Spirits</span>
+        <span class="mock-cat">🍷 Wine</span>
+        <span class="mock-cat">🍔 Food</span>
+        <span class="mock-cat">🧃 Soft</span>
+        <span style="color:#4b5563;font-size:10px;align-self:center;margin-left:4px;">→</span>
+      </div>
+
+      <!-- Content row -->
+      <div style="display:flex; flex:1; overflow:hidden;">
+
+        <!-- Product grid -->
+        <div style="flex:1; overflow-y:auto; min-width:0;">
+          <div class="mock-grid">
+            <div class="mock-card">
+              <div class="mock-card-img">🍺</div>
+              <div class="mock-card-body"><div class="mock-card-name">Savanna</div><div class="mock-card-price">Ksh 350</div></div>
+            </div>
+            <div class="mock-card">
+              <div class="mock-card-img">🍺</div>
+              <div class="mock-card-body"><div class="mock-card-name">Pilsner</div><div class="mock-card-price">Ksh 300</div></div>
+            </div>
+            <div class="mock-card">
+              <div class="mock-card-img">🍺</div>
+              <div class="mock-card-body"><div class="mock-card-name">Guinness</div><div class="mock-card-price">Ksh 350</div></div>
+            </div>
+            <div class="mock-card">
+              <div class="mock-card-img">🥃</div>
+              <div class="mock-card-body"><div class="mock-card-name">Smirnoff</div><div class="mock-card-price">Ksh 400</div></div>
+            </div>
+            <div class="mock-card">
+              <div class="mock-card-img">🥃</div>
+              <div class="mock-card-body"><div class="mock-card-name">Jameson</div><div class="mock-card-price">Ksh 550</div></div>
+            </div>
+            <div class="mock-card">
+              <div class="mock-card-img">🍔</div>
+              <div class="mock-card-body"><div class="mock-card-name">Wings</div><div class="mock-card-price">Ksh 800</div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Compact sidebar -->
+        <div class="mock-sidebar">
+          <div class="mock-sidebar-header">
+            <span class="mock-sidebar-title">Order</span>
+            <span class="mock-sidebar-badge">3</span>
+          </div>
+          <div class="mock-sidebar-items">
+            <div class="mock-order-item">
+              <div class="mock-order-item-name">1× Savanna</div>
+              <div class="mock-order-item-price">Ksh 350</div>
+            </div>
+            <div class="mock-order-item">
+              <div class="mock-order-item-name">2× Pilsner</div>
+              <div class="mock-order-item-price">Ksh 600</div>
+            </div>
+            <div class="mock-order-item">
+              <div class="mock-order-item-name">1× Guinness</div>
+              <div class="mock-order-item-price">Ksh 350</div>
+            </div>
+          </div>
+          <div class="mock-sidebar-footer">
+            <div class="mock-total">
+              <span class="mock-total-label">Total</span>
+              <span class="mock-total-amount">1,300</span>
+            </div>
+            <div class="mock-add-btn">➕ Add to Tab</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="margin-top: 20px; background: #111; border: 1px solid #222; border-radius: 10px; padding: 16px;">
+  <h3 style="margin:0 0 12px; font-size:13px; color:#e5e7eb;">What changes at each breakpoint</h3>
+  <table style="width:100%; border-collapse:collapse; font-size:10px; color:#d1d5db;">
+    <tr style="border-bottom:1px solid #222;">
+      <th style="text-align:left; padding:5px 8px; color:#9ca3af; font-weight:600;">Screen</th>
+      <th style="text-align:left; padding:5px 8px; color:#9ca3af; font-weight:600;">Sidebar</th>
+      <th style="text-align:left; padding:5px 8px; color:#9ca3af; font-weight:600;">Header buttons</th>
+      <th style="text-align:left; padding:5px 8px; color:#9ca3af; font-weight:600;">Product grid</th>
+    </tr>
+    <tr style="border-bottom:1px solid #1a1a1a;">
+      <td style="padding:5px 8px; color:#6b7280;">Phone &lt;768px</td>
+      <td style="padding:5px 8px;">Hidden → floating cart button</td>
+      <td style="padding:5px 8px; color:#6b7280;">Hamburger menu only</td>
+      <td style="padding:5px 8px;">2 columns</td>
+    </tr>
+    <tr style="border-bottom:1px solid #1a1a1a; background:#0f1a0f;">
+      <td style="padding:5px 8px; color:#6ee7b7; font-weight:600;">Tablet 768–1023px ← NEW</td>
+      <td style="padding:5px 8px; color:#6ee7b7;">150px compact</td>
+      <td style="padding:5px 8px; color:#6ee7b7;">All buttons + 👤 icon</td>
+      <td style="padding:5px 8px; color:#6ee7b7;">3 columns</td>
+    </tr>
+    <tr>
+      <td style="padding:5px 8px; color:#6b7280;">Desktop ≥1024px</td>
+      <td style="padding:5px 8px;">400px full</td>
+      <td style="padding:5px 8px; color:#6b7280;">Full text labels + UserButton</td>
+      <td style="padding:5px 8px;">4–6 columns</td>
+    </tr>
+  </table>
+</div>
+
+<div class="options" style="margin-top:16px;">
+  <div class="option" data-choice="looks-good" onclick="toggleSelect(this)">
+    <div class="letter">✓</div>
+    <div class="content">
+      <h3>This looks right</h3>
+      <p>Move forward with this as the tablet layout direction</p>
+    </div>
+  </div>
+  <div class="option" data-choice="tweak-sidebar" onclick="toggleSelect(this)">
+    <div class="letter">↔</div>
+    <div class="content">
+      <h3>Sidebar needs adjusting</h3>
+      <p>Width, position, or content of the cart panel needs changing</p>
+    </div>
+  </div>
+  <div class="option" data-choice="tweak-header" onclick="toggleSelect(this)">
+    <div class="letter">⊤</div>
+    <div class="content">
+      <h3>Header needs adjusting</h3>
+      <p>Button order, icon placement, or search needs rethinking</p>
+    </div>
+  </div>
+</div>
