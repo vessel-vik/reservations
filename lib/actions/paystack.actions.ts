@@ -1,6 +1,6 @@
 "use server";
 
-import { parseStringify } from "@/lib/utils";
+import { getAuthContext, validateBusinessContext } from "@/lib/auth.utils";
 
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 const PAYSTACK_BASE_URL = "https://api.paystack.co";
@@ -48,6 +48,9 @@ export async function initializePaystackTransaction({
             throw new Error("Paystack secret key not configured");
         }
 
+        const { businessId } = await getAuthContext();
+        validateBusinessContext(businessId);
+
         // Convert KES to cents (Paystack expects smallest currency unit)
         const amountInCents = Math.round(amount * 100);
 
@@ -57,10 +60,11 @@ export async function initializePaystackTransaction({
             currency: "KES",
             reference: `ORDER_${orderId}_${Date.now()}`,
             metadata: {
+                businessId,
                 orderId,
                 ...metadata
             },
-            channels: ["card", "mobile_money", "bank_transfer"] // Available payment methods
+            channels: ["mobile_money", "card"]
         };
 
         const response = await fetch(`${PAYSTACK_BASE_URL}/transaction/initialize`, {

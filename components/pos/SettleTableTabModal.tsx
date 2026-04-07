@@ -1,584 +1,710 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
+    Dialog,
+    DialogContent,
+    DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
 import {
-  getTableDailyTabSummary,
-  settleTableTabAndCreateOrder,
-  settleSelectedOrders,
+    getOpenOrdersSummary,
+    settleSelectedOrders,
 } from "@/lib/actions/pos.actions";
 import {
-  initializePaystackTransaction,
-  verifyPaystackTransaction,
+    initializePaystackTransaction,
+    verifyPaystackTransaction,
 } from "@/lib/actions/paystack.actions";
 import { openPaystackWithAccessCode } from "@/lib/paystack-inline";
-import { Loader2, RefreshCw } from "lucide-react";
+import { Loader2, Search, X, ChevronDown, ChevronUp, ArrowLeft } from "lucide-react";
+import { toast } from "sonner";
+import { useOrganization, useUser } from "@clerk/nextjs";
+import type { OpenOrder } from "@/types/pos.types";
 
 type PaymentMethod = "cash" | "pdq" | "mpesa" | "paystack";
 
-const paymentOptions: Array<{ value: PaymentMethod; label: string }> = [
-  { value: "cash", label: "Cash" },
-  { value: "pdq", label: "PDQ / Card" },
-  { value: "mpesa", label: "M-Pesa" },
-  { value: "paystack", label: "Paystack" },
-];
-
 interface SettleTableTabModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onEdit?: (order: any) => void;
+    isOpen: boolean;
+    onClose: () => void;
+    onSettlementSuccess?: (
+        consolidatedOrderId: string,
+        totalAmount: number,
+        paymentMethod: string,
+        paymentReference: string,
+    ) => void;
+}
+
+/** Exported for unit tests */
+export function orderAgeColor(ageMinutes: number): "green" | "amber" | "red" {
+    if (ageMinutes < 60) return "green";
+    if (ageMinutes < 180) return "amber";
+    return "red";
+}
+
+function ageBadgeLabel(ageMinutes: number): string {
+    if (ageMinutes < 60) return `${ageMinutes}m`;
+    const h = Math.floor(ageMinutes / 60);
+    const m = ageMinutes % 60;
+    return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
+
+const COLOR_STYLES = {
+    green: {
+        card: "border-emerald-500/25 bg-emerald-500/[0.04]",
+        dot: "#10b981",
+        badge: "bg-emerald-500/15 text-emerald-300",
+        amount: "text-emerald-400",
+    },
+    amber: {
+        card: "border-amber-500/25 bg-amber-500/[0.04]",
+        dot: "#f59e0b",
+        badge: "bg-amber-500/15 text-amber-300",
+        amount: "text-amber-400",
+    },
+    red: {
+        card: "border-red-500/25 bg-red-500/[0.04]",
+        dot: "#ef4444",
+        badge: "bg-red-500/15 text-red-300",
+        amount: "text-red-400",
+    },
+} as const;
+
+function parseOrderItems(order: OpenOrder): { name: string; quantity: number; price: number }[] {
+    const raw = order.items;
+    if (!Array.isArray(raw)) return [];
+    return raw.map((item: any) => ({
+        name: item.name || "Item",
+        quantity: typeof item.quantity === "number" ? item.quantity : 1,
+        price: typeof item.price === "number" ? item.price : 0,
+    }));
 }
 
 export function SettleTableTabModal({
-  isOpen,
-  onClose,
-  onEdit,
+    isOpen,
+    onClose,
+    onSettlementSuccess,
 }: SettleTableTabModalProps) {
-  const router = useRouter();
-  const [tableNumber, setTableNumber] = useState<number>(1);
-  const [date, setDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
-  const [summary, setSummary] = useState<any | null>(null);
-  const [isLoadingSummary, setIsLoadingSummary] = useState(false);
-  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
-  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
-  const [orderPaymentMethods, setOrderPaymentMethods] = useState<Record<string, PaymentMethod>>({});
-  const [isPaystackReady, setIsPaystackReady] = useState(false);
+    const { membership } = useOrganization();
+    const { user } = useUser();
+    const isAdmin = membership?.role === "org:admin";
 
-  const parseOrderItems = (order: any) => {
-    if (!order?.items) return [];
-    if (typeof order.items === "string") {
-      try {
-        return JSON.parse(order.items);
-      } catch {
-        return [];
-      }
-    }
-    return Array.isArray(order.items) ? order.items : [];
-  };
+    const [orders, setOrders] = useState<OpenOrder[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const [expandedId, setExpandedId] = useState<string | null>(null);
+    const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
+    const [search, setSearch] = useState("");
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [urgentOnly, setUrgentOnly] = useState(false);
+    const [isPaystackReady, setIsPaystackReady] = useState(false);
 
-  const refreshSummary = async () => {
-    if (!tableNumber || tableNumber < 1) return;
-    const result = await getTableDailyTabSummary(tableNumber, date);
-    setSummary(result);
-  };
+    // Payment sub-view state
+    const [paymentSubview, setPaymentSubview] = useState<{
+        type: "cash" | "pdq" | "mpesa";
+        amount: number;
+        orderIds: string[];
+    } | null>(null);
+    const [cashReceived, setCashReceived] = useState("");
+    const [pdqCode, setPdqCode] = useState("");
+    const [mpesaRef, setMpesaRef] = useState("");
 
-  const handleLoadSummary = async () => {
-    try {
-      setError(null);
-      setSuccessMessage(null);
-      setIsLoadingSummary(true);
+    // Auto-load on open
+    useEffect(() => {
+        if (!isOpen) return;
+        void loadOrders();
+    }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
-      if (!tableNumber || tableNumber < 1) {
-        throw new Error("Please enter a valid table number.");
-      }
+    // Paystack readiness poll
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const check = () => { if ((window as any).PaystackPop) setIsPaystackReady(true); };
+        check();
+        const id = window.setInterval(check, 250);
+        return () => window.clearInterval(id);
+    }, []);
 
-      const result = await getTableDailyTabSummary(tableNumber, date);
-      setSummary(result);
-      setSelectedOrderIds([]);
-      setExpandedOrderId(null);
-
-      if (!result.orders || result.orders.length === 0) {
-        setError("No unpaid orders found for this table on the selected date.");
-      }
-    } catch (err) {
-      console.error("Failed to load table tab summary:", err);
-      setSummary(null);
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Failed to load table summary. Please try again."
-      );
-    } finally {
-      setIsLoadingSummary(false);
-    }
-  };
-
-  const handleToggleOrder = (orderId: string) => {
-    setExpandedOrderId((current) => (current === orderId ? null : orderId));
-  };
-
-  const handleToggleSelection = (orderId: string) => {
-    setSelectedOrderIds((current) =>
-      current.includes(orderId) ? current.filter((id) => id !== orderId) : [...current, orderId]
-    );
-  };
-
-  const handleSelectAll = () => {
-    if (!summary?.orders?.length) return;
-    const allIds = summary.orders.map((order: any) => order.$id);
-    setSelectedOrderIds((current) =>
-      current.length === allIds.length ? [] : allIds
-    );
-  };
-
-  const setOrderPaymentMethod = (orderId: string, method: PaymentMethod) => {
-    setOrderPaymentMethods((current) => ({ ...current, [orderId]: method }));
-  };
-
-  const buildOrderMethod = (orderId: string) => {
-    return orderPaymentMethods[orderId] || paymentMethod;
-  };
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const checkPaystack = () => {
-      if ((window as any).PaystackPop) {
-        setIsPaystackReady(true);
-      }
+    const loadOrders = async () => {
+        setIsLoading(true);
+        setError(null);
+        try {
+            const opts = (!isAdmin && user?.id) ? { waiterId: user.id } : undefined;
+            const summary = await getOpenOrdersSummary(opts);
+            setOrders(summary.orders);
+            setSelectedIds([]);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to load orders");
+        } finally {
+            setIsLoading(false);
+        }
     };
 
-    checkPaystack();
-    const interval = window.setInterval(checkPaystack, 250);
-    return () => window.clearInterval(interval);
-  }, []);
-
-  const handlePaystackFlow = async (orderIds: string[], amount: number) => {
-    const syntheticOrderId = `tab-${tableNumber}-${date}-${Date.now()}`;
-    const uniqueEmail = `${syntheticOrderId}@ampm.co.ke`;
-    const initResult = await initializePaystackTransaction({
-      email: uniqueEmail,
-      amount,
-      orderId: syntheticOrderId,
-      metadata: {
-        tableNumber,
-        date,
-        type: "table_tab",
-        orders: orderIds,
-      },
+    // Derived
+    const filtered = orders.filter((o) => {
+        if (urgentOnly && orderAgeColor(o.ageMinutes) !== "red") return false;
+        if (!search) return true;
+        return (
+            String(o.tableNumber ?? "").includes(search) ||
+            (o.orderNumber ?? "").toLowerCase().includes(search.toLowerCase()) ||
+            (o.customerName ?? "").toLowerCase().includes(search.toLowerCase())
+        );
     });
 
-    if (!initResult.success || !initResult.access_code) {
-      throw new Error(initResult.error || "Failed to initialize payment");
-    }
+    const selectedOrders = orders.filter((o) => selectedIds.includes(o.$id));
+    const selectedTotal = selectedOrders.reduce((s, o) => s + o.totalAmount, 0);
+    const grandTotal = orders.reduce((s, o) => s + o.totalAmount, 0);
 
-    return new Promise<string>((resolve, reject) => {
-      openPaystackWithAccessCode(initResult.access_code!, {
-        onSuccess: async (reference) => {
-          try {
-            const verifyResult = await verifyPaystackTransaction(reference);
-            if (!verifyResult.success || verifyResult.data?.status !== "success") {
-              reject(new Error("Payment verification failed."));
-              return;
-            }
-            const expectedKobo = Math.round(amount * 100);
-            const paidKobo = Math.round((verifyResult.data.amount || 0) * 100);
-            if (Math.abs(paidKobo - expectedKobo) > 2) {
-              reject(new Error("Payment amount mismatch."));
-              return;
-            }
-            resolve(reference);
-          } catch (err) {
-            reject(err instanceof Error ? err : new Error("Verification failed"));
-          }
-        },
-        onCancel: () => reject(new Error("Payment cancelled.")),
-        onError: (msg) => reject(new Error(msg)),
-      });
-    });
-  };
+    const freshCount = orders.filter((o) => orderAgeColor(o.ageMinutes) === "green").length;
+    const ageingCount = orders.filter((o) => orderAgeColor(o.ageMinutes) === "amber").length;
+    const urgentCount = orders.filter((o) => orderAgeColor(o.ageMinutes) === "red").length;
 
-  const handleSettleOrders = async (orderIds: string[], overrideMethod?: PaymentMethod) => {
-    try {
-      setError(null);
-      setSuccessMessage(null);
-      setIsProcessingPayment(true);
+    const handleToggleSelect = (id: string) => {
+        setSelectedIds((prev) =>
+            prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+        );
+    };
 
-      const orderIdsToSettle = orderIds.slice();
-      const amount = summary.orders
-        .filter((order: any) => orderIdsToSettle.includes(order.$id))
-        .reduce((sum: number, order: any) => sum + (order.totalAmount || 0), 0);
+    const handleSelectAll = () => {
+        setSelectedIds(
+            selectedIds.length === orders.length ? [] : orders.map((o) => o.$id)
+        );
+    };
 
-      const selectedPaymentMethod = overrideMethod || paymentMethod;
-      let paymentReference = `manual-${selectedPaymentMethod}-${Date.now()}`;
-
-      if (selectedPaymentMethod === "paystack" && !isPaystackReady) {
-        throw new Error("Paystack checkout is still loading. Please wait a moment and try again.");
-      }
-
-      if (selectedPaymentMethod === "paystack") {
-        paymentReference = await handlePaystackFlow(orderIdsToSettle, amount);
-      }
-
-      const settleResult = await settleSelectedOrders({
-        orderIds: orderIdsToSettle,
-        paymentMethod: selectedPaymentMethod,
-        paymentReference,
-      });
-
-      if (!settleResult.success) {
-        throw new Error(settleResult.message || "Failed to settle selected orders.");
-      }
-
-      setSuccessMessage(`Payment successful. ${settleResult.updatedCount} order(s) settled.`);
-      await refreshSummary();
-      if (settleResult.consolidatedOrderId && settleResult.consolidatedOrderId !== orderIdsToSettle[0]) {
-        router.push(`/pos/receipt/${settleResult.consolidatedOrderId}`);
-      }
-    } catch (err) {
-      console.error("Failed to settle selected orders:", err);
-      setError(err instanceof Error ? err.message : "Failed to settle selected orders.");
-    } finally {
-      setIsProcessingPayment(false);
-    }
-  };
-
-  const handleChargeSelected = async () => {
-    if (!selectedOrderIds.length) {
-      setError("Select orders to charge.");
-      return;
-    }
-    await handleSettleOrders(selectedOrderIds);
-  };
-
-  const handleChargeFullTab = async () => {
-    if (!summary?.orders?.length) {
-      setError("There is no unpaid tab to settle for this table.");
-      return;
-    }
-    if (paymentMethod === "paystack") {
-      try {
-        if (!isPaystackReady) {
-          throw new Error("Paystack checkout is still loading. Please wait a moment and try again.");
-        }
-
-        setError(null);
-        setSuccessMessage(null);
-        setIsProcessingPayment(true);
-
-        const orderIds = summary.orders.map((order: any) => order.$id);
-        const amount = summary.totalAmount || 0;
-        const paymentReference = await handlePaystackFlow(orderIds, amount);
-
-        const settleResult = await settleTableTabAndCreateOrder({
-          tableNumber,
-          date,
-          paymentReference,
-          paymentMethod: "paystack",
+    const handlePaystackFlow = async (orderIds: string[], amount: number): Promise<string> => {
+        const syntheticOrderId = `tab-multi-${Date.now()}`;
+        const uniqueEmail = `${syntheticOrderId}@ampm.co.ke`;
+        const initResult = await initializePaystackTransaction({
+            email: uniqueEmail,
+            amount,
+            orderId: syntheticOrderId,
+            metadata: { type: "table_tab_multi", orderIds },
         });
 
-        if (!settleResult.success || !settleResult.consolidatedOrderId) {
-          throw new Error(settleResult.message || "Failed to finalize payment.");
+        if (!initResult.success || !initResult.access_code) {
+            throw new Error(initResult.error || "Failed to initialize payment");
         }
 
-        setSuccessMessage(`Full tab charged successfully. ${settleResult.updatedCount} orders settled.`);
-        await refreshSummary();
-        router.push(`/pos/receipt/${settleResult.consolidatedOrderId}`);
-      } catch (err) {
-        console.error("Failed to settle full tab:", err);
-        setError(err instanceof Error ? err.message : "Failed to settle full tab.");
-      } finally {
-        setIsProcessingPayment(false);
-      }
-      return;
-    }
+        return new Promise<string>((resolve, reject) => {
+            openPaystackWithAccessCode(initResult.access_code!, {
+                onSuccess: async (reference) => {
+                    try {
+                        const verifyResult = await verifyPaystackTransaction(reference);
+                        if (!verifyResult.success || verifyResult.data?.status !== "success") {
+                            reject(new Error("Payment verification failed."));
+                            return;
+                        }
+                        const expectedKobo = Math.round(amount * 100);
+                        const paidKobo = Math.round((verifyResult.data.amount || 0) * 100);
+                        if (Math.abs(paidKobo - expectedKobo) > 2) {
+                            reject(new Error("Payment amount mismatch."));
+                            return;
+                        }
+                        resolve(reference);
+                    } catch (err) {
+                        reject(err instanceof Error ? err : new Error("Verification failed"));
+                    }
+                },
+                onCancel: () => reject(new Error("Payment cancelled.")),
+                onError: (msg) => reject(new Error(msg)),
+            });
+        });
+    };
 
-    await handleSettleOrders(summary.orders.map((order: any) => order.$id));
-  };
+    const settle = async (orderIds: string[], explicitRef?: string) => {
+        if (!orderIds.length) return;
+        setIsProcessing(true);
+        setError(null);
 
-  const handlePayOrder = async (orderId: string) => {
-    const orderMethod = buildOrderMethod(orderId);
-    await handleSettleOrders([orderId], orderMethod);
-  };
+        try {
+            const amount = orders
+                .filter((o) => orderIds.includes(o.$id))
+                .reduce((s, o) => s + o.totalAmount, 0);
 
-  const handleClose = () => {
-    setError(null);
-    setSuccessMessage(null);
-    setSummary(null);
-    setIsLoadingSummary(false);
-    setIsProcessingPayment(false);
-    setExpandedOrderId(null);
-    setSelectedOrderIds([]);
-    onClose();
-  };
+            let paymentReference = explicitRef ?? `manual-${paymentMethod}-${Date.now()}`;
 
-  return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="bg-neutral-900 border-white/10 text-white sm:max-w-5xl">
-        <DialogHeader>
-          <DialogTitle>Settle Table Tab</DialogTitle>
-          <DialogDescription className="text-neutral-400">
-            Review unpaid orders, split bills when needed, and settle using the
-            payment method that matches the customer's choice.
-          </DialogDescription>
-        </DialogHeader>
+            if (paymentMethod === "paystack" && !explicitRef) {
+                if (!isPaystackReady) throw new Error("Paystack is still loading. Please wait.");
+                paymentReference = await handlePaystackFlow(orderIds, amount);
+            }
 
-        <div className="grid grid-cols-1 xl:grid-cols-[1.4fr,0.8fr] gap-4 mt-4">
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <label className="text-sm text-neutral-400 mb-1 block">Table Number</label>
-                <input
-                  type="number"
-                  min={1}
-                  value={tableNumber}
-                  onChange={(e) => setTableNumber(Number.parseInt(e.target.value || "0", 10))}
-                  className="w-full bg-neutral-800 border border-white/10 rounded-2xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-              <div>
-                <label className="text-sm text-neutral-400 mb-1 block">Date</label>
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  className="w-full bg-neutral-800 border border-white/10 rounded-2xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-              <div className="flex items-end">
-                <Button
-                  type="button"
-                  onClick={handleLoadSummary}
-                  disabled={isLoadingSummary}
-                  className="w-full bg-emerald-600 hover:bg-emerald-500"
-                >
-                  {isLoadingSummary ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Loading
-                    </>
-                  ) : (
-                    <>
-                      <RefreshCw className="w-4 h-4 mr-2" />
-                      Load Tab
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
+            const result = await settleSelectedOrders({
+                orderIds,
+                paymentMethod,
+                paymentReference,
+            });
 
-            {summary && (
-              <div className="rounded-[2rem] border border-white/10 bg-slate-950/70 p-5">
-                <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
-                  <div>
-                    <p className="text-sm text-neutral-400">Tab Summary</p>
-                    <p className="text-lg font-semibold text-white">Table {summary.tableNumber} • {summary.date}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm text-neutral-400">Unpaid orders</p>
-                    <p className="text-2xl font-bold text-emerald-400">{summary.orderCount}</p>
-                  </div>
-                </div>
+            if (!result.success) {
+                throw new Error(result.message || "Settlement failed.");
+            }
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="rounded-3xl border border-white/10 bg-slate-900/70 p-4">
-                    <p className="text-xs uppercase tracking-[0.2em] text-neutral-500">Subtotal</p>
-                    <p className="mt-2 text-2xl font-semibold text-white">{formatCurrency(summary.subtotal || 0)}</p>
-                  </div>
-                  <div className="rounded-3xl border border-white/10 bg-slate-900/70 p-4">
-                    <p className="text-xs uppercase tracking-[0.2em] text-neutral-500">Total Due</p>
-                    <p className="mt-2 text-2xl font-semibold text-emerald-400">{formatCurrency(summary.totalAmount || 0)}</p>
-                  </div>
-                  <div className="rounded-3xl border border-white/10 bg-slate-900/70 p-4">
-                    <p className="text-xs uppercase tracking-[0.2em] text-neutral-500">Default payment method</p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {paymentOptions.map((option) => (
+            toast.success(`${result.updatedCount} order(s) settled`);
+
+            if (result.consolidatedOrderId) {
+                onSettlementSuccess?.(result.consolidatedOrderId, amount, paymentMethod, paymentReference);
+            }
+
+            await loadOrders();
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : "Failed to settle orders.";
+            setError(msg);
+            toast.error(msg);
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    /** Open the appropriate payment sub-view instead of settling immediately. */
+    const handleCharge = (orderIds: string[]) => {
+        if (!orderIds.length) return;
+        const amount = orders
+            .filter((o) => orderIds.includes(o.$id))
+            .reduce((s, o) => s + o.totalAmount, 0);
+
+        if (paymentMethod === "paystack") {
+            void settle(orderIds);
+            return;
+        }
+
+        // Reset sub-view fields
+        setCashReceived(amount.toFixed(2));
+        setPdqCode("");
+        setMpesaRef("");
+        setPaymentSubview({ type: paymentMethod as "cash" | "pdq" | "mpesa", amount, orderIds });
+    };
+
+    const handleCloseSubview = () => setPaymentSubview(null);
+
+    const handleConfirmCash = () => {
+        if (!paymentSubview) return;
+        const received = parseFloat(cashReceived) || 0;
+        if (received < paymentSubview.amount) return;
+        const change = Math.round((received - paymentSubview.amount) * 100);
+        const ref = `CASH-CHG${change}-${Date.now()}`;
+        void settle(paymentSubview.orderIds, ref);
+        setPaymentSubview(null);
+    };
+
+    const handleConfirmPdq = () => {
+        if (!paymentSubview || pdqCode.trim().length < 4) return;
+        const ref = `PDQ-${pdqCode.trim().toUpperCase()}-${Date.now()}`;
+        void settle(paymentSubview.orderIds, ref);
+        setPaymentSubview(null);
+    };
+
+    const handleConfirmMpesa = () => {
+        if (!paymentSubview || mpesaRef.trim().length < 6) return;
+        const ref = `MPESA-${mpesaRef.trim().toUpperCase()}-${Date.now()}`;
+        void settle(paymentSubview.orderIds, ref);
+        setPaymentSubview(null);
+    };
+
+    const handleClose = () => {
+        setOrders([]);
+        setSelectedIds([]);
+        setSearch("");
+        setError(null);
+        setUrgentOnly(false);
+        setPaymentSubview(null);
+        onClose();
+    };
+
+    const paymentChips: { value: PaymentMethod; label: string }[] = [
+        { value: "cash", label: "Cash" },
+        { value: "pdq", label: "PDQ" },
+        { value: "mpesa", label: "M-Pesa" },
+        { value: "paystack", label: "Paystack" },
+    ];
+
+    // Cash sub-view derived
+    const cashReceivedNum = parseFloat(cashReceived) || 0;
+    const cashChange = paymentSubview ? cashReceivedNum - paymentSubview.amount : 0;
+    const cashShortfall = cashChange < 0;
+    const cashConfirmReady = !cashShortfall && cashReceivedNum > 0;
+
+    return (
+        <Dialog open={isOpen} onOpenChange={handleClose}>
+            <DialogContent className="bg-[#0a0a0f] border-white/[0.08] text-white max-w-3xl max-h-[90vh] p-0 overflow-hidden flex flex-col">
+                <DialogTitle className="sr-only">Settle Tab</DialogTitle>
+
+                {/* Top bar */}
+                <div className="flex-shrink-0 flex items-center justify-between px-5 py-3.5 bg-neutral-900/80 border-b border-white/[0.07]">
+                    {paymentSubview ? (
                         <button
-                          key={option.value}
-                          type="button"
-                          onClick={() => setPaymentMethod(option.value)}
-                          className={`rounded-full px-3 py-2 text-xs font-semibold transition ${paymentMethod === option.value ? "bg-emerald-500 text-slate-900" : "bg-white/5 text-neutral-300 hover:bg-white/10"}`}
-                        >
-                          {option.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {summary && summary.orders && summary.orders.length > 0 ? (
-              <div className="space-y-4">
-                {summary.orders.map((order: any) => {
-                  const items = parseOrderItems(order);
-                  const selected = selectedOrderIds.includes(order.$id);
-                  const orderMethod = buildOrderMethod(order.$id);
-
-                  return (
-                    <div key={order.$id} className="rounded-[2rem] border border-white/10 bg-slate-950/70 overflow-hidden">
-                      <div className="flex flex-wrap items-center justify-between gap-3 p-4 cursor-pointer" onClick={() => handleToggleOrder(order.$id)}>
-                        <div className="flex items-center gap-3 min-w-0">
-                          <button
                             type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleToggleSelection(order.$id);
-                            }}
-                            className={`w-10 h-10 grid place-items-center rounded-2xl border text-sm transition ${selected ? "border-emerald-400 bg-emerald-500/15 text-emerald-300" : "border-white/10 bg-white/5 text-neutral-300"}`}
-                          >
-                            {selected ? "✓" : ""}
-                          </button>
-                          <div className="min-w-0">
-                            <p className="text-sm font-semibold text-white truncate">Order #{order.orderNumber || order.$id}</p>
-                            <p className="text-xs text-neutral-500 truncate">{order.customerName || "Walk-in Customer"} • {new Date(order.orderTime).toLocaleTimeString()}</p>
-                          </div>
+                            onClick={handleCloseSubview}
+                            className="flex items-center gap-2 text-neutral-300 hover:text-white transition"
+                        >
+                            <ArrowLeft className="w-4 h-4" />
+                            <span className="text-[14px] font-semibold">
+                                {paymentSubview.type === "cash" && "Cash Payment"}
+                                {paymentSubview.type === "pdq" && "PDQ / Card Payment"}
+                                {paymentSubview.type === "mpesa" && "M-Pesa Payment"}
+                            </span>
+                        </button>
+                    ) : (
+                        <div>
+                            <h2 className="text-[15px] font-bold">Settle Tab</h2>
+                            <p className="text-[11px] text-neutral-500 mt-0.5">
+                                {orders.length} open order{orders.length !== 1 ? "s" : ""} · Today
+                            </p>
                         </div>
-                        <div className="text-right">
-                          <p className="text-lg font-semibold text-emerald-400">{formatCurrency(order.totalAmount || 0)}</p>
-                          <span className="inline-flex items-center rounded-full bg-white/5 px-3 py-1 text-xs text-neutral-300">{orderMethod.toUpperCase()}</span>
-                        </div>
-                      </div>
+                    )}
+                    <button
+                        onClick={handleClose}
+                        className="w-7 h-7 rounded-full bg-white/[0.06] flex items-center justify-center text-neutral-400 hover:text-white transition"
+                    >
+                        <X className="w-3.5 h-3.5" />
+                    </button>
+                </div>
 
-                      {expandedOrderId === order.$id && (
-                        <div className="border-t border-white/10 px-4 pb-4">
-                          <div className="space-y-4 pt-4">
-                            {items.length === 0 ? (
-                              <p className="text-sm text-neutral-400">This order has no items.</p>
-                            ) : (
-                              <div className="space-y-3">
-                                {items.map((item: any, itemIdx: number) => (
-                                  <div
-                                    key={`${order.$id}-ln-${itemIdx}-${item.$id}-${item.name}`}
-                                    className="flex flex-wrap items-start justify-between gap-3 rounded-3xl bg-slate-900/80 p-4"
-                                  >
-                                    <div className="min-w-0">
-                                      <p className="text-sm font-medium text-white">{item.quantity}× {item.name}</p>
-                                      {item.description && <p className="text-xs text-neutral-500 mt-1 line-clamp-1">{item.description}</p>}
+                {/* Stats row — hidden in sub-view */}
+                {!paymentSubview && (
+                    <div className="flex-shrink-0 flex gap-2.5 px-5 py-3 bg-neutral-950/70 border-b border-white/[0.06]">
+                        {[
+                            { label: "Fresh <1hr", value: freshCount, color: "text-emerald-400" },
+                            { label: "Ageing 1–3hr", value: ageingCount, color: "text-amber-400" },
+                            { label: "Urgent >3hr", value: urgentCount, color: "text-red-400" },
+                        ].map(({ label, value, color }) => (
+                            <div key={label} className="rounded-[10px] bg-white/[0.04] border border-white/[0.08] px-3 py-1.5">
+                                <div className="text-[9px] uppercase tracking-[0.1em] text-neutral-500">{label}</div>
+                                <div className={`text-[14px] font-bold ${color}`}>{value}</div>
+                            </div>
+                        ))}
+                        <div className="rounded-[10px] bg-white/[0.04] border border-white/[0.08] px-3 py-1.5 ml-auto">
+                            <div className="text-[9px] uppercase tracking-[0.1em] text-neutral-500">Total outstanding</div>
+                            <div className="text-[14px] font-bold text-white">{formatCurrency(grandTotal)}</div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Filter bar — hidden in sub-view */}
+                {!paymentSubview && (
+                    <div className="flex-shrink-0 flex gap-2 px-5 py-2.5 bg-neutral-950/70 border-b border-white/[0.06]">
+                        <div className="flex-1 relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-neutral-500" />
+                            <input
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                placeholder="Search by table, order #, name…"
+                                className="w-full bg-white/[0.05] border border-white/[0.08] rounded-[10px] pl-8 pr-3 py-1.5 text-[11px] text-neutral-200 placeholder:text-neutral-600 focus:outline-none focus:border-white/20"
+                            />
+                        </div>
+                        <button
+                            onClick={() => setUrgentOnly(false)}
+                            className={`rounded-[20px] px-3 py-1 text-[10px] font-semibold border transition ${!urgentOnly ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-300" : "bg-white/[0.04] border-white/10 text-neutral-400"}`}
+                        >
+                            All
+                        </button>
+                        <button
+                            onClick={() => setUrgentOnly(true)}
+                            className={`rounded-[20px] px-3 py-1 text-[10px] font-semibold border transition ${urgentOnly ? "bg-red-500/15 border-red-500/40 text-red-300" : "bg-white/[0.04] border-white/10 text-neutral-400"}`}
+                        >
+                            Urgent
+                        </button>
+                    </div>
+                )}
+
+                {/* Main area: payment sub-view OR order list */}
+                {paymentSubview ? (
+                    <div className="flex-1 flex flex-col justify-between overflow-hidden">
+                        {/* Amount banner */}
+                        <div className="flex-shrink-0 text-center px-6 pt-8 pb-6 border-b border-white/[0.06]">
+                            <div className="text-[11px] uppercase tracking-[0.12em] text-neutral-500 mb-1">
+                                Amount to collect
+                            </div>
+                            <div className="text-[42px] font-extrabold text-white leading-none">
+                                {formatCurrency(paymentSubview.amount)}
+                            </div>
+                            <div className="text-[11px] text-neutral-500 mt-2">
+                                {paymentSubview.orderIds.length} order{paymentSubview.orderIds.length !== 1 ? "s" : ""}
+                            </div>
+                        </div>
+
+                        {/* Sub-view input */}
+                        <div className="flex-1 flex flex-col items-center justify-center px-8 gap-5">
+                            {paymentSubview.type === "cash" && (
+                                <>
+                                    <div className="w-full max-w-xs">
+                                        <label className="block text-[11px] text-neutral-400 mb-1.5">
+                                            Cash received (KES)
+                                        </label>
+                                        <input
+                                            type="number"
+                                            inputMode="decimal"
+                                            min={0}
+                                            step="0.01"
+                                            value={cashReceived}
+                                            onChange={(e) => setCashReceived(e.target.value)}
+                                            className="w-full bg-white/[0.06] border border-white/[0.12] rounded-[12px] px-4 py-3 text-[20px] font-bold text-white text-center focus:outline-none focus:border-emerald-500/60 tabular-nums"
+                                            autoFocus
+                                        />
                                     </div>
-                                    <div className="text-right">
-                                      <p className="text-sm font-semibold text-emerald-400">{formatCurrency((item.price ?? 0) * (item.quantity ?? 1))}</p>
-                                      <p className="text-xs text-neutral-500">{formatCurrency(item.price)} ea</p>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
+                                    {cashReceived && (
+                                        <div className={`rounded-[12px] px-5 py-3 text-center ${cashShortfall ? "bg-red-500/10 border border-red-500/20" : "bg-emerald-500/10 border border-emerald-500/20"}`}>
+                                            <div className="text-[10px] uppercase tracking-[0.1em] mb-0.5 text-neutral-400">
+                                                {cashShortfall ? "Shortfall" : "Change due"}
+                                            </div>
+                                            <div className={`text-[22px] font-extrabold ${cashShortfall ? "text-red-400" : "text-emerald-400"}`}>
+                                                {formatCurrency(Math.abs(cashChange))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
                             )}
 
-                            <div className="rounded-[1.5rem] border border-white/10 bg-slate-900/70 p-4">
-                              <div className="flex flex-wrap items-center justify-between gap-3">
-                                <div>
-                                  <p className="text-sm text-neutral-400 uppercase tracking-[0.2em]">Charge this order</p>
-                                  <p className="mt-2 text-white text-sm">{formatCurrency(order.totalAmount || 0)}</p>
+                            {paymentSubview.type === "pdq" && (
+                                <div className="w-full max-w-xs">
+                                    <label className="block text-[11px] text-neutral-400 mb-1.5">
+                                        Terminal approval code
+                                    </label>
+                                    <input
+                                        type="text"
+                                        maxLength={10}
+                                        value={pdqCode}
+                                        onChange={(e) => setPdqCode(e.target.value.toUpperCase())}
+                                        placeholder="e.g. 123456"
+                                        className="w-full bg-white/[0.06] border border-white/[0.12] rounded-[12px] px-4 py-3 text-[20px] font-bold text-white text-center tracking-[0.18em] focus:outline-none focus:border-sky-500/60 uppercase"
+                                        autoFocus
+                                    />
+                                    <p className="text-[10px] text-neutral-600 text-center mt-2">
+                                        6-digit code from the card terminal receipt
+                                    </p>
                                 </div>
-                                <div className="flex flex-wrap gap-2">
-                                  {paymentOptions.map((option) => (
-                                    <button
-                                      key={option.value}
-                                      type="button"
-                                      onClick={() => setOrderPaymentMethod(order.$id, option.value)}
-                                      className={`rounded-full px-3 py-2 text-xs font-semibold transition ${orderMethod === option.value ? "bg-emerald-500 text-slate-900" : "bg-white/5 text-neutral-300 hover:bg-white/10"}`}
-                                    >
-                                      {option.label}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
+                            )}
 
-                            <div className="grid gap-3 sm:grid-cols-2">
-                              <Button
-                                type="button"
-                                className="bg-emerald-600 hover:bg-emerald-500"
-                                onClick={() => handlePayOrder(order.$id)}
-                                disabled={isProcessingPayment}
-                              >
-                                {isProcessingPayment ? (
-                                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Processing</>
-                                ) : (
-                                  <>Pay Order</>
-                                )}
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                className="border-white/15"
-                                onClick={() => {
-                                  onEdit?.(order);
-                                  onClose();
-                                }}
-                              >
-                                Edit in POS
-                              </Button>
-                            </div>
-                          </div>
+                            {paymentSubview.type === "mpesa" && (
+                                <div className="w-full max-w-xs">
+                                    <label className="block text-[11px] text-neutral-400 mb-1.5">
+                                        M-Pesa transaction code
+                                    </label>
+                                    <input
+                                        type="text"
+                                        maxLength={12}
+                                        value={mpesaRef}
+                                        onChange={(e) => setMpesaRef(e.target.value.toUpperCase())}
+                                        placeholder="e.g. RGH12345XY"
+                                        className="w-full bg-white/[0.06] border border-white/[0.12] rounded-[12px] px-4 py-3 text-[20px] font-bold text-white text-center tracking-[0.12em] focus:outline-none focus:border-green-500/60 uppercase"
+                                        autoFocus
+                                    />
+                                    <p className="text-[10px] text-neutral-600 text-center mt-2">
+                                        Confirmation code from the M-Pesa SMS
+                                    </p>
+                                </div>
+                            )}
                         </div>
-                      )}
+
+                        {/* Sub-view action buttons */}
+                        <div className="flex-shrink-0 bg-neutral-900/95 border-t border-white/10 px-5 py-4 flex gap-3">
+                            <button
+                                type="button"
+                                onClick={handleCloseSubview}
+                                className="flex-1 rounded-[12px] py-3 text-[13px] font-bold bg-transparent text-neutral-400 border border-white/10 hover:border-white/20 transition"
+                            >
+                                ← Back
+                            </button>
+
+                            {paymentSubview.type === "cash" && (
+                                <button
+                                    type="button"
+                                    onClick={handleConfirmCash}
+                                    disabled={!cashConfirmReady || isProcessing}
+                                    className="flex-[2] rounded-[12px] py-3 text-[13px] font-bold bg-emerald-500 text-white hover:bg-emerald-400 transition disabled:opacity-40 flex items-center justify-center gap-2"
+                                >
+                                    {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                                    Confirm Cash · {formatCurrency(paymentSubview.amount)}
+                                </button>
+                            )}
+
+                            {paymentSubview.type === "pdq" && (
+                                <button
+                                    type="button"
+                                    onClick={handleConfirmPdq}
+                                    disabled={pdqCode.trim().length < 4 || isProcessing}
+                                    className="flex-[2] rounded-[12px] py-3 text-[13px] font-bold bg-sky-500 text-white hover:bg-sky-400 transition disabled:opacity-40 flex items-center justify-center gap-2"
+                                >
+                                    {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                                    Confirm PDQ · {formatCurrency(paymentSubview.amount)}
+                                </button>
+                            )}
+
+                            {paymentSubview.type === "mpesa" && (
+                                <button
+                                    type="button"
+                                    onClick={handleConfirmMpesa}
+                                    disabled={mpesaRef.trim().length < 6 || isProcessing}
+                                    className="flex-[2] rounded-[12px] py-3 text-[13px] font-bold bg-green-500 text-white hover:bg-green-400 transition disabled:opacity-40 flex items-center justify-center gap-2"
+                                >
+                                    {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                                    Confirm M-Pesa · {formatCurrency(paymentSubview.amount)}
+                                </button>
+                            )}
+                        </div>
                     </div>
-                  );
-                })}
-              </div>
-            ) : summary ? (
-              <div className="rounded-[2rem] border border-white/10 bg-slate-950/70 p-6 text-center text-sm text-neutral-400">
-                No unpaid orders found for this table on the selected date.
-              </div>
-            ) : null}
-          </div>
+                ) : (
+                    <>
+                        {/* Order list */}
+                        <div className="flex-1 overflow-y-auto px-5 py-3 space-y-2">
+                            {isLoading && (
+                                <div className="flex justify-center items-center py-10">
+                                    <Loader2 className="w-6 h-6 animate-spin text-neutral-400" />
+                                </div>
+                            )}
 
-          <div className="space-y-4">
-            <div className="rounded-[2rem] border border-white/10 bg-slate-950/70 p-5">
-              <p className="text-sm text-neutral-400 uppercase tracking-[0.2em]">Why this works</p>
-              <ul className="mt-4 space-y-3 text-sm text-neutral-300">
-                <li>• Review individual orders before the final payment.</li>
-                <li>• Split bills by order or consolidate the full tab.</li>
-                <li>• Track payment methods per order or for the whole tab.</li>
-                <li>• Adjust orders from the POS cart when a guest changes their mind before payment.</li>
-              </ul>
-            </div>
+                            {!isLoading && error && (
+                                <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300">
+                                    {error}
+                                </div>
+                            )}
 
-            <div className="rounded-[2rem] border border-white/10 bg-slate-950/70 p-5">
-              <p className="text-sm text-neutral-400 uppercase tracking-[0.2em]">Actions</p>
-              <div className="mt-4 flex flex-col gap-3">
-                <Button type="button" variant="outline" onClick={handleSelectAll} disabled={!summary?.orders?.length}>
-                  {selectedOrderIds.length === (summary?.orders?.length || 0) ? "Clear Selection" : "Select All"}
-                </Button>
-                <Button
-                  type="button"
-                  onClick={handleChargeSelected}
-                  disabled={!selectedOrderIds.length || isProcessingPayment}
-                  className="bg-sky-600 hover:bg-sky-500"
-                >
-                  {isProcessingPayment ? (
-                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Processing</>
-                  ) : (
-                    <>Charge Selected Orders</>
-                  )}
-                </Button>
-                <Button
-                  type="button"
-                  onClick={handleChargeFullTab}
-                  disabled={!summary?.orders?.length || isProcessingPayment}
-                  className="bg-emerald-600 hover:bg-emerald-500"
-                >
-                  {isProcessingPayment ? (
-                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Processing</>
-                  ) : (
-                    <>Charge Full Tab</>
-                  )}
-                </Button>
-              </div>
-            </div>
+                            {!isLoading && !error && filtered.length === 0 && (
+                                <div className="text-center py-10 text-sm text-neutral-500">
+                                    {orders.length === 0 ? "No unpaid orders — all tabs are clear." : "No orders match the filter."}
+                                </div>
+                            )}
 
-            <div className="rounded-[2rem] border border-white/10 bg-slate-950/70 p-5">
-              <p className="text-sm text-neutral-400 uppercase tracking-[0.2em]">Status</p>
-              <div className="mt-3 space-y-2 text-sm">
-                <p className="text-white">Selected orders: {selectedOrderIds.length}</p>
-                <p className="text-neutral-400">Default payment method: {paymentMethod.toUpperCase()}</p>
-              </div>
-            </div>
-          </div>
-        </div>
+                            {filtered.map((order) => {
+                                const color = orderAgeColor(order.ageMinutes);
+                                const styles = COLOR_STYLES[color];
+                                const isSelected = selectedIds.includes(order.$id);
+                                const isExpanded = expandedId === order.$id;
+                                const items = parseOrderItems(order);
+                                const tableLabel = order.tableNumber ? `Table ${order.tableNumber}` : "Bar";
 
-        {(error || successMessage) && (
-          <div className={`mt-4 rounded-[2rem] border p-4 text-sm ${error ? "border-rose-500/30 bg-rose-500/10 text-rose-100" : "border-emerald-500/30 bg-emerald-500/10 text-emerald-100"}`}>
-            {error ?? successMessage}
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
-  );
+                                return (
+                                    <div
+                                        key={order.$id}
+                                        className={`rounded-[14px] border overflow-hidden ${styles.card} ${isSelected ? "ring-2 ring-emerald-500" : ""}`}
+                                    >
+                                        {/* Card row */}
+                                        <div
+                                            className="flex items-center gap-2.5 px-3.5 py-2.5 cursor-pointer"
+                                            onClick={() => setExpandedId(isExpanded ? null : order.$id)}
+                                        >
+                                            {/* Checkbox */}
+                                            <button
+                                                type="button"
+                                                onClick={(e) => { e.stopPropagation(); handleToggleSelect(order.$id); }}
+                                                className={`w-[22px] h-[22px] rounded-[7px] border flex items-center justify-center flex-shrink-0 text-[12px] transition ${isSelected ? "bg-emerald-500 border-emerald-500 text-white" : "bg-white/[0.04] border-white/15 text-neutral-300"}`}
+                                            >
+                                                {isSelected ? "✓" : ""}
+                                            </button>
+
+                                            {/* Age dot */}
+                                            <div
+                                                className="w-2 h-2 rounded-full flex-shrink-0"
+                                                style={{ backgroundColor: styles.dot }}
+                                            />
+
+                                            {/* Info */}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="text-[12px] font-semibold truncate">
+                                                    {tableLabel} &nbsp;·&nbsp; #{order.orderNumber || order.$id.slice(-6)}
+                                                </div>
+                                                <div className="text-[10px] text-neutral-500 mt-0.5 flex items-center gap-1.5">
+                                                    {order.customerName || "Walk-in"}
+                                                    &nbsp;·&nbsp;
+                                                    {new Date(order.orderTime).toLocaleTimeString("en-KE", { timeStyle: "short" })}
+                                                    &nbsp;
+                                                    <span className={`rounded-[20px] px-1.5 py-0.5 text-[9px] font-bold ${styles.badge}`}>
+                                                        {ageBadgeLabel(order.ageMinutes)}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            {/* Amount */}
+                                            <div className={`text-[13px] font-bold flex-shrink-0 ${styles.amount}`}>
+                                                {formatCurrency(order.totalAmount)}
+                                            </div>
+
+                                            {/* Expand icon */}
+                                            <div className="text-neutral-500 flex-shrink-0">
+                                                {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                                            </div>
+                                        </div>
+
+                                        {/* Expanded items */}
+                                        {isExpanded && (
+                                            <div className="border-t border-white/[0.06] px-3.5 pb-3 pt-2 space-y-1">
+                                                {items.length === 0 ? (
+                                                    <p className="text-[10px] text-neutral-500">No item breakdown.</p>
+                                                ) : (
+                                                    items.map((item, i) => (
+                                                        <div key={i} className="flex justify-between text-[10px] text-neutral-400 py-0.5">
+                                                            <span>{item.quantity}× {item.name}</span>
+                                                            <span>{formatCurrency(item.price * item.quantity)}</span>
+                                                        </div>
+                                                    ))
+                                                )}
+                                                <div className="flex justify-between text-[10px] font-bold border-t border-dashed border-white/[0.08] mt-1 pt-1.5">
+                                                    <span className={styles.amount}>Total</span>
+                                                    <span className={styles.amount}>{formatCurrency(order.totalAmount)}</span>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {/* Sticky bottom bar */}
+                        <div className="flex-shrink-0 bg-neutral-900/95 border-t border-white/10 px-5 py-3">
+                            {/* Selection summary + payment chips */}
+                            <div className="flex items-end justify-between mb-2.5">
+                                <div>
+                                    <div className="text-[11px] text-neutral-500">
+                                        {selectedIds.length} order{selectedIds.length !== 1 ? "s" : ""} selected
+                                    </div>
+                                    <div className="text-[18px] font-extrabold text-white">
+                                        {formatCurrency(selectedTotal)}
+                                    </div>
+                                </div>
+                                <div className="flex gap-1.5">
+                                    {paymentChips.map(({ value, label }) => (
+                                        <button
+                                            key={value}
+                                            type="button"
+                                            onClick={() => setPaymentMethod(value)}
+                                            className={`rounded-[20px] px-2.5 py-1 text-[10px] font-semibold border transition ${paymentMethod === value ? "bg-emerald-500 border-emerald-500 text-white" : "bg-white/[0.04] border-white/10 text-neutral-400"}`}
+                                        >
+                                            {label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Action buttons */}
+                            <div className="flex gap-2">
+                                <button
+                                    type="button"
+                                    onClick={handleSelectAll}
+                                    disabled={orders.length === 0}
+                                    className="flex-1 rounded-[12px] py-2.5 text-[12px] font-bold bg-transparent text-neutral-400 border border-white/10 hover:border-white/20 transition disabled:opacity-40"
+                                >
+                                    {selectedIds.length === orders.length && orders.length > 0 ? "Deselect All" : "Select All"}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleCharge(selectedIds)}
+                                    disabled={!selectedIds.length || isProcessing}
+                                    className="flex-1 rounded-[12px] py-2.5 text-[12px] font-bold bg-sky-500 text-white hover:bg-sky-400 transition disabled:opacity-40 flex items-center justify-center gap-1.5"
+                                >
+                                    {isProcessing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                                    Charge Selected · {formatCurrency(selectedTotal)}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleCharge(orders.map((o) => o.$id))}
+                                    disabled={orders.length === 0 || isProcessing}
+                                    className="flex-1 rounded-[12px] py-2.5 text-[12px] font-bold bg-emerald-500 text-white hover:bg-emerald-400 transition disabled:opacity-40 flex items-center justify-center gap-1.5"
+                                >
+                                    {isProcessing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                                    Charge All · {formatCurrency(grandTotal)}
+                                </button>
+                            </div>
+                        </div>
+                    </>
+                )}
+            </DialogContent>
+        </Dialog>
+    );
 }
-

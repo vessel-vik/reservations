@@ -2,6 +2,12 @@
   "buildCommand": "npm run build",
   "outputDirectory": ".next",
   "framework": "nextjs",
+  "crons": [
+    {
+      "path": "/api/cron/stale-orders",
+      "schedule": "30 4 * * *"
+    }
+  ],
   "rewrites": [
     {
       "source": "/pos/.well-known/:path*",

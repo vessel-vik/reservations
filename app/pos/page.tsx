@@ -1,6 +1,7 @@
 import { getMenuItems, getCategories } from "@/lib/actions/pos.actions";
 import POSInterface from "@/components/pos/POSInterface";
 import { Product, Category } from "@/types/pos.types";
+import { resolveAppwriteFileViewUrl } from "@/lib/appwrite-storage-url";
 
 export default async function POSPage() {
     // Fetch data on the server (Appwrite may pause projects when idle)
@@ -30,7 +31,7 @@ export default async function POSPage() {
         description: doc.description,
         price: doc.price,
         category: doc.category,
-        imageUrl: doc.imageUrl,
+        imageUrl: resolveAppwriteFileViewUrl(doc.imageUrl),
         isAvailable: doc.isAvailable,
         preparationTime: doc.preparationTime,
         popularity: doc.popularity,

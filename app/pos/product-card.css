@@ -338,6 +338,14 @@
   .tablet-portrait-only {
     display: flex !important;
   }
+  /*
+   * Shrink the right-side cart sidebar by exactly the fixed nav bar height (76px).
+   * This ensures the "Add to Tab" button is never hidden behind the overlay.
+   * h-full on the CartSidebar resolves to (parent height − padding) = 100vh − 76px.
+   */
+  .pos-cart-sidebar-wrapper {
+    padding-bottom: 76px;
+  }
 }
 
 /* Landscape tablet — 4 columns (sidebar takes 240px, leaves ~560px+) */

@@ -11,7 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { CartItem } from "@/types/pos.types";
 import { formatCurrency } from "@/lib/utils";
-import { createOrder } from "@/lib/actions/pos.actions";
+import { createTabOrderFromCart } from "@/lib/actions/pos.actions";
 import { Loader2 } from "lucide-react";
 
 interface AddToTabModalProps {
@@ -31,13 +31,13 @@ export function AddToTabModal({
   waiterId,
   onSuccess,
 }: AddToTabModalProps) {
-  const [tableNumber, setTableNumber] = useState<number>(1);
-  const [guestCount, setGuestCount] = useState<number>(1);
+  const [tableNumber, setTableNumber] = useState<number>(0);
   const [customerName, setCustomerName] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const subtotal = cart.reduce(
+  const cartArray = Array.isArray(cart) ? cart : [];
+  const subtotal = cartArray.reduce(
     (sum, item) => sum + item.price * item.quantity,
     0
   );
@@ -47,63 +47,20 @@ export function AddToTabModal({
     try {
       setError(null);
 
-      if (!cart.length) {
+      if (!cartArray.length) {
         setError("No items in the current order.");
-        return;
-      }
-
-      if (!tableNumber || tableNumber < 1) {
-        setError("Please enter a valid table number.");
-        return;
-      }
-
-      if (!guestCount || guestCount < 1) {
-        setError("Please enter a valid guest count.");
         return;
       }
 
       setIsSubmitting(true);
 
-      const name =
-        customerName.trim() !== "" ? customerName.trim() : "Walk-in Customer";
-
-      // Generate short order number similar to POSInterface implementation
-      const timestamp = Date.now().toString().slice(-10);
-      const random = Math.random().toString(36).substring(2, 6).toUpperCase();
-      const shortOrderNumber = `ORD-${timestamp}-${random}`;
-
-      // Calculate VAT - prices are VAT-inclusive (16%)
-      const vatRate = 0.16;
-      const totalBeforeVat = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-      const subtotal = totalBeforeVat / (1 + vatRate);
-      const taxAmount = subtotal * vatRate;
-      const total = totalBeforeVat;
-
-      const now = new Date().toISOString();
-
-      const orderData = {
-        orderNumber: shortOrderNumber,
-        type: "dine_in",
-        status: "placed",
-        tableNumber,
-        customerName: name,
-        guestCount,
+      const newOrder = await createTabOrderFromCart({
+        items: cartArray,
+        customerName: customerName.trim() || undefined,
+        tableNumber: tableNumber > 0 ? tableNumber : undefined,
         waiterName: waiterName || "POS System",
         waiterId: waiterId || "system",
-        subtotal: Math.round(subtotal * 100) / 100,
-        taxAmount: Math.round(taxAmount * 100) / 100,
-        serviceCharge: 0,
-        discountAmount: 0,
-        tipAmount: 0,
-        totalAmount: total,
-        paymentStatus: "unpaid",
-        orderTime: now,
-        priority: "normal",
-        items: cart,
-        specialInstructions: `TAB - Table ${tableNumber}`,
-      } as any;
-
-      const newOrder = await createOrder(orderData);
+      });
 
       onSuccess(newOrder);
       setIsSubmitting(false);
@@ -131,50 +88,34 @@ export function AddToTabModal({
         <DialogHeader>
           <DialogTitle>Add To Tab</DialogTitle>
           <DialogDescription className="text-neutral-400">
-            Save this order as an unpaid tab for a specific table. You can
-            settle the full tab later from the Settle Table screen.
+            Save this order as an unpaid tab. A tab number is assigned automatically
+            unless you choose a specific table. Kitchen docket is queued for the
+            print bridge when configured.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 mt-2">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-sm text-neutral-400 mb-1 block">
-                Table Number
-              </label>
-              <input
-                type="number"
-                min={1}
-                value={tableNumber}
-                onChange={(e) =>
-                  setTableNumber(
-                    Number.parseInt(e.target.value || "0", 10) || 0
-                  )
-                }
-                className="w-full bg-neutral-800 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
-              />
-            </div>
-            <div>
-              <label className="text-sm text-neutral-400 mb-1 block">
-                Guest Count
-              </label>
-              <input
-                type="number"
-                min={1}
-                value={guestCount}
-                onChange={(e) =>
-                  setGuestCount(
-                    Number.parseInt(e.target.value || "0", 10) || 0
-                  )
-                }
-                className="w-full bg-neutral-800 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
-              />
-            </div>
+          <div>
+            <label className="text-sm text-neutral-400 mb-1 block">
+              Table number (optional)
+            </label>
+            <input
+              type="number"
+              min={1}
+              placeholder="Auto-assign next tab"
+              value={tableNumber > 0 ? tableNumber : ""}
+              onChange={(e) =>
+                setTableNumber(
+                  Number.parseInt(e.target.value || "0", 10) || 0
+                )
+              }
+              className="w-full bg-neutral-800 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
+            />
           </div>
 
           <div>
             <label className="text-sm text-neutral-400 mb-1 block">
-              Customer Name (optional)
+              Customer name (optional)
             </label>
             <input
               type="text"
@@ -220,7 +161,7 @@ export function AddToTabModal({
             <Button
               type="button"
               onClick={handleSubmit}
-              disabled={isSubmitting || !cart.length}
+              disabled={isSubmitting || !cartArray.length}
               className="bg-emerald-600 hover:bg-emerald-500"
             >
               {isSubmitting ? (
@@ -238,4 +179,3 @@ export function AddToTabModal({
     </Dialog>
   );
 }
-

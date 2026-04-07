@@ -8,6 +8,7 @@ interface POSState {
     updateQuantity: (id: string, delta: number) => void;
     removeFromCart: (id: string) => void;
     clearCart: () => void;
+    setCart: (items: CartItem[]) => void;
     
     // UI State
     isPaymentModalOpen: boolean;
@@ -21,7 +22,9 @@ export const usePOSStore = create<POSState>()(
             isPaymentModalOpen: false,
 
             addToCart: (product, quantity = 1) => set((state) => {
-                const existing = state.cart.find((item) => item.$id === product.$id);
+                // Ensure cart is always an array (defensive programming for persisted state)
+                const cart = Array.isArray(state.cart) ? state.cart : [];
+                const existing = cart.find((item) => item.$id === product.$id);
                 const currentQty = existing?.quantity ?? 0;
                 const maxQty = product.stock !== undefined ? product.stock : Infinity;
                 const addable = Math.min(quantity, maxQty - currentQty);
@@ -29,18 +32,20 @@ export const usePOSStore = create<POSState>()(
 
                 if (existing) {
                     return {
-                        cart: state.cart.map((item) =>
+                        cart: cart.map((item) =>
                             item.$id === product.$id
                                 ? { ...item, quantity: item.quantity + addable }
                                 : item
                         ),
                     };
                 }
-                return { cart: [...state.cart, { ...product, quantity: addable }] };
+                return { cart: [...cart, { ...product, quantity: addable }] };
             }),
 
             updateQuantity: (id, delta) => set((state) => {
-                const updated = state.cart.map((item) => {
+                // Ensure cart is always an array
+                const cart = Array.isArray(state.cart) ? state.cart : [];
+                const updated = cart.map((item) => {
                     if (item.$id === id) {
                         if (delta > 0 && item.stock !== undefined && item.quantity >= item.stock) {
                             return item; // at stock limit — don't increment
@@ -54,8 +59,10 @@ export const usePOSStore = create<POSState>()(
             }),
 
             removeFromCart: (id) => set((state) => ({
-                cart: state.cart.filter((item) => item.$id !== id),
+                cart: (Array.isArray(state.cart) ? state.cart : []).filter((item) => item.$id !== id),
             })),
+
+            setCart: (items) => set({ cart: Array.isArray(items) ? items : [] }),
 
             clearCart: () => set({ cart: [] }),
 
@@ -65,6 +72,13 @@ export const usePOSStore = create<POSState>()(
             name: 'pos-cart-storage', // localStorage key
             storage: createJSONStorage(() => localStorage),
             partialize: (state) => ({ cart: state.cart }), // Only persist cart, not UI state
+            // Migration function to ensure cart is always an array
+            onRehydrateStorage: () => (state) => {
+                if (state && !Array.isArray(state.cart)) {
+                    console.warn('POS store: Cart was not an array, resetting to empty array');
+                    state.cart = [];
+                }
+            },
         }
     )
 );

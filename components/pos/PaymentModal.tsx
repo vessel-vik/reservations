@@ -6,7 +6,6 @@ import { formatCurrency } from "@/lib/utils";
 import { Loader2, RefreshCw, ShieldCheck, CheckCircle2 } from "lucide-react";
 import { updateOrder } from "@/lib/actions/pos.actions";
 import { initializePaystackTransaction, verifyPaystackTransaction } from "@/lib/actions/paystack.actions";
-import PaystackPop from "@paystack/inline-js";
 
 interface PaymentModalProps {
     isOpen: boolean;
@@ -25,6 +24,7 @@ export function PaymentModal({ isOpen, onClose, amount, email, orderId, onSucces
     const [guestCount, setGuestCount] = useState(1);
     const [paymentAccessCode, setPaymentAccessCode] = useState<string | null>(null);
     const [isPaystackOpen, setIsPaystackOpen] = useState(false);
+    const [isPaystackReady, setIsPaystackReady] = useState(false);
 
     // Load saved metadata from localStorage on mount (for temp orders or refresh recovery)
     useEffect(() => {
@@ -39,6 +39,20 @@ export function PaymentModal({ isOpen, onClose, amount, email, orderId, onSucces
             }
         }
     }, [orderId]);
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+
+        const checkPaystack = () => {
+            if ((window as any).PaystackPop) {
+                setIsPaystackReady(true);
+            }
+        };
+
+        checkPaystack();
+        const interval = window.setInterval(checkPaystack, 250);
+        return () => window.clearInterval(interval);
+    }, []);
 
     const handlePayment = async (resumeCode?: string) => {
         try {
@@ -96,9 +110,12 @@ export function PaymentModal({ isOpen, onClose, amount, email, orderId, onSucces
             setIsInitializing(false);
             setIsPaystackOpen(true);
 
-            // Step 3: Open Paystack Popup
-            // @ts-ignore - PaystackPop types not available
-            const popup = new PaystackPop();
+            const PaystackGlobal = typeof window !== "undefined" ? (window as any).PaystackPop : null;
+            if (!PaystackGlobal) {
+                throw new Error("Paystack checkout is not loaded. Please refresh the page.");
+            }
+
+            const popup = new PaystackGlobal();
             popup.resumeTransaction(accessCode, {
                 onSuccess: async (transaction: any) => {
                     setIsPaystackOpen(false);
@@ -201,7 +218,7 @@ export function PaymentModal({ isOpen, onClose, amount, email, orderId, onSucces
                             <div className="flex flex-col gap-2">
                                 <button
                                     onClick={() => handlePayment(paymentAccessCode)}
-                                    disabled={isPaystackOpen}
+                                    disabled={isPaystackOpen || !isPaystackReady}
                                     className="w-full bg-emerald-500 hover:bg-emerald-600 active:scale-[0.98] text-white h-14 rounded-xl font-black text-lg shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-3"
                                 >
                                     {isPaystackOpen ? (
@@ -229,7 +246,7 @@ export function PaymentModal({ isOpen, onClose, amount, email, orderId, onSucces
                         ) : (
                             <button
                                 onClick={() => handlePayment()}
-                                disabled={isProcessing}
+                                disabled={isProcessing || !isPaystackReady}
                                 className="w-full bg-emerald-500 hover:bg-emerald-600 active:scale-[0.98] disabled:bg-neutral-800 disabled:text-neutral-600 disabled:cursor-not-allowed text-white h-14 rounded-xl font-black text-lg shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-3"
                             >
                                 {isInitializing ? (

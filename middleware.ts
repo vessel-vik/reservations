@@ -7,9 +7,16 @@ export default clerkMiddleware(async (auth, req) => {
   if (req.nextUrl.pathname.includes('/.well-known/')) {
     return;
   }
-  
+
   if (isProtectedRoute(req)) {
       await auth.protect();
+
+      // Additional organization context validation for POS routes
+      const { orgId } = await auth();
+      if (!orgId) {
+        // Allow access but log warning - fallback to legacy metadata will handle
+        console.warn(`POS route accessed without organization context: ${req.nextUrl.pathname}`);
+      }
   }
 });
 

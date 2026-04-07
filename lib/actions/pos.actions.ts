@@ -3,7 +3,7 @@
 import { databases, DATABASE_ID, MENU_ITEMS_COLLECTION_ID, ORDERS_COLLECTION_ID, CATEGORIES_COLLECTION_ID, DELETED_ORDERS_LOG_COLLECTION_ID } from "@/lib/appwrite.config";
 import { ID, Query } from "node-appwrite";
 import { parseStringify } from "@/lib/utils";
-import { Order, type CartItem } from "@/types/pos.types";
+import { Order, type CartItem, type OpenOrder, type OpenOrdersSummary } from "@/types/pos.types";
 import { decrementItemStocks } from '@/lib/actions/menu.actions';
 import { getAuthContext, validateBusinessContext } from '@/lib/auth.utils';
 import {
@@ -62,9 +62,11 @@ export const getMenuItems = async () => {
             MENU_ITEMS_COLLECTION_ID,
             [
                 Query.equal("businessId", businessId), // CRITICAL: Multi-tenant isolation
-                Query.equal("isAvailable", true),
-                Query.limit(100), // Get enough items
-                Query.orderDesc("popularity")
+                // Fetch both available and low-stock (stock>0) items; client filters out zero-stock
+                // isAvailable=false with stock>0 means manually disabled — excluded by client
+                Query.notEqual("isAvailable", false),
+                Query.limit(150),
+                Query.orderDesc("popularity"),
             ]
         );
 
@@ -924,23 +926,6 @@ export const settleTableTabAndCreateOrder = async ({
     const { businessId } = await getAuthContext();
     validateBusinessContext(businessId);
 
-    // CHECK-THEN-SET PATTERN: Prevent race conditions during settlement
-    // Verify no other settlement is in progress for this table
-    const existingSettlementCheck = await databases.listDocuments(
-        DATABASE_ID!,
-        ORDERS_COLLECTION_ID!,
-        [
-            Query.equal("businessId", businessId), // Multi-tenant isolation
-            Query.equal("tableNumber", tableNumber),
-            Query.equal("paymentStatus", "settling"), // Check for in-progress settlements
-            Query.greaterThanEqual("orderTime", new Date(Date.now() - 5 * 60 * 1000).toISOString()) // Last 5 minutes
-        ]
-    );
-
-    if (existingSettlementCheck.documents.length > 0) {
-        throw new Error(`Table ${tableNumber} is currently being settled by another terminal. Please wait and try again.`);
-    }
-
     // Get the latest snapshot of unpaid orders for this table+date
     const summary = await getTableDailyTabSummary(tableNumber, date);
 
@@ -954,31 +939,7 @@ export const settleTableTabAndCreateOrder = async ({
         };
     }
 
-    // SET PHASE: Mark orders as "settling" to prevent concurrent settlements
-    const settlingPromises = summary.orders.map((order: any) =>
-        databases.updateDocument(
-            DATABASE_ID!,
-            ORDERS_COLLECTION_ID!,
-            order.$id,
-            {
-                paymentStatus: "settling", // Temporary status to block concurrent access
-                status: "processing"
-            }
-        ).catch(err => {
-            console.error(`Failed to mark order ${order.$id} as settling:`, err);
-            return null;
-        })
-    );
-
-    const settlingResults = await Promise.allSettled(settlingPromises);
-    const successfullyMarked = settlingResults.filter(r => r.status === "fulfilled" && r.value !== null).length;
-
-    if (successfullyMarked === 0) {
-        throw new Error("Failed to acquire settlement lock. Another terminal may be processing this table.");
-    }
-
-    try {
-        // Parse and flatten items from all orders to build a consolidated receipt.
+    // Parse and flatten items from all orders to build a consolidated receipt.
         const allItems: any[] = [];
         const orderNumbers: string[] = [];
 
@@ -1097,23 +1058,48 @@ export const settleTableTabAndCreateOrder = async ({
             paymentReference,
             paymentMethod,
         };
-    } catch (error) {
-        // CLEANUP: Reset orders from "settling" status on failure
-        console.error("Settlement failed, cleaning up settling status:", error);
-        const cleanupPromises = summary.orders.map((order: any) =>
-            databases.updateDocument(
-                DATABASE_ID!,
-                ORDERS_COLLECTION_ID!,
-                order.$id,
-                {
-                    paymentStatus: "unpaid", // Reset to original status
-                    status: "active"
-                }
-            ).catch(cleanupErr => console.error(`Failed to cleanup order ${order.$id}:`, cleanupErr))
-        );
-        await Promise.allSettled(cleanupPromises);
-        throw error;
+};
+
+/**
+ * Return all open (unpaid, non-deleted) orders for the business, sorted oldest-first.
+ * Optionally scoped to a single waiter with opts.waiterId.
+ */
+export const getOpenOrdersSummary = async (
+    opts?: { waiterId?: string }
+): Promise<OpenOrdersSummary> => {
+    if (!DATABASE_ID || !ORDERS_COLLECTION_ID) {
+        throw new Error("Database configuration is missing");
     }
+
+    const { businessId } = await getAuthContext();
+    validateBusinessContext(businessId);
+
+    const queries = [
+        Query.equal("businessId", businessId),
+        Query.equal("paymentStatus", "unpaid"),
+        Query.orderAsc("orderTime"),
+        Query.limit(250),
+    ];
+    if (opts?.waiterId) {
+        queries.push(Query.equal("waiterId", opts.waiterId));
+    }
+
+    const response = await databases.listDocuments(DATABASE_ID!, ORDERS_COLLECTION_ID!, queries);
+
+    const now = Date.now();
+    const orders: OpenOrder[] = response.documents.map((doc: any) => {
+        const ageMinutes = Math.floor((now - new Date(doc.orderTime).getTime()) / 60_000);
+        let items = doc.items;
+        if (typeof items === "string") {
+            try { items = JSON.parse(items); } catch { items = []; }
+        }
+        return { ...doc, items: Array.isArray(items) ? items : [], ageMinutes } as OpenOrder;
+    });
+
+    const totalAmount = orders.reduce((s, o) => s + (o.totalAmount ?? 0), 0);
+    const subtotal = orders.reduce((s, o) => s + (o.subtotal ?? 0), 0);
+
+    return { orders, totalAmount, subtotal, orderCount: orders.length };
 };
 
 /**

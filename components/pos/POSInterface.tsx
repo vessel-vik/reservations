@@ -14,6 +14,7 @@ import { SettleTableTabModal } from "./SettleTableTabModal";
 import { OpenOrdersModal } from "./OpenOrdersModal";
 import { ClosedOrdersModal } from "./ClosedOrdersModal";
 import { DocketPreviewModal } from "./DocketPreviewModal";
+import { OrderReceiptModal } from "./OrderReceiptModal";
 import { Search, Grid, LayoutDashboard, X, CreditCard, Receipt, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { usePOSStore } from "@/store/pos-store";
@@ -62,6 +63,20 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
     const [docketModalDelta, setDocketModalDelta] = useState<{ name: string; quantity: number; price: number }[]>([]);
     const [editingOrder, setEditingOrder] = useState<any | null>(null);
     const [showOutOfStock, setShowOutOfStock] = useState(false);
+    const [receiptOrder, setReceiptOrder] = useState<{
+        $id: string;
+        orderNumber?: string;
+        tableNumber?: number;
+        customerName?: string;
+        waiterName?: string;
+        orderTime: string;
+        items: any[];
+        subtotal: number;
+        totalAmount: number;
+        paymentStatus: string;
+    } | null>(null);
+    const [receiptPaymentMethod, setReceiptPaymentMethod] = useState<string | undefined>(undefined);
+    const [receiptPaymentRef, setReceiptPaymentRef] = useState<string | undefined>(undefined);
     const [outOfStockItem, setOutOfStockItem] = useState<Product | null>(null);
 
     // O(1) category lookup optimization
@@ -346,97 +361,86 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
             {/* Main Content Area */}
             <div className="flex-1 flex flex-col min-w-0">
 
-                {/* Optimized Header with Hamburger Menu */}
-                <div className="bg-neutral-900 border-b border-white/10 px-4 py-3 safe-area-top">
-                    <div className="flex items-center justify-between gap-4">
-                        {/* Left: Hamburger (mobile) + Logo */}
-                        <div className="flex items-center gap-3">
-                            {/* Hamburger Menu Button - Mobile Only */}
-                            <button
-                                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                                className={`hamburger-btn md:hidden ${isMobileMenuOpen ? 'open' : ''}`}
-                                aria-label="Toggle menu"
-                            >
-                                <span className="hamburger-line"></span>
-                                <span className="hamburger-line"></span>
-                                <span className="hamburger-line"></span>
-                            </button>
+                {/* Header — stacked, centered, tablet-optimised */}
+                <div className="bg-neutral-900 border-b border-white/10 px-4 pt-3 pb-2 safe-area-top">
+                    {/* Row 1: Hamburger (mobile) + Search + UserButton */}
+                    <div className="flex items-center gap-3">
+                        {/* Hamburger — mobile category drawer */}
+                        <button
+                            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                            className={`hamburger-btn md:hidden flex-shrink-0 ${isMobileMenuOpen ? 'open' : ''}`}
+                            aria-label="Toggle menu"
+                        >
+                            <span className="hamburger-line"></span>
+                            <span className="hamburger-line"></span>
+                            <span className="hamburger-line"></span>
+                        </button>
 
-                            {/* Logo */}
-                            <div>
-                                <h1 className="text-xl md:text-2xl font-bold text-white gradient-text">AM | PM POS</h1>
-                                <p className="hidden md:block text-xs text-neutral-400 mt-0.5">Point of Sale System</p>
-                            </div>
+                        {/* Search — always visible, grows to fill space */}
+                        <div className="flex-1 relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
+                            <input
+                                type="text"
+                                placeholder="Search menu..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full bg-neutral-800 border-none rounded-lg py-2 pl-10 pr-4 text-sm text-white placeholder:text-neutral-500 focus:ring-2 focus:ring-emerald-500/50"
+                            />
                         </div>
 
-                        {/* Right: Search (desktop) + User */}
-                        <div className="flex items-center gap-3">
-                            {/* Search - Large desktop only */}
-                            <div className="hidden lg:block relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
-                                <input
-                                    type="text"
-                                    placeholder="Search menu..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-64 bg-neutral-800 border-none rounded-lg py-2 pl-10 pr-4 text-sm text-white placeholder:text-neutral-500 focus:ring-2 focus:ring-emerald-500/50"
-                                />
-                            </div>
-
-                            {/* Action buttons — tablet: icon+label compact; desktop: full size */}
-                            {user?.id && (
-                                <>
-                                    <Link
-                                        href={`/pos/dashboard/${user.id}`}
-                                        className="hidden lg:flex items-center gap-2 bg-neutral-800 hover:bg-neutral-700 text-white px-4 py-2 rounded-lg transition-colors"
-                                    >
-                                        <LayoutDashboard className="w-4 h-4" />
-                                        <span className="text-sm font-medium">Dashboard</span>
-                                    </Link>
-
-                                    <Button
-                                        type="button"
-                                        onClick={() => setIsOpenOrdersOpen(true)}
-                                        className="hidden md:inline-flex items-center gap-1.5 bg-neutral-800 hover:bg-neutral-700 text-white px-3 py-1.5 rounded-lg text-xs lg:text-sm lg:px-4 lg:py-2"
-                                    >
-                                        <Grid className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
-                                        <span>Open Orders</span>
-                                    </Button>
-
-                                    <Button
-                                        type="button"
-                                        onClick={() => setIsClosedOrdersOpen(true)}
-                                        className="hidden md:inline-flex items-center gap-1.5 bg-sky-600 hover:bg-sky-500 text-white px-3 py-1.5 rounded-lg text-xs lg:text-sm lg:px-4 lg:py-2"
-                                    >
-                                        <Receipt className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
-                                        <span>Closed Orders</span>
-                                    </Button>
-
-                                    <Button
-                                        type="button"
-                                        onClick={() => setIsSettleTabModalOpen(true)}
-                                        className="hidden md:inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs lg:text-sm lg:px-4 lg:py-2"
-                                    >
-                                        <CreditCard className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
-                                        <span>Settle Table</span>
-                                    </Button>
-                                </>
-                            )}
-
-                            {/* User Button - Desktop Only */}
-                            <div className="hidden md:block">
-                                <UserButton
-                                    afterSignOutUrl="/"
-                                    appearance={{
-                                        elements: {
-                                            userButtonAvatarBox: "w-9 h-9",
-                                            userButtonTrigger: "focus:shadow-none"
-                                        }
-                                    }}
-                                />
-                            </div>
+                        {/* UserButton — tablet+ */}
+                        <div className="hidden md:block flex-shrink-0">
+                            <UserButton
+                                afterSignOutUrl="/"
+                                appearance={{
+                                    elements: {
+                                        userButtonAvatarBox: "w-9 h-9",
+                                        userButtonTrigger: "focus:shadow-none"
+                                    }
+                                }}
+                            />
                         </div>
                     </div>
+
+                    {/* Row 2: Action buttons — tablet+, centered */}
+                    {user?.id && (
+                        <div className="hidden md:flex items-center justify-center gap-2 mt-2.5">
+                            <Link
+                                href={`/pos/dashboard/${user.id}`}
+                                className="flex items-center gap-1.5 bg-neutral-800 hover:bg-neutral-700 active:scale-95 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all duration-150"
+                            >
+                                <LayoutDashboard className="w-4 h-4" />
+                                Dashboard
+                            </Link>
+
+                            <button
+                                type="button"
+                                onClick={() => setIsOpenOrdersOpen(true)}
+                                className="flex items-center gap-1.5 bg-neutral-800 hover:bg-neutral-700 active:scale-95 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all duration-150"
+                            >
+                                <Grid className="w-4 h-4" />
+                                Open Orders
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setIsClosedOrdersOpen(true)}
+                                className="flex items-center gap-1.5 bg-sky-700 hover:bg-sky-600 active:scale-95 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all duration-150"
+                            >
+                                <Receipt className="w-4 h-4" />
+                                Closed Orders
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setIsSettleTabModalOpen(true)}
+                                className="flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-600 active:scale-95 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all duration-150"
+                            >
+                                <CreditCard className="w-4 h-4" />
+                                Settle Table
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 {/* Mobile Category Menu Drawer */}
@@ -558,7 +562,7 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
             </div>
 
             {/* Desktop Cart Sidebar - Hidden on mobile */}
-            <div className="hidden md:block">
+            <div className="hidden md:flex md:h-full overflow-hidden pos-cart-sidebar-wrapper">
                 <CartSidebar
                     cart={cart}
                     onUpdateQuantity={updateQuantity}
@@ -644,7 +648,21 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
             <SettleTableTabModal
                 isOpen={isSettleTabModalOpen}
                 onClose={() => setIsSettleTabModalOpen(false)}
-                onEdit={handleEditOrder}
+                onSettlementSuccess={(consolidatedOrderId, totalAmount, method, ref) => {
+                    const subtotal = totalAmount / 1.16;
+                    setReceiptOrder({
+                        $id: consolidatedOrderId,
+                        orderNumber: consolidatedOrderId,
+                        orderTime: new Date().toISOString(),
+                        items: [],
+                        subtotal,
+                        totalAmount,
+                        paymentStatus: "paid",
+                    });
+                    setReceiptPaymentMethod(method);
+                    setReceiptPaymentRef(ref);
+                    setIsSettleTabModalOpen(false);
+                }}
             />
 
             <ClosedOrdersModal
@@ -656,8 +674,20 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
             <OpenOrdersModal
                 isOpen={isOpenOrdersOpen}
                 onClose={() => setIsOpenOrdersOpen(false)}
-                onPrint={async (order) => {
-                    await printOrderDocket(order.$id);
+                onPrint={(order) => {
+                    setReceiptOrder({
+                        $id: order.$id,
+                        orderNumber: order.orderNumber,
+                        tableNumber: order.tableNumber,
+                        customerName: order.customerName,
+                        orderTime: order.orderTime,
+                        items: Array.isArray(order.items) ? order.items as any[] : [],
+                        subtotal: order.totalAmount / 1.16,
+                        totalAmount: order.totalAmount,
+                        paymentStatus: order.paymentStatus ?? "unpaid",
+                    });
+                    setReceiptPaymentMethod(undefined);
+                    setReceiptPaymentRef(undefined);
                 }}
                 onEdit={handleEditOrder}
             />
@@ -680,6 +710,17 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
                 deltaItems={docketModalDelta}
                 type={docketModalType}
             />
+
+            {/* Receipt Modal — shown after print button tap or settlement */}
+            {receiptOrder && (
+                <OrderReceiptModal
+                    isOpen={!!receiptOrder}
+                    onClose={() => setReceiptOrder(null)}
+                    order={receiptOrder}
+                    paymentMethod={receiptPaymentMethod}
+                    paymentReference={receiptPaymentRef}
+                />
+            )}
         </div>
     );
 }

@@ -69,6 +69,8 @@ export interface Order {
     settlementParentOrderId?: string;
     settledOrderIds?: string[];
     paymentMethods?: any[];
+    /** Passed only to updateOrder — merged into specialInstructions as [KITCHEN_PRINTED] (not an Appwrite attribute). */
+    kitchenSnapshotLines?: { i: string; q: number; n?: string }[];
     // VAT fields for Kenya compliance
     vatCategory?: VatCategory;        // Order-level VAT category
     vatRate?: number;                 // VAT rate applied (default 16%)
@@ -84,8 +86,48 @@ export interface Order {
     // eTIMS compliance
     eTIMSInvoiceId?: string;
     eTIMSSubmissionDate?: string;
+    // Soft delete fields for audit trail
+    isDeleted?: boolean;
+    deletedAt?: string;
+    deletedBy?: string; // Clerk user ID
+    deletionReason?: string;
     $createdAt: string;
     $updatedAt: string;
+}
+
+/**
+ * A single open (unpaid) order row returned by getOpenOrdersSummary.
+ * Extends Order with a computed ageMinutes field.
+ */
+export interface OpenOrder extends Order {
+    ageMinutes: number;
+}
+
+/**
+ * Aggregated result returned by getOpenOrdersSummary.
+ */
+export interface OpenOrdersSummary {
+    orders: OpenOrder[];
+    totalAmount: number;
+    subtotal: number;
+    orderCount: number;
+}
+
+/**
+ * Audit log for soft-deleted orders
+ * Maintains complete order snapshot for compliance and recovery
+ */
+export interface DeletedOrderLog {
+    $id: string;
+    orderId: string;           // Original order ID
+    orderNumber: string;       // Order number for reference
+    deletedBy: string;         // Clerk user ID who performed deletion
+    deletedAt: string;         // Timestamp of deletion
+    deletionReason: string;    // Reason for deletion
+    businessId: string;        // Business context
+    // Complete order snapshot for audit trail
+    orderSnapshot: Order;      // Full order data at time of deletion
+    $createdAt: string;
 }
 
 /**

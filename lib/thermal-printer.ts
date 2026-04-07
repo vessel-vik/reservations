@@ -191,18 +191,109 @@ export class ThermalPrinterClient {
 
             const { commands } = await response.json();
 
-            // For browser-based USB printing, we need Web USB API
-            if (this.config.type === 'usb') {
-                return await this.printViaUSB(commands);
-            } else {
-                return await this.printViaNetwork(commands);
-            }
-
+            return this.printRawCommands(commands as number[]);
         } catch (error) {
             console.error('Thermal print error:', error);
             return {
                 success: false,
                 error: error instanceof Error ? error.message : 'Unknown error'
+            };
+        }
+    }
+
+    /**
+     * Captain / kitchen docket (prep slip) for a single order — not a paid receipt.
+     */
+    async printKitchenDocket(orderId: string): Promise<{ success: boolean; error?: string }> {
+        try {
+            const response = await fetch('/api/print/thermal', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    orderId,
+                    jobType: 'kitchen_docket',
+                    printerType: this.config.type,
+                    terminalName: this.config.terminalName,
+                    lineWidth: this.config.lineWidth || 32,
+                    characterSet: this.config.characterSet,
+                }),
+            });
+
+            if (!response.ok) {
+                let errorBody: any = {};
+                try {
+                    errorBody = await response.json();
+                } catch {}
+                return { success: false, error: errorBody.error || 'Docket print failed' };
+            }
+
+            const { commands } = await response.json();
+            return this.printRawCommands(commands as number[]);
+        } catch (error) {
+            console.error('Kitchen docket print error:', error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error',
+            };
+        }
+    }
+
+    /** Delta slip: only items added since last kitchen print. */
+    async printKitchenDelta(
+        orderId: string,
+        deltaItems: { name: string; quantity: number }[]
+    ): Promise<{ success: boolean; error?: string }> {
+        try {
+            const response = await fetch('/api/print/thermal', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    orderId,
+                    jobType: 'kitchen_delta',
+                    deltaItems,
+                    printerType: this.config.type,
+                    terminalName: this.config.terminalName,
+                    lineWidth: this.config.lineWidth || 32,
+                    characterSet: this.config.characterSet,
+                }),
+            });
+
+            if (!response.ok) {
+                let errorBody: any = {};
+                try {
+                    errorBody = await response.json();
+                } catch {}
+                return { success: false, error: errorBody.error || 'Delta docket failed' };
+            }
+
+            const { commands } = await response.json();
+            return this.printRawCommands(commands as number[]);
+        } catch (error) {
+            console.error('Kitchen delta print error:', error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error',
+            };
+        }
+    }
+
+    /**
+     * Send pre-built ESC/POS byte commands to the configured printer (USB or network).
+     */
+    async printRawCommands(commands: number[]): Promise<{ success: boolean; error?: string }> {
+        if (!Array.isArray(commands) || commands.length === 0) {
+            return { success: false, error: 'No print data from server' };
+        }
+        try {
+            if (this.config.type === 'usb') {
+                return await this.printViaUSB(commands);
+            }
+            return await this.printViaNetwork(commands);
+        } catch (error) {
+            console.error('printRawCommands error:', error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error',
             };
         }
     }
@@ -370,10 +461,8 @@ export class ThermalPrinterClient {
      * Print via Network (TCP/IP)
      * Requires server-side proxy or direct network access
      */
-    private async printViaNetwork(commands: string[]): Promise<{ success: boolean; error?: string }> {
+    private async printViaNetwork(commands: number[] | string[]): Promise<{ success: boolean; error?: string }> {
         try {
-            // For network printing, we need a server-side proxy
-            // This would typically connect to the printer's IP:Port
             const response = await fetch('/api/print/network', {
                 method: 'POST',
                 headers: {
@@ -382,7 +471,7 @@ export class ThermalPrinterClient {
                 body: JSON.stringify({
                     commands,
                     ipAddress: this.config.ipAddress,
-                    port: this.config.port || 9100 // Default ESC/POS port
+                    port: this.config.port || 9100
                 })
             });
 

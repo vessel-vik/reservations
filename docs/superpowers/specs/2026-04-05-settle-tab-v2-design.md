@@ -146,17 +146,17 @@ Dialog: open={isOpen}, max-w-3xl, max-h-[90vh], overflow hidden
 
 | Age | Border/background tint | Dot colour | Badge |
 |-----|------------------------|------------|-------|
-| `ageMinutes < 60` | emerald-500/25 | `#10b981` | green `Xm` |
-| `60 ≤ ageMinutes < 180` | amber-500/25 | `#f59e0b` | amber `Xhr Ym` |
-| `ageMinutes ≥ 180` | red-500/25 | `#ef4444` | red `Xhr Ym` |
+| `ageMinutes < 100` | emerald-500/25 | `#10b981` | green `Xm` |
+| `100 ≤ ageMinutes < 250` | amber-500/25 | `#f59e0b` | amber `Xhr Ym` |
+| `ageMinutes ≥ 250` | red-500/25 | `#ef4444` | red `Xhr Ym` |
 
 Color is computed **client-side** from `order.ageMinutes`. No server involvement.
 
 Helper:
 ```typescript
 function orderAgeColor(ageMinutes: number): "green" | "amber" | "red" {
-  if (ageMinutes < 60) return "green";
-  if (ageMinutes < 180) return "amber";
+  if (ageMinutes < 100) return "green";
+  if (ageMinutes < 250) return "amber";
   return "red";
 }
 ```
@@ -166,7 +166,7 @@ function orderAgeColor(ageMinutes: number): "green" | "amber" | "red" {
 ```
 OrderCard (border + bg tinted by age)
   ├── CheckBox (toggles selection)
-  ├── AgeDot (coloured circle)
+  ├── AgeDot (coloured pinging with circle)
   ├── Info: "Table N · #ORD-XXXX" / customer name · time · AgeBadge
   ├── Amount (coloured by age)
   └── Expand chevron (▼/▲)

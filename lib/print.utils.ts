@@ -35,6 +35,31 @@ export async function printOrderDocket(
 }
 
 /**
+ * Customer receipt for a settled/paid order (the 80mm thermal receipt format).
+ * Always queues via PrintBridge — call this after a successful payment.
+ */
+export async function printReceipt(
+    orderId: string
+): Promise<{ success: boolean; error?: string }> {
+    if (typeof window === 'undefined') {
+        return { success: false, error: 'Print is only available in the browser' };
+    }
+    const queue = getQueueFn();
+    if (!queue) {
+        toast.error(BRIDGE_NOT_READY_MSG);
+        return { success: false, error: 'PrintBridge not mounted' };
+    }
+    try {
+        await queue('receipt', `orderId:${orderId}`);
+        return { success: true };
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Unknown print error';
+        toast.error(msg);
+        return { success: false, error: msg };
+    }
+}
+
+/**
  * Delta slip: only newly added items (output of computeKitchenDeltaForOrder, enriched with price).
  * Always queues via PrintBridge.
  */

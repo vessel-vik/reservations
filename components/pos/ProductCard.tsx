@@ -4,7 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import { Product } from "@/types/pos.types";
 import { formatCurrency, cn } from "@/lib/utils";
-import { Plus, AlertTriangle, XCircle } from "lucide-react";
+import { Plus, Info, AlertTriangle, XCircle } from "lucide-react";
 import { getStockStatus, isOutOfStock } from "@/lib/stock-utils";
 
 interface ProductCardProps {
@@ -23,12 +23,17 @@ export const ProductCard = ({ product, onAdd, onView, priority = false }: Produc
     const isLow = stockStatus === 'low' && !isOut;
 
     const handleCardClick = () => {
-        onView(product);
+        onAdd(product);
     };
 
     const handleQuickAdd = (e: React.MouseEvent) => {
         e.stopPropagation();
         onAdd(product);
+    };
+
+    const handleViewDetails = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        onView(product);
     };
 
     const getCategoryIcon = (category: string | { name?: string; slug?: string } | undefined) => {
@@ -51,12 +56,21 @@ export const ProductCard = ({ product, onAdd, onView, priority = false }: Produc
     return (
         <div
             className={cn(
-                "group relative bg-gradient-to-br from-neutral-800 to-neutral-900 rounded-2xl overflow-hidden border border-white/10 hover:border-emerald-500/50 transition-all duration-300 cursor-pointer animate-fade-in",
+                "product-card group relative bg-gradient-to-br from-neutral-800 to-neutral-900 rounded-2xl overflow-hidden border border-white/10 hover:border-emerald-500/50 transition-all duration-300 cursor-pointer animate-fade-in",
                 !isOut && "hover-lift",
                 isOut && "opacity-40",
             )}
             onClick={handleCardClick}
         >
+            {/* View Details Button */}
+            <button
+                onClick={handleViewDetails}
+                className={cn("product-card-info", isOut && "pointer-events-none opacity-0")}
+                aria-label="View product details"
+            >
+                <Info className="w-4 h-4 text-white" />
+            </button>
+
             {/* Quick Add Button - Desktop only, properly positioned */}
             <button
                 onClick={handleQuickAdd}

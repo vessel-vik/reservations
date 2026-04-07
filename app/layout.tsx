@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import "./globals.css";
 import { Plus_Jakarta_Sans as FontSans } from "next/font/google";
 import { ThemeProvider } from "next-themes";
@@ -7,6 +8,7 @@ import { ClerkProvider } from '@clerk/nextjs';
 import { neobrutalism } from '@clerk/themes';
 
 import { cn } from "@/lib/utils";
+import { PrintBridge } from "@/components/pos/PrintBridge";
 
 
 const fontSans = FontSans({
@@ -48,8 +50,10 @@ export default function RootLayout({
           )}
         >
           <ThemeProvider attribute="class" defaultTheme="dark">
+          <PrintBridge />
           {children}
           <Analytics />
+          <Script src="https://js.paystack.co/v2/inline.js" strategy="afterInteractive" />
           </ThemeProvider>
         </body>
       </html>
