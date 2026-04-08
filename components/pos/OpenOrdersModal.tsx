@@ -10,9 +10,12 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
-import { Clock, AlertCircle, Edit2, Printer, RefreshCw, User } from "lucide-react";
+import { Clock, AlertCircle, Edit2, Printer, RefreshCw, User, Trash2 } from "lucide-react";
 import { useOrganization, useUser } from "@clerk/nextjs";
-import { getOpenOrdersSummary } from "@/lib/actions/pos.actions";
+import { getOpenOrdersSummary, voidOrderValidated } from "@/lib/actions/pos.actions";
+import { VOID_ORDER_CATEGORIES, type VoidOrderCategory } from "@/lib/schemas/void-order";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
 
 interface OpenOrderItem {
     $id: string;
@@ -56,6 +59,10 @@ export function OpenOrdersModal({
 
     const [orders, setOrders] = useState<Order[]>([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [voidTarget, setVoidTarget] = useState<Order | null>(null);
+    const [voidCategory, setVoidCategory] = useState<VoidOrderCategory>("CUSTOMER_WALK_OUT");
+    const [voidReason, setVoidReason] = useState("");
+    const [voidSubmitting, setVoidSubmitting] = useState(false);
 
     const parseOrderItems = (order: Order): OpenOrderItem[] => {
         if (!order.items) return [];
@@ -107,7 +114,28 @@ export function OpenOrdersModal({
         }
     }, [isOpen, fetchOpenOrders]);
 
+    const submitVoid = async () => {
+        if (!voidTarget) return;
+        setVoidSubmitting(true);
+        try {
+            await voidOrderValidated({
+                orderId: voidTarget.$id,
+                voidCategory,
+                reason: voidReason,
+            });
+            toast.success("Order voided");
+            setVoidTarget(null);
+            setVoidReason("");
+            await fetchOpenOrders();
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Void failed");
+        } finally {
+            setVoidSubmitting(false);
+        }
+    };
+
     return (
+        <>
         <Dialog open={isOpen} onOpenChange={onClose}>
             <DialogContent className="bg-neutral-950 border-white/10 text-white max-w-lg max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden sm:max-w-lg">
                 <DialogHeader className="shrink-0 px-6 pt-6 pb-2 pr-14">
@@ -200,12 +228,12 @@ export function OpenOrdersModal({
                                         )}
                                     </div>
 
-                                    <div className="flex gap-2">
+                                    <div className="flex flex-wrap gap-2">
                                         <Button
                                             type="button"
                                             size="sm"
                                             onClick={() => onEdit?.(order)}
-                                            className="flex-1 h-10 bg-neutral-950 border-2 border-emerald-500/60 text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-400"
+                                            className="flex-1 min-w-[120px] h-10 bg-neutral-950 border-2 border-emerald-500/60 text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-400"
                                         >
                                             <Edit2 className="w-4 h-4 mr-2" />
                                             Edit Order
@@ -218,6 +246,22 @@ export function OpenOrdersModal({
                                         >
                                             <Printer className="w-4 h-4" />
                                         </Button>
+                                        {isAdmin && (
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="destructive"
+                                                onClick={() => {
+                                                    setVoidTarget(order);
+                                                    setVoidCategory("CUSTOMER_WALK_OUT");
+                                                    setVoidReason("");
+                                                }}
+                                                className="h-10 px-3 bg-rose-950/80 border border-rose-500/40 text-rose-200 hover:bg-rose-900/80 shrink-0"
+                                            >
+                                                <Trash2 className="w-4 h-4 mr-1" />
+                                                Void
+                                            </Button>
+                                        )}
                                     </div>
                                 </div>
                             );
@@ -232,5 +276,66 @@ export function OpenOrdersModal({
                 </div>
             </DialogContent>
         </Dialog>
+
+        <Dialog open={!!voidTarget} onOpenChange={(o) => !o && setVoidTarget(null)}>
+            <DialogContent className="bg-neutral-950 border-white/10 text-white max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Void order</DialogTitle>
+                    <DialogDescription className="text-neutral-400">
+                        Admin only — requires category and a reason (min. 15 characters).
+                    </DialogDescription>
+                </DialogHeader>
+                {voidTarget && (
+                    <div className="space-y-3">
+                        <p className="text-sm text-neutral-300">
+                            #{voidTarget.orderNumber} · {formatCurrency(voidTarget.totalAmount)}
+                        </p>
+                        <div>
+                            <label className="text-xs text-neutral-500 block mb-1">Category</label>
+                            <select
+                                value={voidCategory}
+                                onChange={(e) => setVoidCategory(e.target.value as VoidOrderCategory)}
+                                className="w-full rounded-lg bg-neutral-900 border border-white/10 px-3 py-2 text-sm text-white"
+                            >
+                                {VOID_ORDER_CATEGORIES.map((c) => (
+                                    <option key={c} value={c}>
+                                        {c.replace(/_/g, " ")}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="text-xs text-neutral-500 block mb-1">Reason (15+ chars)</label>
+                            <Textarea
+                                value={voidReason}
+                                onChange={(e) => setVoidReason(e.target.value)}
+                                placeholder="Describe why this order is being voided…"
+                                className="bg-neutral-900 border-white/10 text-white min-h-[100px]"
+                            />
+                        </div>
+                        <div className="flex gap-2 justify-end pt-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                className="border-white/15"
+                                onClick={() => setVoidTarget(null)}
+                                disabled={voidSubmitting}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="destructive"
+                                disabled={voidSubmitting || voidReason.trim().length < 15}
+                                onClick={() => void submitVoid()}
+                            >
+                                {voidSubmitting ? "Voiding…" : "Confirm void"}
+                            </Button>
+                        </div>
+                    </div>
+                )}
+            </DialogContent>
+        </Dialog>
+        </>
     );
 }

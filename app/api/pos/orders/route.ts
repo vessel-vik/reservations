@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getOrders, getOrdersByTable, updateOrder, softDeleteOrder } from '@/lib/actions/pos.actions';
+import { getOrders, getOrdersByTable, updateOrder, voidOrderValidated } from '@/lib/actions/pos.actions';
 
 export async function GET(request: NextRequest) {
   try {
@@ -67,18 +67,25 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const url = new URL(request.url);
-    const orderId = url.searchParams.get('orderId');
-    const deletionReason = url.searchParams.get('reason') || 'Order deleted by staff';
-
-    if (!orderId) {
-      return NextResponse.json({ error: 'orderId is required' }, { status: 400 });
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== 'object') {
+      return NextResponse.json(
+        { error: 'JSON body required: { orderId, voidCategory, reason }' },
+        { status: 400 }
+      );
     }
 
-    await softDeleteOrder(orderId, deletionReason);
+    await voidOrderValidated(body);
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Failed to delete order';
+    if (msg.includes('FORBIDDEN')) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+    if (msg.includes('Invalid') || msg.includes('at least 15')) {
+      return NextResponse.json({ error: msg }, { status: 400 });
+    }
     console.error('Error in DELETE /api/pos/orders:', error);
-    return NextResponse.json({ error: 'Failed to delete order' }, { status: 500 });
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

@@ -317,12 +317,39 @@ async function setupDatabase() {
         { key: 'allergies', type: 'string', size: 100, required: false, array: true }
     ]);
 
+    await createCollection('cash_verifications', 'Cash Verifications', [
+        { key: 'businessId', type: 'string', size: 64, required: true },
+        { key: 'paymentReference', type: 'string', size: 120, required: true },
+        { key: 'fileId', type: 'string', size: 64, required: true },
+        { key: 'deviceInstallId', type: 'string', size: 80, required: false },
+        { key: 'capturedAt', type: 'string', size: 40, required: true },
+        { key: 'clerkUserId', type: 'string', size: 64, required: false },
+        { key: 'userAgent', type: 'string', size: 500, required: false },
+        { key: 'geoJson', type: 'string', size: 500, required: false },
+        { key: 'orderIdsJson', type: 'string', size: 4000, required: false },
+    ]);
+
+    await createCollection('individual_units', 'Individual Units', [
+        { key: 'businessId', type: 'string', size: 64, required: true },
+        { key: 'unitUid', type: 'string', size: 120, required: true },
+        { key: 'menuItemId', type: 'string', size: 64, required: true },
+        { key: 'state', type: 'string', size: 24, required: true },
+        { key: 'scannedInAt', type: 'string', size: 40, required: false },
+        { key: 'scannedOutAt', type: 'string', size: 40, required: false },
+        { key: 'lastOrderId', type: 'string', size: 64, required: false },
+        { key: 'lastScannedBy', type: 'string', size: 64, required: false },
+        { key: 'embeddingLabel', type: 'string', size: 500, required: false },
+    ]);
+
     console.log('🎉 Database setup completed!\n');
     console.log('Next steps:');
-    console.log('1. Run: npm run seed-menu');
-    console.log('2. Run: npm run seed-staff');  
-    console.log('3. Run: npm run seed-tables');
-    console.log('4. Test the POS system\n');
+    console.log('1. Add to .env.local: CASH_VERIFICATIONS_COLLECTION_ID=cash_verifications');
+    console.log('   + NEXT_PUBLIC_CASH_VERIFICATIONS_COLLECTION_ID=cash_verifications (admin realtime toasts)');
+    console.log('2. Add to .env.local: INDIVIDUAL_UNITS_COLLECTION_ID=individual_units');
+    console.log('3. Run: npm run seed-menu');
+    console.log('4. Run: npm run seed-staff');  
+    console.log('5. Run: npm run seed-tables');
+    console.log('6. Test the POS system\n');
 }
 
 setupDatabase().catch(console.error);

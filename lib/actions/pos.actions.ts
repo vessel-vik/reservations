@@ -5,7 +5,8 @@ import { ID, Query } from "node-appwrite";
 import { parseStringify } from "@/lib/utils";
 import { Order, type CartItem, type OpenOrder, type OpenOrdersSummary } from "@/types/pos.types";
 import { decrementItemStocks } from '@/lib/actions/menu.actions';
-import { getAuthContext, validateBusinessContext } from '@/lib/auth.utils';
+import { getAuthContext, validateBusinessContext, requireOrgAdmin } from '@/lib/auth.utils';
+import { VoidOrderSchema, type VoidOrderCategory } from "@/lib/schemas/void-order";
 import {
     computeKitchenDelta,
     linesFromCartItems,
@@ -1307,11 +1308,17 @@ export const updateOrder = async (orderId: string, data: Partial<Order>) => {
 
 const TABLES_COLLECTION_ID = "tables";
 
-export const softDeleteOrder = async (orderId: string, deletionReason: string = "Order deleted by staff") => {
+export const softDeleteOrder = async (
+    orderId: string,
+    deletionReason: string = "Order deleted by staff",
+    voidCategory?: VoidOrderCategory
+) => {
     try {
         if (!DATABASE_ID || !ORDERS_COLLECTION_ID || !DELETED_ORDERS_LOG_COLLECTION_ID) {
             throw new Error("Database configuration is missing");
         }
+
+        await requireOrgAdmin();
 
         const { businessId, userId } = await getAuthContext();
         validateBusinessContext(businessId);
@@ -1327,12 +1334,15 @@ export const softDeleteOrder = async (orderId: string, deletionReason: string = 
 
         const now = new Date().toISOString();
 
-        // Mark order as soft deleted
+        const cat = voidCategory ?? "OTHER";
+        const taggedReason = `[${cat}] ${deletionReason}`;
+
+        // Mark order as soft deleted (category embedded for Appwrite schemas without a dedicated attribute)
         await databases.updateDocument(DATABASE_ID, ORDERS_COLLECTION_ID, orderId, {
             isDeleted: true,
             deletedAt: now,
             deletedBy: userId,
-            deletionReason: deletionReason,
+            deletionReason: taggedReason,
         });
 
         // Create audit log entry
@@ -1341,7 +1351,7 @@ export const softDeleteOrder = async (orderId: string, deletionReason: string = 
             orderNumber: parsedOrder.orderNumber,
             deletedBy: userId,
             deletedAt: now,
-            deletionReason: deletionReason,
+            deletionReason: taggedReason,
             businessId: businessId,
             orderSnapshot: parsedOrder, // Complete order snapshot
         });
@@ -1373,6 +1383,17 @@ export const softDeleteOrder = async (orderId: string, deletionReason: string = 
         throw new Error("Failed to delete order");
     }
 };
+
+/** Validates payload with {@link VoidOrderSchema}, requires org:admin, soft-deletes the order. */
+export async function voidOrderValidated(input: unknown) {
+    const parsed = VoidOrderSchema.safeParse(input);
+    if (!parsed.success) {
+        const first = parsed.error.issues[0];
+        throw new Error(first?.message ?? "Invalid void order request");
+    }
+    await softDeleteOrder(parsed.data.orderId, parsed.data.reason, parsed.data.voidCategory);
+    return { success: true as const };
+}
 
 // Legacy hard delete function - kept for backward compatibility but should not be used
 export const deleteOrder = async (orderId: string) => {

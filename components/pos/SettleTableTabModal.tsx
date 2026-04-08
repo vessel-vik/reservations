@@ -16,6 +16,8 @@ import { Loader2, Search, X, ChevronDown, ChevronUp, ArrowLeft } from "lucide-re
 import { toast } from "sonner";
 import { useOrganization, useUser } from "@clerk/nextjs";
 import type { OpenOrder } from "@/types/pos.types";
+import { CashCameraCapture } from "@/components/pos/CashCameraCapture";
+import { enqueueCashVerification } from "@/lib/pos-cash-verification-client";
 
 type PaymentMethod = "cash" | "pdq" | "mpesa" | "paystack";
 
@@ -103,6 +105,8 @@ export function SettleTableTabModal({
     const [cashReceived, setCashReceived] = useState("");
     const [pdqCode, setPdqCode] = useState("");
     const [mpesaRef, setMpesaRef] = useState("");
+    const [paystackCustomerPhone, setPaystackCustomerPhone] = useState("");
+    const [cashPhotoDataUrl, setCashPhotoDataUrl] = useState<string | null>(null);
 
     // Auto-load on open
     useEffect(() => {
@@ -162,9 +166,15 @@ export function SettleTableTabModal({
      * to Paystack's hosted page. On return, /pos/paystack-callback verifies
      * and settles the orders server-side.
      */
+    const paystackCheckoutEmail = (syntheticOrderId: string): string => {
+        const digits = paystackCustomerPhone.replace(/\D/g, "");
+        if (digits.length >= 9) return `${digits}@ampm.co.ke`;
+        return `${syntheticOrderId}@ampm.co.ke`;
+    };
+
     const handlePaystackRedirect = async (orderIds: string[], amount: number): Promise<void> => {
         const syntheticOrderId = `tab-multi-${Date.now()}`;
-        const uniqueEmail = `${syntheticOrderId}@ampm.co.ke`;
+        const uniqueEmail = paystackCheckoutEmail(syntheticOrderId);
         const callbackUrl = `${window.location.origin}/pos/paystack-callback`;
 
         const initResult = await initializePaystackTransaction({
@@ -181,6 +191,7 @@ export function SettleTableTabModal({
 
         // Persist settlement context so the callback page can complete the job
         sessionStorage.setItem("paystack_pending_settlement", JSON.stringify({
+            flow: "tab_multi" as const,
             orderIds,
             amount,
             reference: initResult.reference,
@@ -190,8 +201,8 @@ export function SettleTableTabModal({
         window.location.href = initResult.authorization_url;
     };
 
-    const settle = async (orderIds: string[], explicitRef?: string) => {
-        if (!orderIds.length) return;
+    const settle = async (orderIds: string[], explicitRef?: string): Promise<boolean> => {
+        if (!orderIds.length) return false;
         setIsProcessing(true);
         setError(null);
 
@@ -219,10 +230,12 @@ export function SettleTableTabModal({
             }
 
             await loadOrders();
+            return true;
         } catch (err) {
             const msg = err instanceof Error ? err.message : "Failed to settle orders.";
             setError(msg);
             toast.error(msg);
+            return false;
         } finally {
             setIsProcessing(false);
         }
@@ -251,19 +264,35 @@ export function SettleTableTabModal({
         setCashReceived(amount.toFixed(2));
         setPdqCode("");
         setMpesaRef("");
+        setCashPhotoDataUrl(null);
         setPaymentSubview({ type: paymentMethod as "cash" | "pdq" | "mpesa", amount, orderIds });
     };
 
-    const handleCloseSubview = () => setPaymentSubview(null);
+    const handleCloseSubview = () => {
+        setCashPhotoDataUrl(null);
+        setPaymentSubview(null);
+    };
 
     const handleConfirmCash = () => {
-        if (!paymentSubview) return;
+        if (!paymentSubview || !cashPhotoDataUrl) return;
         const received = parseFloat(cashReceived) || 0;
         if (received < paymentSubview.amount) return;
         const change = Math.round((received - paymentSubview.amount) * 100);
         const ref = `CASH-CHG${change}-${Date.now()}`;
-        void settle(paymentSubview.orderIds, ref);
-        setPaymentSubview(null);
+        const orderIds = [...paymentSubview.orderIds];
+        const photo = cashPhotoDataUrl;
+        void (async () => {
+            const ok = await settle(orderIds, ref);
+            if (ok) {
+                enqueueCashVerification({
+                    paymentReference: ref,
+                    imageDataUrl: photo,
+                    orderIds,
+                });
+                setPaymentSubview(null);
+                setCashPhotoDataUrl(null);
+            }
+        })();
     };
 
     const handleConfirmPdq = () => {
@@ -287,6 +316,8 @@ export function SettleTableTabModal({
         setError(null);
         setUrgentOnly(false);
         setPaymentSubview(null);
+        setCashPhotoDataUrl(null);
+        setPaystackCustomerPhone("");
         onClose();
     };
 
@@ -301,7 +332,7 @@ export function SettleTableTabModal({
     const cashReceivedNum = parseFloat(cashReceived) || 0;
     const cashChange = paymentSubview ? cashReceivedNum - paymentSubview.amount : 0;
     const cashShortfall = cashChange < 0;
-    const cashConfirmReady = !cashShortfall && cashReceivedNum > 0;
+    const cashConfirmReady = !cashShortfall && cashReceivedNum > 0 && !!cashPhotoDataUrl;
 
     return (
         <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -406,6 +437,16 @@ export function SettleTableTabModal({
                         <div className="flex-1 flex flex-col items-center justify-center px-8 gap-5">
                             {paymentSubview.type === "cash" && (
                                 <>
+                                    <div className="w-full max-w-md px-1">
+                                        <p className="text-[10px] uppercase tracking-wider text-neutral-500 mb-2 text-center">
+                                            Verify cash — capture note / coins
+                                        </p>
+                                        <CashCameraCapture
+                                            compact
+                                            capturedDataUrl={cashPhotoDataUrl}
+                                            onCapture={setCashPhotoDataUrl}
+                                        />
+                                    </div>
                                     <div className="w-full max-w-xs">
                                         <label className="block text-[11px] text-neutral-400 mb-1.5">
                                             Cash received (KES)
@@ -640,17 +681,30 @@ export function SettleTableTabModal({
                                         {formatCurrency(selectedTotal)}
                                     </div>
                                 </div>
-                                <div className="flex gap-1.5">
-                                    {paymentChips.map(({ value, label }) => (
-                                        <button
-                                            key={value}
-                                            type="button"
-                                            onClick={() => setPaymentMethod(value)}
-                                            className={`rounded-[20px] px-2.5 py-1 text-[10px] font-semibold border transition ${paymentMethod === value ? "bg-emerald-500 border-emerald-500 text-white" : "bg-white/[0.04] border-white/10 text-neutral-400"}`}
-                                        >
-                                            {label}
-                                        </button>
-                                    ))}
+                                <div className="flex flex-col items-end gap-1.5">
+                                    <div className="flex gap-1.5 flex-wrap justify-end">
+                                        {paymentChips.map(({ value, label }) => (
+                                            <button
+                                                key={value}
+                                                type="button"
+                                                onClick={() => setPaymentMethod(value)}
+                                                className={`rounded-[20px] px-2.5 py-1 text-[10px] font-semibold border transition ${paymentMethod === value ? "bg-emerald-500 border-emerald-500 text-white" : "bg-white/[0.04] border-white/10 text-neutral-400"}`}
+                                            >
+                                                {label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    {paymentMethod === "paystack" && (
+                                        <input
+                                            type="tel"
+                                            inputMode="tel"
+                                            autoComplete="tel"
+                                            placeholder="Customer phone (for Paystack email)"
+                                            value={paystackCustomerPhone}
+                                            onChange={(e) => setPaystackCustomerPhone(e.target.value)}
+                                            className="w-full max-w-[220px] rounded-lg bg-white/[0.06] border border-white/12 px-2 py-1 text-[10px] text-white placeholder:text-neutral-600"
+                                        />
+                                    )}
                                 </div>
                             </div>
 

@@ -12,6 +12,8 @@ interface CartSidebarProps {
     editingCustomerName?: string | null;
     onSaveOrderChanges?: () => void;
     onCancelEdit?: () => void;
+    /** Shown only while editing an existing order — opens PayNowModal. */
+    onOpenPayNow?: () => void;
 }
 
 export const CartSidebar = ({
@@ -22,6 +24,7 @@ export const CartSidebar = ({
     editingCustomerName,
     onSaveOrderChanges,
     onCancelEdit,
+    onOpenPayNow,
 }: CartSidebarProps) => {
     const vatRate = 0.16;
     const cartArray = Array.isArray(cart) ? cart : [];
@@ -139,24 +142,37 @@ export const CartSidebar = ({
                     </div>
 
                     {editingOrderId ? (
-                        <div className="grid grid-cols-2 gap-3">
-                            <button
-                                type="button"
-                                onClick={onSaveOrderChanges}
-                                disabled={cart.length === 0}
-                                className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-neutral-700 disabled:cursor-not-allowed text-white text-sm lg:text-lg font-bold py-2.5 lg:py-3 rounded-lg shadow-lg shadow-emerald-900/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
-                            >
-                                <Check className="w-4 h-4 lg:w-5 lg:h-5" />
-                                Update Order
-                            </button>
-                            <button
-                                type="button"
-                                onClick={onCancelEdit}
-                                className="w-full bg-neutral-800 hover:bg-neutral-700 text-white text-sm lg:text-lg font-semibold py-2.5 lg:py-3 rounded-lg border border-white/10 transition-all flex items-center justify-center gap-2"
-                            >
-                                <X className="w-4 h-4 lg:w-5 lg:h-5" />
-                                Cancel
-                            </button>
+                        <div className="space-y-2">
+                            <div className="grid grid-cols-2 gap-3">
+                                <button
+                                    type="button"
+                                    onClick={onSaveOrderChanges}
+                                    disabled={cart.length === 0}
+                                    className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-neutral-700 disabled:cursor-not-allowed text-white text-sm lg:text-lg font-bold py-2.5 lg:py-3 rounded-lg shadow-lg shadow-emerald-900/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                                >
+                                    <Check className="w-4 h-4 lg:w-5 lg:h-5" />
+                                    Update Order
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={onCancelEdit}
+                                    className="w-full bg-neutral-800 hover:bg-neutral-700 text-white text-sm lg:text-lg font-semibold py-2.5 lg:py-3 rounded-lg border border-white/10 transition-all flex items-center justify-center gap-2"
+                                >
+                                    <X className="w-4 h-4 lg:w-5 lg:h-5" />
+                                    Cancel
+                                </button>
+                            </div>
+                            {onOpenPayNow && (
+                                <button
+                                    type="button"
+                                    onClick={onOpenPayNow}
+                                    disabled={cart.length === 0}
+                                    className="w-full bg-sky-600 hover:bg-sky-500 disabled:bg-neutral-700 disabled:cursor-not-allowed text-white text-sm font-bold py-2.5 rounded-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                                >
+                                    <CreditCard className="w-4 h-4" />
+                                    Pay now
+                                </button>
+                            )}
                         </div>
                     ) : (
                         <button

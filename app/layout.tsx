@@ -8,6 +8,7 @@ import { neobrutalism } from '@clerk/themes';
 
 import { cn } from "@/lib/utils";
 import { PrintBridge } from "@/components/pos/PrintBridge";
+import { CashVerificationRealtimeListener } from "@/components/pos/CashVerificationRealtimeListener";
 
 
 const fontSans = FontSans({
@@ -50,6 +51,7 @@ export default function RootLayout({
         >
           <ThemeProvider attribute="class" defaultTheme="dark">
           <PrintBridge />
+          <CashVerificationRealtimeListener />
           {children}
           <Analytics />
           </ThemeProvider>

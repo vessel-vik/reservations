@@ -93,6 +93,15 @@ export async function withTenantIsolation<T>(
   }
 }
 
+/** Throws if the signed-in user is not an organization admin (Clerk `org:admin`). */
+export async function requireOrgAdmin(): Promise<AuthContext> {
+  const ctx = await getAuthContext();
+  if (ctx.role !== "org:admin") {
+    throw new Error("FORBIDDEN: org:admin role required.");
+  }
+  return ctx;
+}
+
 /**
  * Validate business context for API routes
  * @param businessId Business ID to validate

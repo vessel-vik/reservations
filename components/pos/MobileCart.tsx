@@ -206,7 +206,7 @@ export function MobileCart({
             {/* Portrait tablet (≥768px portrait) — bottom tab bar */}
             <div
                 className="hidden tablet-portrait-only fixed bottom-0 left-0 right-0 z-40 bg-neutral-900/98 backdrop-blur-md border-t border-white/10 items-stretch"
-                style={{ height: '76px', paddingBottom: 'env(safe-area-inset-bottom)' }}
+                style={{ minHeight: "92px", paddingBottom: "env(safe-area-inset-bottom)" }}
             >
                 {([
                     { id: "menu" as const, icon: "🍽️", label: "Menu" },
@@ -230,29 +230,27 @@ export function MobileCart({
                                 onClosedOrders?.();
                             }
                         }}
-                        className={`relative flex-1 flex flex-col items-center justify-center gap-1 transition-all duration-200 hover:scale-110 active:scale-90 ${
+                        className={`relative flex-1 flex flex-col items-center justify-center gap-1.5 min-h-[56px] py-2 transition-transform duration-200 ease-out hover:scale-105 active:scale-95 touch-manipulation ${
                             activeTab === tab.id
                                 ? "text-emerald-400"
                                 : "text-neutral-400 hover:text-neutral-100"
                         }`}
                     >
-                        {/* Active top bar */}
                         {activeTab === tab.id && (
-                            <span className="absolute top-0 inset-x-3 h-[3px] bg-emerald-400 rounded-full" />
+                            <span className="absolute top-0 inset-x-2 h-[4px] bg-emerald-400 rounded-full" />
                         )}
-                        {/* Active background pill */}
                         {activeTab === tab.id && (
-                            <span className="absolute inset-x-2 inset-y-1.5 rounded-2xl bg-emerald-500/10" />
+                            <span className="absolute inset-x-1 inset-y-1 rounded-2xl bg-emerald-500/12" />
                         )}
-                        <span className="text-[22px] relative z-10">
+                        <span className="text-[28px] leading-none relative z-10 select-none">
                             {tab.icon}
-                            {'badge' in tab && tab.badge > 0 && (
-                                <span className="absolute -top-1 -right-2 bg-emerald-500 text-white text-[9px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                            {"badge" in tab && tab.badge > 0 && (
+                                <span className="absolute -top-0.5 -right-2 bg-emerald-500 text-white text-[10px] font-bold rounded-full min-w-[20px] h-[20px] flex items-center justify-center px-1">
                                     {tab.badge > 9 ? "9+" : tab.badge}
                                 </span>
                             )}
                         </span>
-                        <span className="text-[11px] font-semibold leading-none relative z-10">{tab.label}</span>
+                        <span className="text-xs font-bold leading-tight relative z-10">{tab.label}</span>
                     </button>
                 ))}
             </div>

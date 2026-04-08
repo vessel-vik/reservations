@@ -21,6 +21,8 @@ import { usePOSStore } from "@/store/pos-store";
 import { ProductDetailsModal } from "./ProductDetailsModal";
 import { client } from "@/lib/appwrite-client";
 import { Button } from "@/components/ui/button";
+import { BottleUnitScanBar } from "@/components/pos/BottleUnitScanBar";
+import { PayNowModal } from "@/components/pos/PayNowModal";
 
 import { formatCurrency } from "@/lib/utils";
 import { useUser, UserButton } from "@clerk/nextjs";
@@ -78,6 +80,7 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
     const [receiptPaymentMethod, setReceiptPaymentMethod] = useState<string | undefined>(undefined);
     const [receiptPaymentRef, setReceiptPaymentRef] = useState<string | undefined>(undefined);
     const [outOfStockItem, setOutOfStockItem] = useState<Product | null>(null);
+    const [payNowOpen, setPayNowOpen] = useState(false);
 
     // O(1) category lookup optimization
     const categoryMap = useMemo(() => {
@@ -85,6 +88,11 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
         initialCategories.forEach(cat => map.set(cat.slug, cat));
         return map;
     }, [initialCategories]);
+
+    const payNowTotal = useMemo(() => {
+        const arr = Array.isArray(cart) ? cart : [];
+        return arr.reduce((s, i) => s + i.price * i.quantity, 0);
+    }, [cart]);
 
     // Add "All Items" as UI-only filter
     const displayCategories = useMemo(() => [
@@ -361,87 +369,109 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
             {/* Main Content Area */}
             <div className="flex-1 flex flex-col min-w-0">
 
-                {/* Header — stacked, centered, tablet-optimised */}
-                <div className="bg-neutral-900 border-b border-white/10 px-4 pt-3 pb-2 safe-area-top">
-                    {/* Row 1: Hamburger (mobile) + Search + UserButton */}
-                    <div className="flex items-center gap-3">
-                        {/* Hamburger — mobile category drawer */}
+                {/* Header — vertically stacked, centered on tablet; no logo chrome */}
+                <div className="bg-neutral-900 border-b border-white/10 px-4 pt-3 pb-3 safe-area-top">
+                    {/* Phone: hamburger + search + user inline */}
+                    <div className="flex md:hidden items-center gap-3">
                         <button
                             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                            className={`hamburger-btn md:hidden flex-shrink-0 ${isMobileMenuOpen ? 'open' : ''}`}
+                            className={`hamburger-btn flex-shrink-0 ${isMobileMenuOpen ? 'open' : ''}`}
                             aria-label="Toggle menu"
                         >
                             <span className="hamburger-line"></span>
                             <span className="hamburger-line"></span>
                             <span className="hamburger-line"></span>
                         </button>
-
-                        {/* Search — always visible, grows to fill space */}
-                        <div className="flex-1 relative">
+                        <div className="flex-1 relative min-w-0">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
                             <input
                                 type="text"
                                 placeholder="Search menu..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full bg-neutral-800 border-none rounded-lg py-2 pl-10 pr-4 text-sm text-white placeholder:text-neutral-500 focus:ring-2 focus:ring-emerald-500/50"
+                                className="w-full bg-neutral-800 border-none rounded-xl py-2.5 pl-10 pr-3 text-sm text-white placeholder:text-neutral-500 focus:ring-2 focus:ring-emerald-500/50"
                             />
                         </div>
-
-                        {/* UserButton — tablet+ */}
-                        <div className="hidden md:block flex-shrink-0">
-                            <UserButton
-                                afterSignOutUrl="/"
-                                appearance={{
-                                    elements: {
-                                        userButtonAvatarBox: "w-9 h-9",
-                                        userButtonTrigger: "focus:shadow-none"
-                                    }
-                                }}
-                            />
-                        </div>
+                        {user?.id && (
+                            <div className="flex-shrink-0">
+                                <UserButton
+                                    afterSignOutUrl="/"
+                                    appearance={{
+                                        elements: {
+                                            userButtonAvatarBox: "w-9 h-9",
+                                            userButtonTrigger: "focus:shadow-none"
+                                        }
+                                    }}
+                                />
+                            </div>
+                        )}
                     </div>
 
-                    {/* Row 2: Action buttons — tablet+, centered */}
-                    {user?.id && (
-                        <div className="hidden md:flex items-center justify-center gap-2 mt-2.5">
-                            <Link
-                                href={`/pos/dashboard/${user.id}`}
-                                className="flex items-center gap-1.5 bg-neutral-800 hover:bg-neutral-700 active:scale-95 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all duration-150"
-                            >
-                                <LayoutDashboard className="w-4 h-4" />
-                                Dashboard
-                            </Link>
-
-                            <button
-                                type="button"
-                                onClick={() => setIsOpenOrdersOpen(true)}
-                                className="flex items-center gap-1.5 bg-neutral-800 hover:bg-neutral-700 active:scale-95 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all duration-150"
-                            >
-                                <Grid className="w-4 h-4" />
-                                Open Orders
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => setIsClosedOrdersOpen(true)}
-                                className="flex items-center gap-1.5 bg-sky-700 hover:bg-sky-600 active:scale-95 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all duration-150"
-                            >
-                                <Receipt className="w-4 h-4" />
-                                Closed Orders
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => setIsSettleTabModalOpen(true)}
-                                className="flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-600 active:scale-95 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all duration-150"
-                            >
-                                <CreditCard className="w-4 h-4" />
-                                Settle Table
-                            </button>
+                    {/* Tablet+: single centered column — search full width, then actions */}
+                    <div className="hidden md:flex flex-col items-center w-full max-w-3xl mx-auto gap-3">
+                        <div className="relative w-full">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-500" />
+                            <input
+                                type="text"
+                                placeholder="Search menu..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full bg-neutral-800 border border-white/5 rounded-xl py-3 pl-11 pr-14 text-base text-white placeholder:text-neutral-500 focus:ring-2 focus:ring-emerald-500/50 text-center md:text-left"
+                            />
+                            {user?.id && (
+                                <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                                    <UserButton
+                                        afterSignOutUrl="/"
+                                        appearance={{
+                                            elements: {
+                                                userButtonAvatarBox: "w-9 h-9",
+                                                userButtonTrigger: "focus:shadow-none"
+                                            }
+                                        }}
+                                    />
+                                </div>
+                            )}
                         </div>
-                    )}
+
+                        {user?.id && (
+                            <div className="flex flex-wrap items-center justify-center gap-2 w-full">
+                                <Link
+                                    href={`/pos/dashboard/${user.id}`}
+                                    className="flex items-center justify-center gap-2 bg-neutral-800 hover:bg-neutral-700 hover:scale-[1.03] active:scale-95 text-white px-5 py-3 min-h-[48px] rounded-xl text-sm font-semibold transition-transform duration-150"
+                                >
+                                    <LayoutDashboard className="w-4 h-4 shrink-0" />
+                                    Dashboard
+                                </Link>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsOpenOrdersOpen(true)}
+                                    className="flex items-center justify-center gap-2 bg-neutral-800 hover:bg-neutral-700 hover:scale-[1.03] active:scale-95 text-white px-5 py-3 min-h-[48px] rounded-xl text-sm font-semibold transition-transform duration-150"
+                                >
+                                    <Grid className="w-4 h-4 shrink-0" />
+                                    Open Orders
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsClosedOrdersOpen(true)}
+                                    className="flex items-center justify-center gap-2 bg-sky-700 hover:bg-sky-600 hover:scale-[1.03] active:scale-95 text-white px-5 py-3 min-h-[48px] rounded-xl text-sm font-semibold transition-transform duration-150"
+                                >
+                                    <Receipt className="w-4 h-4 shrink-0" />
+                                    Closed Orders
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsSettleTabModalOpen(true)}
+                                    className="flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-600 hover:scale-[1.03] active:scale-95 text-white px-5 py-3 min-h-[48px] rounded-xl text-sm font-semibold transition-transform duration-150"
+                                >
+                                    <CreditCard className="w-4 h-4 shrink-0" />
+                                    Settle Table
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
+
+                <BottleUnitScanBar activeCaptainOrderId={editingOrder?.$id ?? null} />
 
                 {/* Mobile Category Menu Drawer */}
                 <div
@@ -512,7 +542,7 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
                 )}
 
                 {/* Products Grid - Optimized responsive layout */}
-                <div className="flex-1 overflow-y-auto px-3 md:px-4 py-4 pb-24 md:pb-4 scrollbar-hide">
+                <div className="pos-main-content flex-1 overflow-y-auto px-3 md:px-4 py-4 pb-24 md:pb-4 scrollbar-hide">
                     {visibleProducts.length === 0 ? (
                         <div className="flex items-center justify-center h-full">
                             <div className="text-center space-y-3 max-w-xs">
@@ -571,6 +601,11 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
                     editingCustomerName={editingOrder?.customerName ?? null}
                     onSaveOrderChanges={handleSaveOrderChanges}
                     onCancelEdit={handleCancelOrderEdit}
+                    onOpenPayNow={
+                        editingOrder?.$id
+                            ? () => setPayNowOpen(true)
+                            : undefined
+                    }
                 />
             </div>
 
@@ -719,6 +754,21 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
                     order={receiptOrder}
                     paymentMethod={receiptPaymentMethod}
                     paymentReference={receiptPaymentRef}
+                />
+            )}
+
+            {editingOrder && (
+                <PayNowModal
+                    isOpen={payNowOpen}
+                    onClose={() => setPayNowOpen(false)}
+                    orderId={editingOrder.$id}
+                    totalAmount={payNowTotal}
+                    onPaymentSuccess={() => {
+                        setPayNowOpen(false);
+                        clearCart();
+                        setEditingOrder(null);
+                        toast.success("Order paid");
+                    }}
                 />
             )}
         </div>
