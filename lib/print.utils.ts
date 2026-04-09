@@ -14,6 +14,13 @@ type PrintJobPayload = {
     printMode?: "queued" | "direct";
 };
 
+type QueueResult = {
+    success: boolean;
+    deduped?: boolean;
+    jobId?: string;
+    error?: string;
+};
+
 type QueueMeta = {
     targetTerminal?: string;
     waiterUserId?: string;
@@ -24,7 +31,7 @@ type QueueMeta = {
     requeueReason?: string;
 };
 
-function getQueueFn(): ((jobType: string, content: string, meta?: QueueMeta) => Promise<void>) | null {
+function getQueueFn(): ((jobType: string, content: string, meta?: QueueMeta) => Promise<QueueResult | void>) | null {
     if (typeof window === 'undefined') return null;
     const fn = (window as any).queuePrintJob;
     return typeof fn === 'function' ? fn : null;
@@ -40,6 +47,7 @@ const PRINT_PARALLEL_ENABLED = (() => {
 })();
 const TABLET_QUEUE_ONLY_ENABLED =
     String(process.env.NEXT_PUBLIC_TABLET_QUEUE_ONLY || "true").trim().toLowerCase() !== "false";
+const DEDUPE_BUCKET_MS = 15_000;
 
 function isTabletLikeViewport(): boolean {
     if (typeof window === "undefined") return false;
@@ -48,11 +56,9 @@ function isTabletLikeViewport(): boolean {
     return touch && width > 0 && width <= 1100;
 }
 
-function buildCorrelationKey(prefix: string, orderId: string): string {
-    const seed = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-    return `${prefix}:${orderId}:${seed}`.slice(0, 120);
+function buildDedupeKey(jobType: string, orderId: string, mode: "queued" | "direct" = "queued"): string {
+    const bucket = Math.floor(Date.now() / DEDUPE_BUCKET_MS);
+    return `${jobType}:${orderId}:${mode}:${bucket}`.slice(0, 120);
 }
 
 function getSessionWaiterMeta() {
@@ -69,12 +75,12 @@ async function queueWithMeta(
     jobType: string,
     payload: PrintJobPayload,
     meta?: QueueMeta
-): Promise<{ success: boolean; error?: string }> {
+): Promise<QueueResult> {
     const queue = getQueueFn();
     if (!queue) return { success: false, error: BRIDGE_NOT_READY_MSG };
     try {
         const content = JSON.stringify(payload);
-        await queue(jobType, content, {
+        const result = await queue(jobType, content, {
             ...meta,
             correlationKey: payload.correlationKey,
             sessionId: payload.sessionId,
@@ -82,6 +88,14 @@ async function queueWithMeta(
             waiterName: payload.waiterName,
             printMode: "queued",
         });
+        if (result && typeof result === "object") {
+            return {
+                success: Boolean(result.success),
+                deduped: Boolean(result.deduped),
+                jobId: result.jobId ? String(result.jobId) : undefined,
+                error: result.error ? String(result.error) : undefined,
+            };
+        }
         return { success: true };
     } catch (err) {
         const msg = err instanceof Error ? err.message : 'Unknown print error';
@@ -92,7 +106,7 @@ async function queueWithMeta(
 async function directThermalPrint(
     jobType: string,
     payload: PrintJobPayload
-): Promise<{ success: boolean; error?: string }> {
+): Promise<QueueResult> {
     try {
         const config = ThermalPrinterClient.loadConfig();
         if (!config) {
@@ -140,12 +154,14 @@ async function runParallelPrint(
     jobType: string,
     payload: PrintJobPayload,
     requeueReason: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<QueueResult> {
     const queuePromise = queueWithMeta(jobType, payload, { requeueReason });
     if (!PRINT_PARALLEL_ENABLED || (TABLET_QUEUE_ONLY_ENABLED && isTabletLikeViewport())) {
         const queued = await queuePromise;
         if (!queued.success) {
             toast.error(queued.error || BRIDGE_NOT_READY_MSG);
+        } else if (queued.deduped) {
+            toast.message("Already queued or printing.");
         }
         return queued;
     }
@@ -177,14 +193,14 @@ async function runParallelPrint(
  */
 export async function printOrderDocket(
     orderId: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<QueueResult> {
     if (typeof window === 'undefined') {
         return { success: false, error: 'Print is only available in the browser' };
     }
     const waiterMeta = getSessionWaiterMeta();
     return runParallelPrint("captain_docket", {
         orderId,
-        correlationKey: buildCorrelationKey("docket", orderId),
+        correlationKey: buildDedupeKey("captain_docket", orderId, "queued"),
         ...waiterMeta,
     }, "initial_docket");
 }
@@ -195,14 +211,14 @@ export async function printOrderDocket(
  */
 export async function printReceipt(
     orderId: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<QueueResult> {
     if (typeof window === 'undefined') {
         return { success: false, error: 'Print is only available in the browser' };
     }
     const waiterMeta = getSessionWaiterMeta();
     return runParallelPrint("receipt", {
         orderId,
-        correlationKey: buildCorrelationKey("receipt", orderId),
+        correlationKey: buildDedupeKey("receipt", orderId, "queued"),
         ...waiterMeta,
     }, "receipt_reprint");
 }
@@ -215,7 +231,7 @@ export async function printKitchenDelta(
     orderId: string,
     deltaItems: { name: string; quantity: number; price: number }[],
     dedupeKey?: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<QueueResult> {
     if (typeof window === 'undefined') {
         return { success: false, error: 'Print is only available in the browser' };
     }
@@ -224,7 +240,7 @@ export async function printKitchenDelta(
     const waiterMeta = getSessionWaiterMeta();
     const correlationKey = dedupeKey
         ? String(dedupeKey).slice(0, 120)
-        : buildCorrelationKey("delta", orderId);
+        : buildDedupeKey("kitchen_delta", orderId, "queued");
     return runParallelPrint("kitchen_delta", {
         orderId,
         deltaItems,
@@ -242,7 +258,7 @@ export async function printKitchenAnomalyAdjustment(
     adjustments: { name: string; quantity: number; note?: string }[],
     note = "Customer requested to return item",
     dedupeKey?: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<QueueResult> {
     if (typeof window === 'undefined') {
         return { success: false, error: 'Print is only available in the browser' };
     }
@@ -253,7 +269,7 @@ export async function printKitchenAnomalyAdjustment(
     const waiterMeta = getSessionWaiterMeta();
     const correlationKey = dedupeKey
         ? String(dedupeKey).slice(0, 120)
-        : buildCorrelationKey("anomaly", orderId);
+        : buildDedupeKey("anomaly_adjustment", orderId, "queued");
     return runParallelPrint("anomaly_adjustment", {
         orderId,
         adjustments: adjustments.map((x) => ({

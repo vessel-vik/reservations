@@ -406,15 +406,21 @@ export function PrintBridge() {
                     requeueReason: meta?.requeueReason,
                 }),
             });
+            const body = await res.json().catch(() => ({}));
             if (!res.ok) {
-                const body = await res.json().catch(() => ({}));
                 throw new Error(body?.error || `Queue failed (${res.status})`);
             }
-
-            toast.success("Print job queued");
+            return {
+                success: true,
+                deduped: Boolean(body?.deduped),
+                jobId: body?.jobId ? String(body.jobId) : undefined,
+            };
         } catch (error) {
             console.error("Error queuing print job:", error);
-            toast.error("Failed to queue print job");
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : "Failed to queue print job",
+            };
         }
     };
 

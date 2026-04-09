@@ -264,6 +264,19 @@ export async function POST(request: NextRequest) {
         if (!parsed.orderId) {
             return NextResponse.json({ error: "orderId is required in print job payload." }, { status: 400 });
         }
+        const effectiveDedupeKey =
+            dedupeKey || `${jobType}:${parsed.orderId}:${Math.floor(Date.now() / 15000)}`.slice(0, 120);
+        const activeDuplicate = await databases.listDocuments(DATABASE_ID, coll, [
+            Query.equal("businessId", businessId),
+            Query.equal("jobType", jobType),
+            Query.equal("dedupeKey", effectiveDedupeKey),
+            Query.equal("status", ["pending_approval", "pending", "printing"]),
+            Query.limit(1),
+        ]);
+        if ((activeDuplicate.total || 0) > 0) {
+            const existingId = activeDuplicate.documents[0]?.$id;
+            return NextResponse.json({ success: true, jobId: existingId, deduped: true });
+        }
         const waiter = await resolveOrderWaiterContext(businessId, parsed.orderId);
         const routing = await resolveTerminalRouting({
             businessId,
@@ -283,7 +296,7 @@ export async function POST(request: NextRequest) {
             waiterId: waiter.waiterId,
             waiterNameSnapshot: waiter.waiterName,
             targetTerminal: routing.targetTerminal,
-            dedupeKey,
+            dedupeKey: effectiveDedupeKey,
             requeueReason,
             createdByUserId: String(userId || "").slice(0, 64),
             createdByRole: String(role || "").slice(0, 40),
@@ -312,7 +325,7 @@ export async function POST(request: NextRequest) {
             orderId: parsed.orderId,
             summary: parsed.summary || `Queued ${jobType}`,
             content,
-            dedupeKey,
+            dedupeKey: effectiveDedupeKey,
             actorUserId: userId,
             actorRole: role,
             waiterId: waiter.waiterId,

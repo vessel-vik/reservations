@@ -4,7 +4,6 @@ import {
     databases,
     DATABASE_ID,
     ORDERS_COLLECTION_ID,
-    PRINT_AUDIT_ENTRIES_COLLECTION_ID,
 } from "@/lib/appwrite.config";
 import { getAuthContext, validateBusinessContext } from "@/lib/auth.utils";
 import { printCategoryFromJobType, recordPrintAudit } from "@/lib/print-audit";
@@ -135,39 +134,12 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "Print content too large" }, { status: 400 });
         }
 
-        // Idempotency for update/anomaly jobs: if the same dedupeKey was already queued/printed, skip duplicates.
+        // Parse and carry dedupe metadata from payload.
         if (jobType === "kitchen_delta" || jobType === "anomaly_adjustment") {
             try {
                 const parsed = JSON.parse(content) as { dedupeKey?: string; correlationKey?: string; orderId?: string };
                 dedupeKey = String(parsed.dedupeKey || parsed.correlationKey || "").trim().slice(0, 120);
                 parsedOrderId = String(parsed.orderId || "").trim();
-                if (dedupeKey) {
-                    const pending = await databases.listDocuments(DATABASE_ID, coll, [
-                        Query.equal("businessId", businessId),
-                        Query.equal("jobType", jobType),
-                        Query.equal("status", ["pending", "printing"]),
-                        Query.equal("dedupeKey", dedupeKey),
-                        Query.limit(1),
-                    ]);
-                    if ((pending.total || 0) > 0) {
-                        const existingId = pending.documents[0]?.$id;
-                        return NextResponse.json({ success: true, jobId: existingId, deduped: true });
-                    }
-                    if (PRINT_AUDIT_ENTRIES_COLLECTION_ID) {
-                        const seenByKey = await databases
-                            .listDocuments(DATABASE_ID, PRINT_AUDIT_ENTRIES_COLLECTION_ID, [
-                                Query.equal("businessId", businessId),
-                                Query.equal("jobType", jobType),
-                                Query.equal("status", ["queued", "printing", "completed"]),
-                                Query.equal("dedupeKey", dedupeKey),
-                                Query.limit(1),
-                            ])
-                            .catch(() => null);
-                        if (seenByKey && (seenByKey.total || 0) > 0) {
-                            return NextResponse.json({ success: true, deduped: true });
-                        }
-                    }
-                }
             } catch {
                 return NextResponse.json(
                     { error: `${jobType} payload must be valid JSON with orderId.` },
@@ -182,6 +154,22 @@ export async function POST(request: NextRequest) {
         }
         if (!parsedOrderId) {
             return NextResponse.json({ error: "orderId is required in print job payload." }, { status: 400 });
+        }
+        if (!dedupeKey) {
+            dedupeKey = `${jobType}:${parsedOrderId}:${Math.floor(Date.now() / 15000)}`.slice(0, 120);
+        }
+
+        // Shared idempotency across all print job types.
+        const activeDuplicate = await databases.listDocuments(DATABASE_ID, coll, [
+            Query.equal("businessId", businessId),
+            Query.equal("jobType", jobType),
+            Query.equal("dedupeKey", dedupeKey),
+            Query.equal("status", ["pending_approval", "pending", "printing"]),
+            Query.limit(1),
+        ]);
+        if ((activeDuplicate.total || 0) > 0) {
+            const existingId = activeDuplicate.documents[0]?.$id;
+            return NextResponse.json({ success: true, jobId: existingId, deduped: true });
         }
 
         const waiter = await resolveOrderWaiterContext(businessId, parsedOrderId);

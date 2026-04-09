@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useState } from "react";
 import {
     Dialog,
     DialogContent,
@@ -12,6 +12,7 @@ import { Printer } from "lucide-react";
 import { printReceipt } from "@/lib/print.utils";
 import { displayPaymentMethod, formatPaymentMethodEntry } from "@/lib/payment-display";
 import { buildPaybillReceiptLines } from "@/lib/receipt-paybill";
+import { toast } from "sonner";
 
 interface ReceiptOrder {
     $id: string;
@@ -55,6 +56,8 @@ export function OrderReceiptModal({
     paymentMethod,
     paymentReference,
 }: OrderReceiptModalProps) {
+    const [isPrinting, setIsPrinting] = useState(false);
+    const [cooldownUntil, setCooldownUntil] = useState(0);
     const isPaid = order.paymentStatus === "paid" || order.paymentStatus === "settled";
 
     const subtotal = order.subtotal > 0 ? order.subtotal : order.totalAmount / 1.16;
@@ -108,11 +111,27 @@ export function OrderReceiptModal({
         return paymentMethod ? `PAID — ${displayPaymentMethod(paymentMethod)}` : "PAID";
     })();
 
-    // Auto-queue print job when modal opens
-    useEffect(() => {
-        if (!isOpen) return;
-        void printReceipt(order.$id);
-    }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+    const isCoolingDown = Date.now() < cooldownUntil;
+
+    const handlePrintReceipt = async () => {
+        if (isPrinting || isCoolingDown) return;
+        setIsPrinting(true);
+        try {
+            const result = await printReceipt(order.$id);
+            if (!result.success) {
+                toast.error(result.error || "Failed to queue receipt print");
+                return;
+            }
+            if (result.deduped) {
+                toast.message("Receipt is already queued or printing.");
+            } else {
+                toast.success("Receipt queued for printing.");
+            }
+            setCooldownUntil(Date.now() + 4000);
+        } finally {
+            setIsPrinting(false);
+        }
+    };
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
@@ -276,11 +295,16 @@ export function OrderReceiptModal({
                 <div className="flex gap-2 bg-neutral-900 border-t border-white/10 px-4 py-3">
                     <button
                         type="button"
-                        onClick={() => void printReceipt(order.$id)}
-                        className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 py-2.5 text-[12px] font-semibold text-neutral-300 hover:bg-white/10 hover:text-white transition"
+                        disabled={isPrinting || isCoolingDown}
+                        onClick={() => void handlePrintReceipt()}
+                        className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 py-2.5 text-[12px] font-semibold text-neutral-300 hover:bg-white/10 hover:text-white transition disabled:cursor-not-allowed disabled:opacity-60"
                     >
                         <Printer className="w-3.5 h-3.5" />
-                        Print Again
+                        {isPrinting
+                            ? "Printing..."
+                            : isCoolingDown
+                              ? "Please wait..."
+                              : "Print Receipt"}
                     </button>
                     <button
                         type="button"

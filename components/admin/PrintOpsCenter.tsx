@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Printer, ReceiptText, RefreshCw, ScrollText } from "lucide-react";
 import { toast } from "sonner";
 import { client } from "@/lib/appwrite-client";
+import { ThermalPrinterClient } from "@/lib/thermal-printer";
 
 type Category = "docket" | "update" | "anomaly" | "receipt";
 
@@ -206,6 +207,8 @@ export function PrintOpsCenter({ defaultTab = "docket" as Category }) {
     customerName?: string;
     paymentStatus?: string;
   } | null>(null);
+  const [printActionBusy, setPrintActionBusy] = useState<string>("");
+  const [readinessTick, setReadinessTick] = useState(0);
 
   const fetchRows = useCallback(
     async (opts?: { cursor?: string; append?: boolean; silent?: boolean }) => {
@@ -506,6 +509,10 @@ export function PrintOpsCenter({ defaultTab = "docket" as Category }) {
     });
     const json = await res.json();
     if (!res.ok) throw new Error(json?.error || "Queue failed");
+    return {
+      deduped: Boolean(json?.deduped),
+      jobId: String(json?.jobId || ""),
+    };
   };
 
   const runTerminalAction = useCallback(
@@ -547,22 +554,36 @@ export function PrintOpsCenter({ defaultTab = "docket" as Category }) {
       return;
     }
     try {
-      await queueJob("receipt", `orderId:${orderId}`, "admin_receipt_reprint");
-      toast.success("Receipt queued");
+      setPrintActionBusy(`receipt:${orderId}`);
+      const queued = await queueJob("receipt", `orderId:${orderId}`, "admin_receipt_reprint");
+      if (queued.deduped) {
+        toast.message("Receipt already queued/printing.");
+      } else {
+        toast.success("Receipt queued");
+      }
       await fetchRows({ append: false, silent: true });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to queue receipt");
+    } finally {
+      setPrintActionBusy("");
     }
   }, [fetchRows]);
 
   const reprintJob = useCallback(async (row: PrintJobRow) => {
     try {
+      setPrintActionBusy(`reprint:${row.$id}`);
       const reason = row.jobType === "receipt" ? "admin_receipt_reprint" : "admin_docket_reprint";
-      await queueJob(row.jobType, row.content, reason);
-      toast.success("Print queued");
+      const queued = await queueJob(row.jobType, row.content, reason);
+      if (queued.deduped) {
+        toast.message("Print already queued/printing.");
+      } else {
+        toast.success("Print queued");
+      }
       await fetchRows({ append: false, silent: true });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to queue print");
+    } finally {
+      setPrintActionBusy("");
     }
   }, [fetchRows]);
 
@@ -570,6 +591,7 @@ export function PrintOpsCenter({ defaultTab = "docket" as Category }) {
     const id = String(jobId || "").trim();
     if (!id) return;
     try {
+      setPrintActionBusy(`approve:${id}`);
       const res = await fetch(`/api/pos/print-jobs/${encodeURIComponent(id)}/approve`, {
         method: "POST",
       });
@@ -579,8 +601,25 @@ export function PrintOpsCenter({ defaultTab = "docket" as Category }) {
       await fetchRows({ append: false, silent: true });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to approve print job");
+    } finally {
+      setPrintActionBusy("");
     }
   }, [fetchRows]);
+
+  const readiness = useMemo(() => {
+    const config =
+      typeof window !== "undefined" ? ThermalPrinterClient.loadConfig() : null;
+    const hasPrinterConfig = Boolean(config?.vendorId && config?.productId);
+    const webUsbReady = typeof navigator !== "undefined" && "usb" in navigator;
+    const queueBridgeReady =
+      typeof window !== "undefined" && typeof (window as any).queuePrintJob === "function";
+    return {
+      hasPrinterConfig,
+      webUsbReady,
+      queueBridgeReady,
+      printerLabel: config?.deviceName || config?.terminalName || "Not configured",
+    };
+  }, [readinessTick]);
 
   const trendMax = useMemo(() => {
     return trendHourly.reduce((m, x) => Math.max(m, x.completed + x.failed), 1);
@@ -611,6 +650,27 @@ export function PrintOpsCenter({ defaultTab = "docket" as Category }) {
         </div>
         {successRate != null && (
           <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-3">
+            <div className="rounded-md border border-slate-800 bg-slate-950/50 p-2 text-[11px] md:col-span-3">
+              <div className="mb-1 flex items-center justify-between">
+                <p className="uppercase tracking-wide text-slate-500">Thermal readiness</p>
+                <button
+                  type="button"
+                  onClick={() => setReadinessTick((x) => x + 1)}
+                  className="rounded border border-slate-700 px-2 py-0.5 text-[10px] text-slate-200 hover:bg-slate-800"
+                >
+                  Refresh checks
+                </button>
+              </div>
+              <p className={readiness.hasPrinterConfig ? "text-emerald-300" : "text-rose-300"}>
+                Printer config: {readiness.hasPrinterConfig ? "ready" : "missing"} ({readiness.printerLabel})
+              </p>
+              <p className={readiness.webUsbReady ? "text-emerald-300" : "text-amber-300"}>
+                Browser capability: {readiness.webUsbReady ? "WebUSB available" : "WebUSB unavailable (queue mode still works)"}
+              </p>
+              <p className={readiness.queueBridgeReady ? "text-emerald-300" : "text-rose-300"}>
+                Queue bridge: {readiness.queueBridgeReady ? "online" : "not detected on this client"}
+              </p>
+            </div>
             <p className="text-xs text-slate-400">
               24h success rate:{" "}
               <span className={successRate >= 0.97 ? "text-emerald-400" : successRate >= 0.9 ? "text-amber-400" : "text-rose-400"}>
@@ -853,8 +913,9 @@ export function PrintOpsCenter({ defaultTab = "docket" as Category }) {
                   {row.status === "pending_approval" && (
                     <button
                       type="button"
+                      disabled={printActionBusy === `approve:${row.$id}`}
                       onClick={() => void approveJob(row.$id)}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/40 px-3 py-1.5 text-xs text-amber-200 hover:bg-amber-500/10"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/40 px-3 py-1.5 text-xs text-amber-200 hover:bg-amber-500/10 disabled:opacity-50"
                     >
                       Approve
                     </button>
@@ -871,8 +932,9 @@ export function PrintOpsCenter({ defaultTab = "docket" as Category }) {
                   {(tab === "docket" || tab === "update" || tab === "anomaly") && (
                     <button
                       type="button"
+                      disabled={printActionBusy === `reprint:${row.$id}`}
                       onClick={() => void reprintJob(row)}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-600 px-3 py-1.5 text-xs text-slate-200 hover:bg-slate-800"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-600 px-3 py-1.5 text-xs text-slate-200 hover:bg-slate-800 disabled:opacity-50"
                     >
                       <Printer className="h-3.5 w-3.5" />
                       Print Docket
@@ -881,8 +943,9 @@ export function PrintOpsCenter({ defaultTab = "docket" as Category }) {
                   {(tab === "update" || tab === "anomaly" || tab === "receipt") && (
                     <button
                       type="button"
+                      disabled={printActionBusy === `receipt:${row.orderId}`}
                       onClick={() => void printReceiptFor(row.orderId)}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/40 px-3 py-1.5 text-xs text-emerald-300 hover:bg-emerald-500/10"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/40 px-3 py-1.5 text-xs text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-50"
                     >
                       <ReceiptText className="h-3.5 w-3.5" />
                       Print Final Receipt
