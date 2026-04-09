@@ -1,7 +1,9 @@
-import { Plus, Search, SlidersHorizontal } from 'lucide-react';
+import { Plus, Search, LayoutGrid, Table2, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 type MenuSection = 'items' | 'categories' | 'modifiers';
+
+export type ItemsViewMode = 'cards' | 'table';
 
 interface Props {
   activeSection: MenuSection;
@@ -12,9 +14,24 @@ interface Props {
   filterCategory: string | undefined;
   onFilterCategory: (id: string | undefined) => void;
   onAddItem: () => void;
+  itemsViewMode?: ItemsViewMode;
+  onItemsViewModeChange?: (mode: ItemsViewMode) => void;
+  onOpenBulkImport?: () => void;
 }
 
-export function MenuSectionNav({ activeSection, onSectionChange, search, onSearch, categories, filterCategory, onFilterCategory, onAddItem }: Props) {
+export function MenuSectionNav({
+  activeSection,
+  onSectionChange,
+  search,
+  onSearch,
+  categories,
+  filterCategory,
+  onFilterCategory,
+  onAddItem,
+  itemsViewMode = 'cards',
+  onItemsViewModeChange,
+  onOpenBulkImport,
+}: Props) {
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -45,9 +62,52 @@ export function MenuSectionNav({ activeSection, onSectionChange, search, onSearc
           </button>
         </div>
 
-        <Button onClick={onAddItem} className="gap-2 bg-emerald-600 hover:bg-emerald-500 text-white">
-          <Plus className="w-4 h-4" /> {activeSection === 'categories' ? 'New Category' : activeSection === 'modifiers' ? 'New Group' : 'New Item'}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {activeSection === 'items' && onItemsViewModeChange && (
+            <div className="flex rounded-lg border border-slate-700/80 bg-slate-900/50 p-0.5">
+              <button
+                type="button"
+                title="Card grid"
+                onClick={() => onItemsViewModeChange('cards')}
+                className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors ${
+                  itemsViewMode === 'cards'
+                    ? 'bg-slate-700 text-slate-100'
+                    : 'text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                <LayoutGrid className="w-4 h-4" />
+                <span className="hidden sm:inline">Cards</span>
+              </button>
+              <button
+                type="button"
+                title="Dense table"
+                onClick={() => onItemsViewModeChange('table')}
+                className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors ${
+                  itemsViewMode === 'table'
+                    ? 'bg-slate-700 text-slate-100'
+                    : 'text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                <Table2 className="w-4 h-4" />
+                <span className="hidden sm:inline">Table</span>
+              </button>
+            </div>
+          )}
+          {activeSection === 'items' && onOpenBulkImport && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onOpenBulkImport}
+              className="gap-2 border-slate-600 text-slate-300 hover:bg-slate-800"
+            >
+              <Upload className="w-4 h-4" />
+              <span className="hidden sm:inline">JSON import</span>
+            </Button>
+          )}
+          <Button onClick={onAddItem} className="gap-2 bg-emerald-600 hover:bg-emerald-500 text-white">
+            <Plus className="w-4 h-4" /> {activeSection === 'categories' ? 'New Category' : activeSection === 'modifiers' ? 'New Group' : 'New Item'}
+          </Button>
+        </div>
       </div>
 
       {activeSection === 'items' && (

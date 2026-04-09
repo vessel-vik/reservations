@@ -1,8 +1,72 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getOrders, getOrdersByTable, updateOrder, voidOrderValidated } from '@/lib/actions/pos.actions';
+import {
+  getOrders,
+  getOrdersByTable,
+  getUnpaidOrdersForBusiness,
+  getClosedOrdersForAudit,
+  updateOrder,
+  voidOrderValidated,
+} from '@/lib/actions/pos.actions';
+import { databases, DATABASE_ID } from '@/lib/appwrite.config';
+import { Query } from 'node-appwrite';
+import { getAuthContext, validateBusinessContext } from '@/lib/auth.utils';
+
+const PAYMENT_LEDGER_COLLECTION_ID = process.env.PAYMENT_LEDGER_COLLECTION_ID;
+
+async function attachLedgerMethods(
+  businessId: string,
+  orders: any[]
+): Promise<any[]> {
+  if (!DATABASE_ID || !PAYMENT_LEDGER_COLLECTION_ID || !Array.isArray(orders) || orders.length === 0) {
+    return orders;
+  }
+
+  const ids = orders.map((o: any) => String(o.$id || "")).filter(Boolean);
+  if (!ids.length) return orders;
+
+  const byOrderId = new Map<string, any[]>();
+  const chunkSize = 50;
+  for (let i = 0; i < ids.length; i += chunkSize) {
+    const chunk = ids.slice(i, i + chunkSize);
+    const rows = await databases.listDocuments(DATABASE_ID, PAYMENT_LEDGER_COLLECTION_ID, [
+      Query.equal("businessId", businessId),
+      Query.equal("status", "confirmed"),
+      Query.equal("orderId", chunk),
+      Query.limit(5000),
+      Query.orderAsc("settledAt"),
+    ]);
+    for (const d of rows.documents as any[]) {
+      const oid = String(d.orderId || "");
+      if (!oid) continue;
+      const list = byOrderId.get(oid) || [];
+      list.push({
+        method: d.method,
+        amount: d.amount,
+        reference: d.reference || undefined,
+        settledAt: d.settledAt || d.$createdAt,
+        terminalId: d.terminalId || undefined,
+      });
+      byOrderId.set(oid, list);
+    }
+  }
+
+  return orders.map((o: any) => {
+    const ledgerMethods = byOrderId.get(String(o.$id || ""));
+    if (!ledgerMethods || ledgerMethods.length === 0) return o;
+    return {
+      ...o,
+      paymentMethods: ledgerMethods,
+      paymentMethodsSource: "ledger",
+      paymentMethodsTotal: ledgerMethods.reduce((s, x) => s + (Number(x.amount) || 0), 0),
+    };
+  });
+}
 
 export async function GET(request: NextRequest) {
   try {
+    const { businessId } = await getAuthContext();
+    validateBusinessContext(businessId);
+
     const url = new URL(request.url);
     const tableParam = url.searchParams.get('table');
     const status = url.searchParams.get('status') || 'open';
@@ -15,6 +79,10 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid table number' }, { status: 400 });
       }
       orders = await getOrdersByTable(tableNumber, false);
+    } else if (status === 'closed') {
+      orders = await getClosedOrdersForAudit();
+    } else if (status === 'open') {
+      orders = await getUnpaidOrdersForBusiness();
     } else {
       orders = await getOrders();
     }
@@ -37,6 +105,10 @@ export async function GET(request: NextRequest) {
       return order.status === status || order.paymentStatus === status;
     });
 
+    if (status === 'closed' && filteredOrders.length > 0) {
+      filteredOrders = await attachLedgerMethods(businessId, filteredOrders);
+    }
+
     return NextResponse.json({ orders: filteredOrders }, { status: 200 });
   } catch (error) {
     console.error('Error in GET /api/pos/orders:', error);
@@ -46,6 +118,8 @@ export async function GET(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    const { businessId } = await getAuthContext();
+    validateBusinessContext(businessId);
     const body = await request.json();
     const { orderId, data } = body;
 

@@ -1,8 +1,28 @@
 "use server";
 
+import { auth } from "@clerk/nextjs/server";
 import { databases, DATABASE_ID, MENU_ITEMS_COLLECTION_ID, CATEGORIES_COLLECTION_ID } from "@/lib/appwrite.config";
 import { Query, ID } from "node-appwrite";
 import { parseStringify } from "@/lib/utils";
+
+/** Drop Appwrite metadata keys if a raw document is ever spread into a PATCH body. */
+function stripInternalKeys(payload: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(payload)) {
+    if (k.startsWith("$")) continue;
+    out[k] = v;
+  }
+  return out;
+}
+
+/** Appwrite returns a 400-style error when the collection has no `businessId` attribute. */
+function isMissingBusinessIdAttributeError(error: unknown): boolean {
+  const msg = String((error as { message?: string })?.message ?? "");
+  if (!/businessId/i.test(msg)) return false;
+  return /unknown attribute|not found in schema|attribute not found|invalid document|document structure|Unknown attribute/i.test(
+    msg
+  );
+}
 
 // ─── Menu Items ────────────────────────────────────────────────────────────────
 
@@ -15,6 +35,13 @@ export async function getMenuItems(options?: {
 }) {
   try {
     const queries: any[] = [Query.orderAsc('name'), Query.limit(options?.limit || 500)];
+
+    const { orgId } = await auth();
+    if (orgId) {
+      queries.push(
+        Query.or([Query.equal("businessId", orgId), Query.isNull("businessId")])
+      );
+    }
 
     if (options?.categoryId) {
       queries.push(Query.equal('category', options.categoryId));
@@ -51,6 +78,8 @@ export async function createMenuItem(data: {
   calories?: number;
   preparationTime?: number;
   vatCategory?: string;
+  /** Clerk organization id — required for POS visibility */
+  businessId?: string;
 }) {
   try {
     const doc: any = {
@@ -75,14 +104,38 @@ export async function createMenuItem(data: {
       modifierGroupIds: data.modifierGroupIds || [],
     };
 
-    const result = await databases.createDocument(
-      DATABASE_ID!,
-      MENU_ITEMS_COLLECTION_ID!,
-      ID.unique(),
-      doc
-    );
+    if (data.businessId && String(data.businessId).trim() !== "") {
+      doc.businessId = data.businessId;
+    }
 
-    return { success: true, item: parseStringify(result) };
+    try {
+      const result = await databases.createDocument(
+        DATABASE_ID!,
+        MENU_ITEMS_COLLECTION_ID!,
+        ID.unique(),
+        doc
+      );
+      return { success: true, item: parseStringify(result) };
+    } catch (error: any) {
+      if (doc.businessId !== undefined && isMissingBusinessIdAttributeError(error)) {
+        delete doc.businessId;
+        try {
+          const result = await databases.createDocument(
+            DATABASE_ID!,
+            MENU_ITEMS_COLLECTION_ID!,
+            ID.unique(),
+            doc
+          );
+          console.warn(
+            "[menu] Created item without businessId — add a string attribute `businessId` to menu_items in Appwrite for org scoping."
+          );
+          return { success: true, item: parseStringify(result) };
+        } catch (e2: any) {
+          return { success: false, error: e2.message };
+        }
+      }
+      return { success: false, error: error.message };
+    }
   } catch (error: any) {
     return { success: false, error: error.message };
   }
@@ -108,33 +161,75 @@ export async function updateMenuItem(
     calories: number;
     preparationTime: number;
     vatCategory: string;
+    businessId?: string;
   }>
 ) {
   try {
-    const updateData: any = { ...data };
-    
+    const updateData: Record<string, unknown> = stripInternalKeys({ ...data }) as Record<string, unknown>;
+
     // Convert numerical fields correctly to avoid Appwrite type errors
     if (updateData.price !== undefined) updateData.price = Number(updateData.price);
-    if (updateData.stock !== undefined) updateData.stock = (updateData.stock === null || String(updateData.stock) === '') ? null : Number(updateData.stock);
-    if (updateData.lowStockThreshold !== undefined) updateData.lowStockThreshold = (updateData.lowStockThreshold === null || String(updateData.lowStockThreshold) === '') ? 5 : Number(updateData.lowStockThreshold);
-    if (updateData.calories !== undefined) updateData.calories = (updateData.calories === null || String(updateData.calories) === '') ? null : Number(updateData.calories);
-    if (updateData.preparationTime !== undefined) updateData.preparationTime = (updateData.preparationTime === null || String(updateData.preparationTime) === '') ? 10 : Number(updateData.preparationTime);
+    if (updateData.stock !== undefined)
+      updateData.stock =
+        updateData.stock === null || String(updateData.stock) === "" ? null : Number(updateData.stock);
+    if (updateData.lowStockThreshold !== undefined)
+      updateData.lowStockThreshold =
+        updateData.lowStockThreshold === null || String(updateData.lowStockThreshold) === ""
+          ? 5
+          : Number(updateData.lowStockThreshold);
+    if (updateData.calories !== undefined)
+      updateData.calories =
+        updateData.calories === null || String(updateData.calories) === "" ? null : Number(updateData.calories);
+    if (updateData.preparationTime !== undefined)
+      updateData.preparationTime =
+        updateData.preparationTime === null || String(updateData.preparationTime) === ""
+          ? 10
+          : Number(updateData.preparationTime);
 
     if (data.categoryId !== undefined) {
       updateData.category = data.categoryId;
       delete updateData.categoryId;
     }
 
-    const result = await databases.updateDocument(
-      DATABASE_ID!,
-      MENU_ITEMS_COLLECTION_ID!,
-      itemId,
-      updateData
-    );
-    return { success: true, item: parseStringify(result) };
+    const payload = updateData as Record<string, unknown>;
+
+    try {
+      const result = await databases.updateDocument(
+        DATABASE_ID!,
+        MENU_ITEMS_COLLECTION_ID!,
+        itemId,
+        payload
+      );
+      return { success: true, item: parseStringify(result) };
+    } catch (error: any) {
+      if (payload.businessId !== undefined && isMissingBusinessIdAttributeError(error)) {
+        delete payload.businessId;
+        try {
+          const result = await databases.updateDocument(
+            DATABASE_ID!,
+            MENU_ITEMS_COLLECTION_ID!,
+            itemId,
+            payload
+          );
+          console.warn(
+            "[menu] Updated item without businessId — add a string attribute `businessId` to menu_items in Appwrite for org scoping."
+          );
+          return { success: true, item: parseStringify(result) };
+        } catch (e2: any) {
+          if (e2?.code === 404 || e2?.message?.includes("not found")) {
+            return { success: false, error: "Document not found" };
+          }
+          return { success: false, error: e2.message };
+        }
+      }
+      if (error?.code === 404 || error?.message?.includes("not found")) {
+        return { success: false, error: "Document not found" };
+      }
+      return { success: false, error: error.message };
+    }
   } catch (error: any) {
-    if (error?.code === 404 || error?.message?.includes('not found')) {
-      return { success: false, error: 'Document not found' };
+    if (error?.code === 404 || error?.message?.includes("not found")) {
+      return { success: false, error: "Document not found" };
     }
     return { success: false, error: error.message };
   }

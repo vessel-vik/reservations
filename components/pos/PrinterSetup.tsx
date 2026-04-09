@@ -16,23 +16,43 @@ export function PrinterSetup({ orderId, onPrintSuccess }: PrinterSetupProps) {
     const [printerType, setPrinterType] = useState<'browser' | 'thermal'>('browser');
     const [showConfig, setShowConfig] = useState(false);
     const [showDeviceDiscovery, setShowDeviceDiscovery] = useState(false);
-    const [printerConfig, setPrinterConfig] = useState<PrinterConfig>(COMMON_PRINTERS.EPOS_TEP_220MC);
+    const [printerConfig, setPrinterConfig] = useState<PrinterConfig>(COMMON_PRINTERS.CHINAMI_54SUB2J);
     const [webUSBSupported, setWebUSBSupported] = useState<boolean | null>(null);
     const [lastError, setLastError] = useState<string | null>(null);
 
     // Load configuration on mount or auto-detect
     useEffect(() => {
         const load = async () => {
+            const parseEnvHex = (value: string | undefined) => {
+                if (!value) return undefined;
+                const normalized = value.trim().toLowerCase().replace(/^0x/, "");
+                const num = Number.parseInt(normalized, 16);
+                return Number.isFinite(num) ? num : undefined;
+            };
+            const envVendor = parseEnvHex(process.env.NEXT_PUBLIC_PRINTER_VENDOR_ID);
+            const envProduct = parseEnvHex(process.env.NEXT_PUBLIC_PRINTER_PRODUCT_ID);
+            const envPreset: PrinterConfig | null =
+                envVendor != null && envProduct != null
+                    ? {
+                          ...COMMON_PRINTERS.CHINAMI_54SUB2J,
+                          vendorId: envVendor,
+                          productId: envProduct,
+                      }
+                    : null;
+
             const savedConfig = ThermalPrinterClient.loadConfig();
             if (savedConfig) {
                 setPrinterConfig(savedConfig);
                 setPrinterType('thermal');
             } else {
+                if (envPreset) {
+                    setPrinterConfig(envPreset);
+                }
                 // Try to auto-detect a previously authorized printer
                 const autoDevice = await ThermalPrinterClient.autoDetect();
                 if (autoDevice) {
                     const newConfig = {
-                        ...COMMON_PRINTERS.EPOS_TEP_220MC, // Default settings
+                        ...COMMON_PRINTERS.CHINAMI_54SUB2J, // Default settings
                         vendorId: autoDevice.vendorId,
                         productId: autoDevice.productId,
                         deviceName: autoDevice.productName || 'Detected Printer'

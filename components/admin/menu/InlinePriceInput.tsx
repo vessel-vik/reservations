@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { fetchWithSession } from '@/lib/fetch-with-session';
 
 interface Props {
   itemId: string;
@@ -45,15 +46,16 @@ export function InlinePriceInput({ itemId, price, onSaved }: Props) {
     setError(null);
 
     try {
-      const res = await fetch(`/api/menu/items/${itemId}`, {
+      const res = await fetchWithSession(`/api/menu/items/${itemId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ price: numValue })
       });
+      if (res.status === 401) throw new Error('Unauthorized');
       if (!res.ok) throw new Error('Failed to update price');
       onSaved();
     } catch (e) {
-      toast.error('Failed to update price');
+      toast.error(e instanceof Error && e.message === 'Unauthorized' ? 'Sign in to save changes' : 'Failed to update price');
       setValue(price.toString()); // revert
     } finally {
       setIsSaving(false);

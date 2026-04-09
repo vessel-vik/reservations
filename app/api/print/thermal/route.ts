@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrder, getOrdersByTable } from '@/lib/actions/pos.actions';
 import { Order } from '@/types/pos.types';
+import { displayPaymentMethod } from '@/lib/payment-display';
+import { buildPaybillReceiptLines } from '@/lib/receipt-paybill';
+import { getAuthContext, validateBusinessContext } from '@/lib/auth.utils';
+import { databases, DATABASE_ID, PRINT_JOBS_COLLECTION_ID } from '@/lib/appwrite.config';
+import { recordPrintAudit } from '@/lib/print-audit';
 
 function safeParseOrderItems(order: Order): any[] {
     try {
@@ -16,16 +21,62 @@ function safeParseOrderItems(order: Order): any[] {
     }
 }
 
+function maskUserId(userId: string): string {
+    const id = String(userId || "").trim();
+    if (!id) return "—";
+    if (id.length <= 8) return id;
+    return `${id.slice(0, 4)}...${id.slice(-4)}`;
+}
+
 /**
  * Thermal Printer API Endpoint
  * Generates ESC/POS commands for thermal receipt printers
  * Supports USB and Network printers
  */
 export async function POST(request: NextRequest) {
+    let auditDirectMode = false;
+    let auditBusinessId = "";
+    let auditOrderId = "";
+    let auditJobType = "";
+    let auditCorrelationKey = "";
+    let auditWaiterUserId = "";
+    let auditTerminal = "";
     try {
+        const { businessId } = await getAuthContext();
+        validateBusinessContext(businessId);
         const body = await request.json();
-        const { orderId, printerType = 'usb', tableNumber, lineWidth = 32, terminalName, characterSet, jobType } = body;
-        const config = { lineWidth, terminalName, characterSet };
+        const {
+            orderId,
+            printerType = 'usb',
+            tableNumber,
+            lineWidth = 32,
+            terminalName,
+            characterSet,
+            jobType,
+            jobId,
+            waiterUserId,
+            waiterName,
+            printMode,
+            correlationKey,
+            sessionId,
+        } = body;
+        const config = {
+            lineWidth,
+            terminalName,
+            characterSet,
+            waiterUserId: waiterUserId ? String(waiterUserId) : "",
+            waiterName: waiterName ? String(waiterName) : "",
+            printMode: printMode ? String(printMode) : "queued",
+            correlationKey: correlationKey ? String(correlationKey) : "",
+            sessionId: sessionId ? String(sessionId) : "",
+        };
+        auditDirectMode = config.printMode === "direct";
+        auditBusinessId = businessId;
+        auditOrderId = String(orderId || "");
+        auditJobType = String(jobType || "receipt");
+        auditCorrelationKey = String(config.correlationKey || "");
+        auditWaiterUserId = String(config.waiterUserId || "");
+        auditTerminal = String(config.terminalName || "");
 
         if (!orderId && typeof tableNumber === 'undefined') {
             return NextResponse.json(
@@ -76,6 +127,18 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        const knownJobTypes = new Set([
+            'receipt',
+            'docket',
+            'kitchen_docket',
+            'captain_docket',
+            'kitchen_delta',
+            'anomaly_adjustment',
+        ]);
+        if (jobType && !knownJobTypes.has(jobType)) {
+            return NextResponse.json({ error: `Unsupported job type: ${jobType}` }, { status: 400 });
+        }
+
         // Generate ESC/POS commands based on job type
         let escposCommands: number[];
 
@@ -86,9 +149,31 @@ export async function POST(request: NextRequest) {
             }
             escposCommands = generateESCPOSKitchenDocket(singleOrder, config);
         } else if (jobType === 'kitchen_delta') {
-            const deltaItems = (body as { deltaItems?: unknown }).deltaItems;
+            let deltaItems = (body as { deltaItems?: unknown }).deltaItems;
             if (!orderId) {
                 return NextResponse.json({ error: 'orderId is required for kitchen_delta' }, { status: 400 });
+            }
+            if (!jobId || !PRINT_JOBS_COLLECTION_ID || !DATABASE_ID) {
+                return NextResponse.json({ error: 'jobId is required for kitchen_delta print integrity' }, { status: 400 });
+            }
+            const printJob = await databases.getDocument(DATABASE_ID, PRINT_JOBS_COLLECTION_ID, String(jobId));
+            if (String((printJob as any).businessId || '') !== businessId) {
+                return NextResponse.json({ error: 'Print job not found' }, { status: 404 });
+            }
+            if (String((printJob as any).jobType || '') !== 'kitchen_delta') {
+                return NextResponse.json({ error: 'Print job type mismatch' }, { status: 400 });
+            }
+            try {
+                const payload = JSON.parse(String((printJob as any).content || '{}')) as {
+                    orderId?: string;
+                    deltaItems?: unknown[];
+                };
+                if (!payload.orderId || payload.orderId !== orderId) {
+                    return NextResponse.json({ error: 'Order mismatch for print job' }, { status: 400 });
+                }
+                deltaItems = payload.deltaItems;
+            } catch {
+                return NextResponse.json({ error: 'Malformed print job content' }, { status: 400 });
             }
             if (!Array.isArray(deltaItems) || deltaItems.length === 0) {
                 return NextResponse.json({ error: 'deltaItems (non-empty array) is required' }, { status: 400 });
@@ -103,6 +188,50 @@ export async function POST(request: NextRequest) {
                 price: typeof d?.price === 'number' ? d.price : undefined,
             }));
             escposCommands = generateESCPOSKitchenDelta(singleOrder, normalizedDelta, config);
+        } else if (jobType === 'anomaly_adjustment') {
+            let adjustments = (body as { adjustments?: unknown }).adjustments;
+            const note =
+                typeof (body as { note?: unknown }).note === 'string'
+                    ? String((body as { note?: string }).note)
+                    : 'Customer requested to return item';
+            if (!orderId) {
+                return NextResponse.json({ error: 'orderId is required for anomaly_adjustment' }, { status: 400 });
+            }
+            if (!jobId || !PRINT_JOBS_COLLECTION_ID || !DATABASE_ID) {
+                return NextResponse.json({ error: 'jobId is required for anomaly print integrity' }, { status: 400 });
+            }
+            const printJob = await databases.getDocument(DATABASE_ID, PRINT_JOBS_COLLECTION_ID, String(jobId));
+            if (String((printJob as any).businessId || '') !== businessId) {
+                return NextResponse.json({ error: 'Print job not found' }, { status: 404 });
+            }
+            if (String((printJob as any).jobType || '') !== 'anomaly_adjustment') {
+                return NextResponse.json({ error: 'Print job type mismatch' }, { status: 400 });
+            }
+            try {
+                const payload = JSON.parse(String((printJob as any).content || '{}')) as {
+                    orderId?: string;
+                    adjustments?: unknown[];
+                };
+                if (!payload.orderId || payload.orderId !== orderId) {
+                    return NextResponse.json({ error: 'Order mismatch for print job' }, { status: 400 });
+                }
+                adjustments = payload.adjustments;
+            } catch {
+                return NextResponse.json({ error: 'Malformed print job content' }, { status: 400 });
+            }
+            if (!Array.isArray(adjustments) || adjustments.length === 0) {
+                return NextResponse.json({ error: 'adjustments (non-empty array) is required' }, { status: 400 });
+            }
+            const singleOrder = orders[0];
+            if (!singleOrder) {
+                return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+            }
+            const normalized = (adjustments as { name?: string; quantity?: number; note?: string }[]).map((a) => ({
+                name: String(a?.name || 'Item').slice(0, 80),
+                quantity: Math.max(1, Math.floor(Number(a?.quantity) || 1)),
+                note: typeof a?.note === 'string' ? a.note.slice(0, 140) : note,
+            }));
+            escposCommands = generateESCPOSAnomalyAdjustment(singleOrder, normalized, note, config);
         } else {
             // Full receipt or table summary
             escposCommands = orders.length === 1
@@ -110,19 +239,47 @@ export async function POST(request: NextRequest) {
                 : generateESCPOSReceiptForOrders(tableNumber ?? null, orders, config);
         }
 
-        return NextResponse.json({
+        const responsePayload = {
             success: true,
             commands: escposCommands,
             order: {
                 orderNumber: orders[0].orderNumber,
                 total: orders.reduce((sum, o) => sum + o.totalAmount, 0)
             }
-        });
+        };
+        if (auditDirectMode) {
+            await recordPrintAudit({
+                businessId: auditBusinessId,
+                printJobId: `direct:${auditCorrelationKey || Date.now()}`,
+                jobType: auditJobType,
+                status: "completed",
+                orderId: auditOrderId,
+                summary: `[direct] ${auditJobType} completed`,
+                dedupeKey: auditCorrelationKey,
+                waiterId: auditWaiterUserId,
+                terminalId: auditTerminal,
+            });
+        }
+        return NextResponse.json(responsePayload);
 
     } catch (error) {
         console.error('Thermal print error:', error);
+        if (auditDirectMode) {
+            await recordPrintAudit({
+                businessId: auditBusinessId,
+                printJobId: `direct:${auditCorrelationKey || Date.now()}`,
+                jobType: auditJobType || "receipt",
+                status: "failed",
+                orderId: auditOrderId || undefined,
+                summary: `[direct] ${auditJobType || "receipt"} failed`,
+                errorMessage: error instanceof Error ? error.message : "Failed to generate thermal print",
+                dedupeKey: auditCorrelationKey,
+                waiterId: auditWaiterUserId,
+                terminalId: auditTerminal,
+            });
+        }
         return NextResponse.json(
-            { error: 'Failed to generate thermal print', details: error instanceof Error ? error.message : String(error) },
+            { error: 'Failed to generate thermal print' },
             { status: 500 }
         );
     }
@@ -170,8 +327,11 @@ function generateESCPOSReceipt(order: Order, config: any): number[] {
     commands.push(ESC, 0x61, 0x00); // left
 
     // Order details
+    const effectiveWaiterName = String(config.waiterName || order.waiterName || "POS System").slice(0, 40);
+    const effectiveWaiterId = maskUserId(String(config.waiterUserId || order.waiterId || ""));
     commands.push(...encode(`ORD #: ${order.orderNumber} | Date: ${dateStr} | Time: ${timeStr}\n`));
-    commands.push(...encode(`Server: ${order.waiterName} | Table: ${order.tableNumber ?? '—'} | Guests: ${order.guestCount ?? 1}\n`));
+    commands.push(...encode(`Server: ${effectiveWaiterName} (${effectiveWaiterId}) | Table: ${order.tableNumber ?? '—'} | Guests: ${order.guestCount ?? 1}\n`));
+    commands.push(...encode(`Print: ${String(config.printMode || "queued")} | Ref: ${String(config.correlationKey || "—").slice(0, 24)}\n`));
     commands.push(...encode(separator));
 
     // Column header: QTY / ITEM DESCRIPTION / TOTAL (KSh)
@@ -233,6 +393,39 @@ function generateESCPOSReceipt(order: Order, config: any): number[] {
     commands.push(...encode('PAID - THANK YOU\n'));
     commands.push(ESC, 0x21, 0x00);
 
+    const paymentMethods = Array.isArray((order as unknown as { paymentMethods?: unknown }).paymentMethods)
+        ? (order as unknown as { paymentMethods: { method?: string; amount?: number; reference?: string }[] }).paymentMethods
+        : [];
+    if (paymentMethods.length > 0) {
+        commands.push(ESC, 0x61, 0x00);
+        commands.push(...encode(separator));
+        commands.push(ESC, 0x21, 0x08);
+        commands.push(...encode('PAYMENT\n'));
+        commands.push(ESC, 0x21, 0x00);
+        paymentMethods.forEach((m) => {
+            const label = displayPaymentMethod(m?.method);
+            const amt = typeof m?.amount === 'number' ? m.amount : 0;
+            commands.push(
+                ...encode(
+                    `${label}  KSh ${amt.toLocaleString('en-KE', { minimumFractionDigits: 0 })}\n`
+                )
+            );
+            if (m?.reference) {
+                const ref = String(m.reference).slice(0, lineWidth);
+                commands.push(...encode(`Ref: ${ref}\n`));
+            }
+        });
+    }
+
+    commands.push(ESC, 0x61, 0x00);
+    commands.push(...encode(separator));
+    const paybillRef = String(order.orderNumber || order.$id || 'ORDER');
+    buildPaybillReceiptLines(paybillRef).forEach((line) => {
+        const chunk = line.length <= lineWidth ? line : line.slice(0, lineWidth);
+        commands.push(...encode(`${chunk}\n`));
+    });
+    commands.push(...encode(separator));
+
     // QR code — encodes orderId
     commands.push(...encode('\n'));
     const qrData = order.$id || order.orderNumber;
@@ -289,6 +482,10 @@ function generateESCPOSReceiptForOrders(tableNumber: number | null, orders: Orde
     if (config.terminalName) {
         commands.push(...encode(center(`Terminal: ${config.terminalName}`, lineWidth) + '\n'));
     }
+    const tabWaiterName = String(config.waiterName || orders[0]?.waiterName || "POS System").slice(0, 40);
+    const tabWaiterId = maskUserId(String(config.waiterUserId || orders[0]?.waiterId || ""));
+    commands.push(...encode(center(`Waiter: ${tabWaiterName} (${tabWaiterId})`, lineWidth) + '\n'));
+    commands.push(...encode(center(`Print: ${String(config.printMode || "queued")} Ref: ${String(config.correlationKey || "—").slice(0, 18)}`, lineWidth) + '\n'));
 
     // Orders
     let grandTotal = 0;
@@ -333,6 +530,15 @@ function generateESCPOSReceiptForOrders(tableNumber: number | null, orders: Orde
     
     commands.push(ESC, 0x61, 0x01); // Center align
     commands.push(...encode(equals));
+
+    commands.push(ESC, 0x61, 0x00);
+    commands.push(...encode(separator));
+    const tabPaybillRef = orders[0]?.orderNumber || orders[0]?.$id || 'ORDER';
+    buildPaybillReceiptLines(String(tabPaybillRef)).forEach((line) => {
+        const chunk = line.length <= lineWidth ? line : line.slice(0, lineWidth);
+        commands.push(...encode(`${chunk}\n`));
+    });
+    commands.push(...encode(separator));
 
     // Footer
     commands.push(...encode('\n'));
@@ -380,10 +586,13 @@ function generateESCPOSKitchenDelta(order: Order, deltaItems: { name: string; qu
     commands.push(ESC, 0x21, 0x00);
 
     commands.push(ESC, 0x61, 0x00); // left
+    const waiterName = String(config.waiterName || order.waiterName || "POS System").slice(0, 40);
+    const waiterId = maskUserId(String(config.waiterUserId || order.waiterId || ""));
     commands.push(...encode(`Order #: ${order.orderNumber}\n`));
     commands.push(...encode(`Time: ${timeStr}\n`));
-    commands.push(...encode(`Server: ${order.waiterName}\n`));
+    commands.push(...encode(`Server: ${waiterName} (${waiterId})\n`));
     commands.push(...encode(`Table: #${order.tableNumber ?? '—'}\n`));
+    commands.push(...encode(`Print: ${String(config.printMode || "queued")} | Ref: ${String(config.correlationKey || "—").slice(0, 18)}\n`));
     commands.push(...encode(separator));
 
     commands.push(ESC, 0x21, 0x10);
@@ -406,6 +615,58 @@ function generateESCPOSKitchenDelta(order: Order, deltaItems: { name: string; qu
         commands.push(ESC, 0x21, 0x00);
     }
 
+    commands.push(...encode('\n\n\n'));
+    commands.push(GS, 0x56, 0x00);
+    return commands;
+}
+
+function generateESCPOSAnomalyAdjustment(
+    order: Order,
+    adjustments: { name: string; quantity: number; note?: string }[],
+    note: string,
+    config: any
+): number[] {
+    const commands: number[] = [];
+    const lineWidth = config.lineWidth || 32;
+    const ESC = 0x1B;
+    const GS = 0x1D;
+
+    const encode = (str: string) => Array.from(new TextEncoder().encode(str));
+    const separator = '-'.repeat(lineWidth) + '\n';
+    const timeStr = new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+    commands.push(ESC, 0x40);
+    commands.push(ESC, 0x61, 0x01); // center
+    commands.push(ESC, 0x21, 0x30);
+    commands.push(...encode('AM | PM\n'));
+    commands.push(ESC, 0x21, 0x10);
+    commands.push(...encode('ANOMALY ADJUSTMENT\n'));
+    commands.push(ESC, 0x21, 0x00);
+    if (config.terminalName) {
+        commands.push(...encode(`Terminal: ${config.terminalName}\n`));
+    }
+    commands.push(...encode(separator));
+    commands.push(ESC, 0x61, 0x00); // left
+    const anomalyWaiterName = String(config.waiterName || order.waiterName || 'POS System').slice(0, 40);
+    const anomalyWaiterId = maskUserId(String(config.waiterUserId || order.waiterId || ""));
+    commands.push(...encode(`Order #: ${order.orderNumber}\n`));
+    commands.push(...encode(`Time: ${timeStr}\n`));
+    commands.push(...encode(`Server: ${anomalyWaiterName} (${anomalyWaiterId})\n`));
+    commands.push(...encode(`Table: #${order.tableNumber ?? '—'}\n`));
+    commands.push(...encode(`Print: ${String(config.printMode || "queued")} | Ref: ${String(config.correlationKey || "—").slice(0, 18)}\n`));
+    commands.push(...encode(separator));
+    commands.push(ESC, 0x21, 0x10);
+    commands.push(...encode('SUBTRACTIONS (DO NOT RE-FIRE FULL ORDER)\n'));
+    commands.push(ESC, 0x21, 0x00);
+
+    adjustments.forEach((row) => {
+        const qty = `-${Math.max(1, Number(row.quantity) || 1)}x`;
+        const safeName = String(row.name || 'Item').slice(0, Math.max(4, lineWidth - qty.length - 2));
+        commands.push(...encode(`${qty} ${safeName}\n`));
+    });
+
+    commands.push(...encode(separator));
+    commands.push(...encode(`Note: ${String(note || 'Customer requested to return item').slice(0, lineWidth)}\n`));
     commands.push(...encode('\n\n\n'));
     commands.push(GS, 0x56, 0x00);
     return commands;
@@ -444,11 +705,14 @@ function generateESCPOSKitchenDocket(order: Order, config: any): number[] {
     commands.push(ESC, 0x61, 0x00); // left
 
     // Order metadata
+    const docketWaiterName = String(config.waiterName || order.waiterName || "POS System").slice(0, 40);
+    const docketWaiterId = maskUserId(String(config.waiterUserId || order.waiterId || ""));
     commands.push(...encode(`Order #: ${order.orderNumber}\n`));
     commands.push(...encode(`Date: ${dateStr}\n`));
     commands.push(...encode(`Time: ${timeStr}\n`));
-    commands.push(...encode(`Server: ${order.waiterName}\n`));
+    commands.push(...encode(`Server: ${docketWaiterName} (${docketWaiterId})\n`));
     commands.push(...encode(`Type: ${order.type || 'dine_in'}  |  Table: #${order.tableNumber ?? '—'}\n`));
+    commands.push(...encode(`Print: ${String(config.printMode || "queued")} | Ref: ${String(config.correlationKey || "—").slice(0, 18)}\n`));
     commands.push(...encode(separator));
 
     // Items header

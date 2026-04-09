@@ -7,6 +7,8 @@ export interface PrinterConfig {
     type: 'usb' | 'network';
     vendorId?: number;
     productId?: number;
+    usbInterfaceNumber?: number;
+    usbEndpointNumber?: number;
     ipAddress?: string;
     port?: number;
     deviceName?: string;
@@ -392,13 +394,23 @@ export class ThermalPrinterClient {
                 )
                 .sort((a: any, b: any) => a.endpointNumber - b.endpointNumber)[0] || null;
 
-            if (!candidate) {
+            const forcedInterface = this.config.usbInterfaceNumber;
+            const forcedEndpoint = this.config.usbEndpointNumber;
+            const selected = forcedInterface != null && forcedEndpoint != null
+                ? {
+                    interfaceNumber: forcedInterface,
+                    alternate: 0,
+                    endpointNumber: forcedEndpoint,
+                }
+                : candidate;
+
+            if (!selected) {
                 throw new Error('No OUT endpoint found on the selected USB interface. Ensure this is an ESC/POS-compatible printer.');
             }
 
             // Claim the interface and select the alternate setting just in case
             try {
-                await device.claimInterface(candidate.interfaceNumber);
+                await device.claimInterface(selected.interfaceNumber);
             } catch (claimError: any) {
                 // Some browsers may throw if interface is already claimed. Ignore if that's the case.
                 const msg = claimError?.message || '';
@@ -406,7 +418,7 @@ export class ThermalPrinterClient {
                     throw claimError;
                 }
             }
-            await device.selectAlternateInterface(candidate.interfaceNumber, candidate.alternate);
+            await device.selectAlternateInterface(selected.interfaceNumber, selected.alternate);
 
             // Convert commands to bytes and send to the claimed endpoint
             const encoder = new TextEncoder();
@@ -414,12 +426,12 @@ export class ThermalPrinterClient {
             // If the server returns a byte array, send it in one go.
             if (Array.isArray(commands) && typeof commands[0] === 'number') {
                 const data = new Uint8Array(commands as number[]);
-                await device.transferOut(candidate.endpointNumber, data);
+                await device.transferOut(selected.endpointNumber, data);
             } else {
                 // Legacy: string list commands (ESC/POS text segments)
                 for (const command of commands as string[]) {
                     const data = encoder.encode(command);
-                    await device.transferOut(candidate.endpointNumber, data);
+                    await device.transferOut(selected.endpointNumber, data);
                 }
             }
 
@@ -533,6 +545,16 @@ export const COMMON_PRINTERS = {
         productId: 0x0055,
         deviceName: 'E-POS TEP-220MC',
         lineWidth: 42
+    },
+    CHINAMI_54SUB2J: {
+        type: 'usb' as const,
+        vendorId: 0x0cf3,
+        productId: 0xe003,
+        deviceName: 'CHINAMI-54SUB2J',
+        lineWidth: 48,
+        characterSet: 'PC437',
+        usbInterfaceNumber: 0,
+        usbEndpointNumber: 1,
     },
     // Xprinter / Generic Chinese POS
     XPRINTER: {

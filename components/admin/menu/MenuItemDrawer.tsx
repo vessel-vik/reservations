@@ -1,21 +1,25 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { useUser } from '@clerk/nextjs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2 } from 'lucide-react';
+import { ChevronDown, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { ImageUploadField } from './ImageUploadField';
 import { TagInput } from './TagInput';
 import { DietaryFlagPills } from './DietaryFlagPills';
 import { ModifierGroupSelector } from './ModifierGroupSelector';
+import { VersionHistoryPanel } from './VersionHistoryPanel';
+import { itemDocToFormSnapshot, snapshotToFormSnapshot, type MenuItemFormSnapshot } from '@/lib/menu-item-form';
+import { fetchWithSession } from '@/lib/fetch-with-session';
 
 const menuItemSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(200),
@@ -42,38 +46,67 @@ interface Props {
   open: boolean;
   item: any | null;
   categories: any[];
-  modifierGroups?: any[]; // optional, fetched by parent MenuCMS
+  modifierGroups?: any[];
   onClose: () => void;
   onSaved: () => void;
 }
 
+async function recordMenuItemVersion(
+  itemId: string,
+  formValues: MenuItemFormSnapshot,
+  publisher: { id: string; label: string }
+) {
+  const listRes = await fetchWithSession(`/api/menu/items/${itemId}/versions`);
+  if (!listRes.ok) return;
+  const data = await listRes.json();
+  const versions = (data.versions || []) as { versionNumber?: number }[];
+  const maxV = versions.reduce((m, v) => Math.max(m, Number(v.versionNumber) || 0), 0);
+  const next = maxV + 1;
+
+  const postRes = await fetchWithSession(`/api/menu/items/${itemId}/versions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      formValues,
+      versionNumber: next,
+      userId: publisher.id,
+      userName: publisher.label,
+    }),
+  });
+  if (!postRes.ok) {
+    const err = await postRes.json().catch(() => ({}));
+    console.warn('Menu item version snapshot failed:', err);
+  }
+}
+
 export function MenuItemDrawer({ open, item, categories, modifierGroups = [], onClose, onSaved }: Props) {
   const isEdit = !!item;
+  const { user } = useUser();
 
-  const [stagedImageFile, setStagedImageFile] = useState<File | null>(null)
-  const [isUploading, setIsUploading] = useState(false)
+  const [stagedImageFile, setStagedImageFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
-  const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting } } = useForm<MenuItemFormValues>({
+  const publisher = {
+    id: user?.id ?? '',
+    label:
+      user?.fullName ||
+      user?.primaryEmailAddress?.emailAddress ||
+      user?.username ||
+      'Admin',
+  };
+
+  const { register, handleSubmit, setValue, watch, reset, formState: { errors, isSubmitting } } = useForm<MenuItemFormValues>({
     resolver: zodResolver(menuItemSchema),
-    defaultValues: {
-      name: item?.name || '',
-      description: item?.description || '',
-      price: item?.price || 0,
-      categoryId: item?.category || '',
-      imageUrl: item?.imageUrl || null,
-      stock: item?.stock ?? null,
-      lowStockThreshold: item?.lowStockThreshold ?? 5,
-      isVegetarian: item?.isVegetarian ?? false,
-      isVegan: item?.isVegan ?? false,
-      isGlutenFree: item?.isGlutenFree ?? false,
-      ingredients: item?.ingredients || [],
-      allergens: item?.allergens || [],
-      modifierGroupIds: item?.modifierGroupIds || [],
-      vatCategory: item?.vatCategory || 'standard',
-      preparationTime: item?.preparationTime ?? 10,
-      calories: item?.calories || undefined,
-    }
+    defaultValues: itemDocToFormSnapshot(item),
   });
+
+  useEffect(() => {
+    if (!open) return;
+    reset(itemDocToFormSnapshot(item));
+    setStagedImageFile(null);
+    setHistoryOpen(false);
+  }, [open, item?.$id, reset]);
 
   const imageUrl = watch('imageUrl');
   const watchIngredients = watch('ingredients') || [];
@@ -86,82 +119,102 @@ export function MenuItemDrawer({ open, item, categories, modifierGroups = [], on
     isGlutenFree: watch('isGlutenFree') || false,
   };
 
+  const onRevertSnapshot = useCallback((raw: Record<string, unknown>) => {
+    const normalized = snapshotToFormSnapshot(raw);
+    reset(normalized);
+    toast.message('Draft loaded from history — press Update Item to save.');
+  }, [reset]);
+
   const onSubmit = async (data: MenuItemFormValues) => {
-    // ── EDIT MODE ─────────────────────────────────────────────────
+    const snapshotPayload: MenuItemFormSnapshot = { ...data };
+
     if (isEdit) {
       if (stagedImageFile) {
-        setIsUploading(true)
-        const form = new FormData()
-        form.append('file', stagedImageFile)
+        setIsUploading(true);
+        const form = new FormData();
+        form.append('file', stagedImageFile);
         try {
-          const res = await fetch(`/api/menu/items/${item.$id}/image`, { method: 'POST', body: form })
-          const json = await res.json()
-          if (!res.ok) throw new Error(json.error ?? 'Image upload failed')
-          data.imageUrl = json.imageUrl
-        } catch (err: any) {
-          toast.error(err.message ?? 'Image upload failed')
-          setIsUploading(false)
-          return
+          const res = await fetchWithSession(`/api/menu/items/${item.$id}/image`, { method: 'POST', body: form });
+          const json = await res.json();
+          if (!res.ok) throw new Error(json.error ?? 'Image upload failed');
+          data.imageUrl = json.imageUrl;
+          snapshotPayload.imageUrl = json.imageUrl;
+        } catch (err: unknown) {
+          toast.error(err instanceof Error ? err.message : 'Image upload failed');
+          setIsUploading(false);
+          return;
         }
-        setIsUploading(false)
+        setIsUploading(false);
       }
-      const res = await fetch(`/api/menu/items/${item.$id}`, {
+      const res = await fetchWithSession(`/api/menu/items/${item.$id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
-      })
-      const json = await res.json()
+      });
+      const json = await res.json();
       if (!res.ok) {
-        toast.error(json.error || 'Failed to save item')
-        return
+        toast.error(res.status === 401 ? 'Sign in to save changes' : json.error || 'Failed to save item');
+        return;
       }
-      toast.success('Item saved')
-      onSaved()
-      onClose()
-      return
+      try {
+        await recordMenuItemVersion(item.$id, snapshotPayload, publisher);
+      } catch (e) {
+        console.warn('Version snapshot:', e);
+      }
+      toast.success('Item saved');
+      onSaved();
+      onClose();
+      return;
     }
 
-    // ── CREATE MODE ────────────────────────────────────────────────
-    let newItemId: string | null = null
-    const { imageUrl: _, ...dataWithoutImage } = data as any
-    const createRes = await fetch('/api/menu/items', {
+    let newItemId: string | null = null;
+    const { imageUrl: _, ...dataWithoutImage } = data as MenuItemFormValues & { imageUrl?: unknown };
+    const createRes = await fetchWithSession('/api/menu/items', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(dataWithoutImage),
-    })
-    const createJson = await createRes.json()
+    });
+    const createJson = await createRes.json();
     if (!createRes.ok) {
-      toast.error(createJson.error ?? 'Failed to create item')
-      return
+      toast.error(createRes.status === 401 ? 'Sign in to save changes' : createJson.error ?? 'Failed to create item');
+      return;
     }
-    newItemId = createJson.item.$id
+    newItemId = createJson.item.$id;
 
-    // Upload image to newly created item (best-effort)
+    let merged: MenuItemFormSnapshot = itemDocToFormSnapshot(createJson.item);
+
     if (stagedImageFile && newItemId) {
-      setIsUploading(true)
+      setIsUploading(true);
       try {
-        const form = new FormData()
-        form.append('file', stagedImageFile)
-        const imgRes = await fetch(`/api/menu/items/${newItemId}/image`, { method: 'POST', body: form })
-        const imgJson = await imgRes.json()
+        const form = new FormData();
+        form.append('file', stagedImageFile);
+        const imgRes = await fetchWithSession(`/api/menu/items/${newItemId}/image`, { method: 'POST', body: form });
+        const imgJson = await imgRes.json();
         if (imgRes.ok) {
-          await fetch(`/api/menu/items/${newItemId}`, {
+          await fetchWithSession(`/api/menu/items/${newItemId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ imageUrl: imgJson.imageUrl }),
-          })
+          });
+          merged = { ...merged, imageUrl: imgJson.imageUrl };
         } else {
-          toast.error('Item saved but image upload failed. Edit the item to add an image.')
+          toast.error('Item saved but image upload failed. Edit the item to add an image.');
         }
       } catch {
-        toast.error('Item saved but image upload failed.')
+        toast.error('Item saved but image upload failed.');
       }
-      setIsUploading(false)
+      setIsUploading(false);
     }
 
-    toast.success('Item saved')
-    onSaved()
-    onClose()
+    try {
+      if (newItemId) await recordMenuItemVersion(newItemId, merged, publisher);
+    } catch (e) {
+      console.warn('Version snapshot:', e);
+    }
+
+    toast.success('Item saved');
+    onSaved();
+    onClose();
   };
 
   return (
@@ -169,7 +222,7 @@ export function MenuItemDrawer({ open, item, categories, modifierGroups = [], on
       <DialogContent className="sm:max-w-[700px] h-[90vh] flex flex-col p-0 gap-0 bg-slate-900 border-slate-700">
         <DialogHeader className="p-6 pb-4 border-b border-slate-700">
           <DialogTitle className="text-xl font-bold text-slate-100">
-            {isEdit ? `Edit — ${item.name}` : 'Add New Menu Item'}
+            {isEdit ? `Edit — ${item?.name ?? 'Item'}` : 'Add New Menu Item'}
           </DialogTitle>
         </DialogHeader>
 
@@ -181,7 +234,7 @@ export function MenuItemDrawer({ open, item, categories, modifierGroups = [], on
             <ImageUploadField
               currentUrl={imageUrl}
               onFileStaged={(file) => setStagedImageFile(file)}
-              onRemoved={() => { setStagedImageFile(null); setValue('imageUrl', null) }}
+              onRemoved={() => { setStagedImageFile(null); setValue('imageUrl', null); }}
             />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -288,6 +341,24 @@ export function MenuItemDrawer({ open, item, categories, modifierGroups = [], on
               onChange={(ids) => setValue('modifierGroupIds', ids)}
             />
           </div>
+
+          {isEdit && item?.$id && (
+            <div className="rounded-xl border border-slate-700/80 bg-slate-900/40 overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setHistoryOpen(!historyOpen)}
+                className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium text-slate-200 hover:bg-slate-800/50"
+              >
+                <span>Publish history & revert</span>
+                <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${historyOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {historyOpen && (
+                <div className="border-t border-slate-700/80 px-2 pb-4">
+                  <VersionHistoryPanel itemId={item.$id} onRevert={onRevertSnapshot} />
+                </div>
+              )}
+            </div>
+          )}
 
         </form>
 

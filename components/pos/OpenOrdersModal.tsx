@@ -16,6 +16,8 @@ import { getOpenOrdersSummary, voidOrderValidated } from "@/lib/actions/pos.acti
 import { VOID_ORDER_CATEGORIES, type VoidOrderCategory } from "@/lib/schemas/void-order";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { client } from "@/lib/appwrite-client";
+import { subscribeWithRetry } from "@/lib/realtime-subscribe";
 
 interface OpenOrderItem {
     $id: string;
@@ -31,10 +33,14 @@ interface Order {
     orderNumber: string;
     tableNumber?: number;
     customerName?: string;
+    waiterName?: string;
     totalAmount: number;
     orderTime: string;
     status: string;
     paymentStatus?: string;
+    isDeleted?: boolean;
+    waiterId?: string;
+    paymentMethods?: Array<{ method?: string; amount?: number; reference?: string }>;
     items?: OpenOrderItem[] | string;
 }
 
@@ -54,7 +60,7 @@ export function OpenOrdersModal({
     tableNumber,
 }: OpenOrdersModalProps) {
     const { membership } = useOrganization();
-    const { user } = useUser();
+    const { user, isLoaded: userLoaded } = useUser();
     const isAdmin = membership?.role === "org:admin";
 
     const [orders, setOrders] = useState<Order[]>([]);
@@ -79,6 +85,10 @@ export function OpenOrdersModal({
     const fetchOpenOrders = useCallback(async () => {
         try {
             setIsLoading(true);
+            if (!isAdmin && (!userLoaded || !user?.id)) {
+                setOrders([]);
+                return;
+            }
             // Admins see all orders; waiters (org:member) see only their own
             const opts = (!isAdmin && user?.id) ? { waiterId: user.id } : undefined;
             const summary = await getOpenOrdersSummary(opts);
@@ -89,12 +99,18 @@ export function OpenOrdersModal({
                 orderNumber: o.orderNumber,
                 tableNumber: o.tableNumber,
                 customerName: o.customerName,
+                waiterId: o.waiterId,
+                waiterName: o.waiterName,
                 totalAmount: o.totalAmount,
                 orderTime: o.orderTime,
                 status: "active",
                 paymentStatus: o.paymentStatus,
+                isDeleted: (o as any).isDeleted,
                 items: o.items as OpenOrderItem[],
             }));
+
+            // Keep Open Orders strictly unpaid + not deleted (extra guard against stale or mixed records).
+            result = result.filter((o) => !o.isDeleted && String(o.paymentStatus || "unpaid") === "unpaid");
 
             if (tableNumber != null) {
                 result = result.filter((o) => o.tableNumber === tableNumber);
@@ -106,12 +122,36 @@ export function OpenOrdersModal({
         } finally {
             setIsLoading(false);
         }
-    }, [tableNumber, isAdmin, user?.id]);
+    }, [tableNumber, isAdmin, user?.id, userLoaded]);
 
     useEffect(() => {
         if (isOpen) {
             void fetchOpenOrders();
         }
+    }, [isOpen, fetchOpenOrders]);
+
+    // Live refresh while modal is open so paid/settled orders disappear immediately.
+    useEffect(() => {
+        if (!isOpen) return;
+        const databaseId = process.env.NEXT_PUBLIC_DATABASE_ID;
+        const ordersCollectionId = process.env.NEXT_PUBLIC_ORDERS_COLLECTION_ID;
+        if (!databaseId || !ordersCollectionId) return;
+        const unsub = subscribeWithRetry(
+            () =>
+                client.subscribe(
+                    `databases.${databaseId}.collections.${ordersCollectionId}.documents`,
+                    (response: { events?: string[] }) => {
+                        const ev = response.events || [];
+                        const changed =
+                            ev.some((x) => x.includes(".update")) ||
+                            ev.some((x) => x.includes(".create")) ||
+                            ev.some((x) => x.includes(".delete"));
+                        if (changed) void fetchOpenOrders();
+                    }
+                ),
+            { maxAttempts: 5, initialDelayMs: 120 }
+        );
+        return () => unsub();
     }, [isOpen, fetchOpenOrders]);
 
     const submitVoid = async () => {

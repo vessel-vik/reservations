@@ -9,13 +9,64 @@ import { ThermalPrinterClient } from "@/lib/thermal-printer";
 
 interface PrintJob {
     $id: string;
-    status: "pending" | "printing" | "completed" | "failed";
-    jobType: "receipt" | "docket" | "captain_docket" | "kitchen_docket" | "kitchen_delta";
+    status: "pending" | "pending_approval" | "printing" | "completed" | "failed";
+    jobType:
+        | "receipt"
+        | "docket"
+        | "captain_docket"
+        | "kitchen_docket"
+        | "kitchen_delta"
+        | "anomaly_adjustment";
     content: string;
     timestamp: string;
     targetTerminal?: string;
     errorMessage?: string;
     businessId?: string; // Multi-tenant isolation
+    correlationKey?: string;
+    printMode?: string;
+    sessionId?: string;
+    waiterUserId?: string;
+    waiterName?: string;
+}
+
+type QueuePrintMeta = {
+    targetTerminal?: string;
+    waiterUserId?: string;
+    waiterName?: string;
+    correlationKey?: string;
+    printMode?: "queued" | "direct";
+    sessionId?: string;
+    requeueReason?: string;
+};
+
+function parseJobPayload(content: string): {
+    orderId: string;
+    deltaItems?: { name: string; quantity: number; price: number }[];
+    adjustments?: { name: string; quantity: number; note?: string }[];
+    note?: string;
+    correlationKey?: string;
+    sessionId?: string;
+    waiterUserId?: string;
+    waiterName?: string;
+} {
+    const raw = String(content || "").trim();
+    if (!raw) return { orderId: "" };
+    try {
+        const parsed = JSON.parse(raw) as Record<string, unknown>;
+        return {
+            orderId: String(parsed.orderId || "").trim(),
+            deltaItems: Array.isArray(parsed.deltaItems) ? (parsed.deltaItems as any) : undefined,
+            adjustments: Array.isArray(parsed.adjustments) ? (parsed.adjustments as any) : undefined,
+            note: parsed.note != null ? String(parsed.note) : undefined,
+            correlationKey: parsed.correlationKey != null ? String(parsed.correlationKey) : undefined,
+            sessionId: parsed.sessionId != null ? String(parsed.sessionId) : undefined,
+            waiterUserId: parsed.waiterUserId != null ? String(parsed.waiterUserId) : undefined,
+            waiterName: parsed.waiterName != null ? String(parsed.waiterName) : undefined,
+        };
+    } catch {
+        const byToken = raw.match(/orderId:([\w-]+)/)?.[1];
+        return { orderId: byToken || raw };
+    }
 }
 
 /**
@@ -111,13 +162,17 @@ export function PrintBridge() {
             const unsubscribe = client.subscribe(
                 `databases.${DATABASE_ID}.collections.${PRINT_JOBS_COLLECTION_ID}.documents`,
                 (response: any) => {
-                    if (response.events.includes("databases.*.collections.*.documents.*.create")) {
-                        const job = response.payload as PrintJob;
-                        // Only process jobs for this business
-                        if (job.businessId === businessId && job.status === "pending") {
-                            setJobQueue((prev) => [...prev, job]);
-                        }
-                    }
+                    const events = Array.isArray(response?.events) ? response.events : [];
+                    const changed =
+                        events.some((evt: string) => evt.includes(".create")) ||
+                        events.some((evt: string) => evt.includes(".update"));
+                    if (!changed) return;
+                    const job = response.payload as PrintJob;
+                    if (job.businessId !== businessId || job.status !== "pending") return;
+                    setJobQueue((prev) => {
+                        if (prev.some((existing) => existing.$id === job.$id)) return prev;
+                        return [...prev, job];
+                    });
                 }
             );
 
@@ -164,27 +219,17 @@ export function PrintBridge() {
         status: PrintJob["status"],
         errorMessage?: string
     ) => {
-        try {
-            const databases = new Databases(client);
-            const PRINT_JOBS_COLLECTION_ID =
-                process.env.NEXT_PUBLIC_PRINT_JOBS_COLLECTION_ID;
-            const DATABASE_ID = process.env.NEXT_PUBLIC_DATABASE_ID;
-
-            if (!PRINT_JOBS_COLLECTION_ID || !DATABASE_ID) return;
-
-            const updateData: any = { status };
-            if (errorMessage) {
-                updateData.errorMessage = errorMessage;
-            }
-
-            await databases.updateDocument(
-                DATABASE_ID,
-                PRINT_JOBS_COLLECTION_ID,
-                jobId,
-                updateData
-            );
-        } catch (error) {
-            console.error("Error updating job status:", error);
+        const res = await fetch(`/api/pos/print-jobs/${encodeURIComponent(jobId)}/status`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                status,
+                errorMessage,
+            }),
+        });
+        if (!res.ok) {
+            const body = await res.json().catch(() => ({}));
+            throw new Error(body?.error || `Status update failed (${res.status})`);
         }
     };
 
@@ -201,7 +246,8 @@ export function PrintBridge() {
             // Execute print based on job type
             switch (job.jobType) {
                 case "receipt": {
-                    const orderId = job.content.match(/orderId:(\w+)/)?.[1] || job.content;
+                    const parsed = parseJobPayload(job.content);
+                    const orderId = parsed.orderId || job.content;
                     const result = await printer.printReceipt(orderId);
                     if (!result.success) {
                         throw new Error(result.error || "Receipt print failed");
@@ -211,8 +257,8 @@ export function PrintBridge() {
 
                 case "docket":
                 case "captain_docket": {
-                    const docketOrderId =
-                        job.content.match(/orderId:([\w-]+)/)?.[1] || job.content.trim();
+                    const parsed = parseJobPayload(job.content);
+                    const docketOrderId = parsed.orderId || job.content.trim();
                     const docketRes = await printer.printKitchenDocket(docketOrderId);
                     if (!docketRes.success) {
                         throw new Error(docketRes.error || 'Captain docket print failed');
@@ -222,7 +268,8 @@ export function PrintBridge() {
 
                 case "kitchen_docket": {
                     // Legacy jobType — kept for backwards compat. Bug fix: was fetching bytes but never printing.
-                    const orderId = job.content.match(/orderId:([\w-]+)/)?.[1]
+                    const parsed = parseJobPayload(job.content);
+                    const orderId = parsed.orderId || job.content.match(/orderId:([\w-]+)/)?.[1]
                         ?? job.content.match(/table:(\d+)/)?.[1]
                         ?? job.content.trim();
                     const res = await fetch('/api/print/thermal', {
@@ -234,6 +281,11 @@ export function PrintBridge() {
                             printerType: printerConfig.type,
                             terminalName: printerConfig.terminalName,
                             lineWidth: printerConfig.lineWidth || 32,
+                            correlationKey: parsed.correlationKey,
+                            sessionId: parsed.sessionId,
+                            waiterUserId: parsed.waiterUserId,
+                            waiterName: parsed.waiterName,
+                            printMode: "queued",
                         }),
                     });
                     if (!res.ok) {
@@ -251,20 +303,23 @@ export function PrintBridge() {
                 }
 
                 case "kitchen_delta": {
-                    const parsed = JSON.parse(job.content) as {
-                        orderId: string;
-                        deltaItems: { name: string; quantity: number; price: number }[];
-                    };
+                    const parsed = parseJobPayload(job.content);
                     const res = await fetch('/api/print/thermal', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
+                            jobId: job.$id,
                             orderId: parsed.orderId,
                             jobType: 'kitchen_delta',
                             deltaItems: parsed.deltaItems,
                             printerType: printerConfig.type,
                             terminalName: printerConfig.terminalName,
                             lineWidth: printerConfig.lineWidth || 32,
+                            correlationKey: parsed.correlationKey,
+                            sessionId: parsed.sessionId,
+                            waiterUserId: parsed.waiterUserId,
+                            waiterName: parsed.waiterName,
+                            printMode: "queued",
                         }),
                     });
                     if (!res.ok) {
@@ -277,6 +332,41 @@ export function PrintBridge() {
                         await printer.printRawCommands(data.commands as number[]);
                     } else {
                         throw new Error(data.error || 'Kitchen delta print failed');
+                    }
+                    break;
+                }
+
+                case "anomaly_adjustment": {
+                    const parsed = parseJobPayload(job.content);
+                    const res = await fetch('/api/print/thermal', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            jobId: job.$id,
+                            orderId: parsed.orderId,
+                            jobType: 'anomaly_adjustment',
+                            adjustments: parsed.adjustments,
+                            note: parsed.note,
+                            printerType: printerConfig.type,
+                            terminalName: printerConfig.terminalName,
+                            lineWidth: printerConfig.lineWidth || 32,
+                            correlationKey: parsed.correlationKey,
+                            sessionId: parsed.sessionId,
+                            waiterUserId: parsed.waiterUserId,
+                            waiterName: parsed.waiterName,
+                            printMode: "queued",
+                        }),
+                    });
+                    if (!res.ok) {
+                        let msg = `Thermal API error ${res.status}`;
+                        try { msg = (await res.json()).error || msg; } catch {}
+                        throw new Error(msg);
+                    }
+                    const data = await res.json();
+                    if (data.commands) {
+                        await printer.printRawCommands(data.commands as number[]);
+                    } else {
+                        throw new Error(data.error || 'Anomaly adjustment print failed');
                     }
                     break;
                 }
@@ -298,41 +388,28 @@ export function PrintBridge() {
     const queuePrintJob = async (
         jobType: PrintJob["jobType"],
         content: string,
-        targetTerminal?: string
+        meta?: QueuePrintMeta
     ) => {
         try {
-            const databases = new Databases(client);
-            const PRINT_JOBS_COLLECTION_ID =
-                process.env.NEXT_PUBLIC_PRINT_JOBS_COLLECTION_ID;
-            const DATABASE_ID = process.env.NEXT_PUBLIC_DATABASE_ID;
-
-            if (!PRINT_JOBS_COLLECTION_ID || !DATABASE_ID) {
-                toast.error("Print configuration missing");
-                return;
+            const res = await fetch("/api/pos/print-jobs/queue", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    jobType,
+                    content,
+                    targetTerminal: meta?.targetTerminal || "default",
+                    waiterUserId: meta?.waiterUserId,
+                    waiterName: meta?.waiterName,
+                    correlationKey: meta?.correlationKey,
+                    printMode: meta?.printMode || "queued",
+                    sessionId: meta?.sessionId,
+                    requeueReason: meta?.requeueReason,
+                }),
+            });
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({}));
+                throw new Error(body?.error || `Queue failed (${res.status})`);
             }
-
-            // Get business context for tenant isolation
-            const businessId = businessIdRef.current;
-            if (!businessId) {
-                toast.error('Cannot queue print job — organisation not loaded.');
-                return;
-            }
-
-            const jobData = {
-                status: "pending",
-                jobType,
-                content,
-                timestamp: new Date().toISOString(),
-                targetTerminal: targetTerminal || "default",
-                businessId // CRITICAL: Multi-tenant isolation
-            };
-
-            await databases.createDocument(
-                DATABASE_ID,
-                PRINT_JOBS_COLLECTION_ID,
-                "unique()",
-                jobData
-            );
 
             toast.success("Print job queued");
         } catch (error) {

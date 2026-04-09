@@ -1,4 +1,4 @@
-const { Client, Databases, ID, Query } = require('node-appwrite');
+const { Client, Databases } = require('node-appwrite');
 require('dotenv').config({ path: '.env.local' });
 
 const client = new Client()
@@ -11,69 +11,63 @@ const databases = new Databases(client);
 const DATABASE_ID = process.env.DATABASE_ID;
 const COLLECTION_ID = process.env.CATEGORIES_COLLECTION_ID || 'categories';
 
+/**
+ * Fixed document IDs = relationship targets for menu_items.category (manyToOne → categories).
+ * Order matches typical POS tab order (bar-first for AM | PM Lounge).
+ */
 const CATEGORIES = [
-  { id: 'food', name: 'food', label: 'Food', index: 0 },
-  { id: 'salads', name: 'salads', label: 'Salads', index: 1 },
-  { id: 'desserts', name: 'desserts', label: 'Desserts', index: 2 },
-  { id: 'wine', name: 'wine', label: 'Wine', index: 3 },
-  { id: 'beer', name: 'beer', label: 'Beer', index: 4 },
+  { id: 'beers', name: 'beers', label: 'Beers', slug: 'beers', index: 0 },
+  { id: 'whiskys', name: 'whiskys', label: 'Whiskys', slug: 'whiskys', index: 1 },
+  { id: 'cognac', name: 'cognac', label: 'Cognac', slug: 'cognac', index: 2 },
+  { id: 'cocktails', name: 'cocktails', label: 'Cocktails', slug: 'cocktails', index: 3 },
+  { id: 'soft_drinks', name: 'soft_drinks', label: 'Soft Drinks', slug: 'soft_drinks', index: 4 },
+  { id: 'wine', name: 'wine', label: 'Wine', slug: 'wine', index: 5 },
+  { id: 'food', name: 'food', label: 'Food', slug: 'food', index: 6 },
+  { id: 'salads', name: 'salads', label: 'Salads', slug: 'salads', index: 7 },
+  { id: 'desserts', name: 'desserts', label: 'Desserts', slug: 'desserts', index: 8 },
 ];
 
 async function seedCategories() {
-    console.log('🌱 Seeding Categories...');
+  console.log('🌱 Seeding categories (fixed IDs for product relationships)...\n');
 
-    try {
-        // Check if collection exists implicitly by listing documents
-        // If fail, it means collection missing (run setup first)
-        const existing = await databases.listDocuments(DATABASE_ID, COLLECTION_ID);
-        
-        // For simplicity, we just add missing ones or update existing by slug match
-        // But listDocuments returns docs by ID. We can search by 'slug'.
-        // Assuming we haven't created 'slug' attribute globally unique index yet, so we query.
-        
-        // Actually, let's just create them using ID = slug/id for easier seeding?
-        // Appwrite IDs allowed chars: a-z, A-Z, 0-9, period, hyphen, underscore.
-        // our IDs match this.
-        
-        for (const cat of CATEGORIES) {
-            try {
-                await databases.createDocument(
-                    DATABASE_ID,
-                    COLLECTION_ID,
-                    cat.id, // Use ID as document ID for simplicity
-                    {
-                        name: cat.name,
-                        label: cat.label,
-                        slug: cat.id,
-                        index: cat.index,
-                        isActive: true
-                    }
-                );
-                console.log(`✅ Added ${cat.label}`);
-            } catch (error) {
-                if (error.code === 409) {
-                   console.log(`⚠️  ${cat.label} already exists`);
-                   // Optional: Update it?
-                   await databases.updateDocument(
-                        DATABASE_ID, 
-                        COLLECTION_ID, 
-                        cat.id,
-                        {
-                            label: cat.label,
-                            index: cat.index,
-                            isActive: true
-                        }
-                   );
-                   console.log(`   Updated ${cat.label}`);
-                } else {
-                    console.error(`❌ Failed to add ${cat.label}:`, error.message);
-                }
-            }
+  if (!DATABASE_ID || !COLLECTION_ID) {
+    console.error('❌ DATABASE_ID or CATEGORIES_COLLECTION_ID missing in .env.local');
+    process.exit(1);
+  }
+
+  try {
+    for (const cat of CATEGORIES) {
+      try {
+        await databases.createDocument(DATABASE_ID, COLLECTION_ID, cat.id, {
+          name: cat.name,
+          label: cat.label,
+          slug: cat.slug,
+          index: cat.index,
+          isActive: true,
+        });
+        console.log(`✅ Created category: ${cat.label} (${cat.id})`);
+      } catch (error) {
+        if (error.code === 409) {
+          await databases.updateDocument(DATABASE_ID, COLLECTION_ID, cat.id, {
+            name: cat.name,
+            label: cat.label,
+            slug: cat.slug,
+            index: cat.index,
+            isActive: true,
+          });
+          console.log(`♻️  Updated category: ${cat.label} (${cat.id})`);
+        } else {
+          console.error(`❌ Failed ${cat.label}:`, error.message);
         }
-
-    } catch (error) {
-        console.error('❌ Error seeding categories:', error.message);
+      }
+      await new Promise((r) => setTimeout(r, 200));
     }
+
+    console.log('\n🎉 Categories ready:', CATEGORIES.length);
+  } catch (error) {
+    console.error('❌ Error seeding categories:', error.message);
+    process.exit(1);
+  }
 }
 
 seedCategories();

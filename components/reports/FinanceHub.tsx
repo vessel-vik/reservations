@@ -15,15 +15,6 @@ import { Expense } from "@/types/pos.types";
 import { BudgetMeters } from './BudgetMeters'
 import { ExportButtons } from './ExportButtons'
 
-type CashVerificationAuditRow = {
-  $id: string;
-  paymentReference: string;
-  fileId: string;
-  capturedAt: string;
-  deviceInstallId?: string;
-  geoJson?: string;
-};
-
 function getPeriodDateRange(period: FinancePeriod) {
   const today = new Date()
   const fmt = (d: Date) => d.toISOString().slice(0, 10)
@@ -61,7 +52,6 @@ export function FinanceHub() {
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [chartStartDate, setChartStartDate] = useState('')
   const [chartEndDate, setChartEndDate] = useState('')
-  const [cashVerifications, setCashVerifications] = useState<CashVerificationAuditRow[]>([])
 
   const fetchData = async () => {
     setLoading(true);
@@ -108,17 +98,6 @@ export function FinanceHub() {
 
       setComparisons(compareBudgetToActual(budgetsMap, actuals));
 
-      try {
-        const cvRes = await fetch('/api/pos/cash-verifications?limit=24');
-        if (cvRes.ok) {
-          const cvJson = await cvRes.json();
-          setCashVerifications(Array.isArray(cvJson.verifications) ? cvJson.verifications : []);
-        } else {
-          setCashVerifications([]);
-        }
-      } catch {
-        setCashVerifications([]);
-      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -149,35 +128,6 @@ export function FinanceHub() {
         onAddExpense={() => { setSelectedExpense(null); setIsExpenseDrawerOpen(true); }}
         onSetBudgets={() => setIsBudgetManagerOpen(true)}
       />
-
-      {cashVerifications.length > 0 && (
-        <section className="rounded-xl border border-white/10 bg-slate-900/50 p-4 space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold text-slate-100">Cash verification photos</h3>
-            <span className="text-xs text-slate-500">Recent captures — same evidence as admin alerts</span>
-          </div>
-          <div className="flex gap-3 overflow-x-auto pb-1">
-            {cashVerifications.map((v) => (
-              <div key={v.$id} className="shrink-0 w-36 space-y-1">
-                <div className="aspect-[4/3] rounded-lg overflow-hidden border border-white/10 bg-black">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={`/api/pos/cash-verifications/${encodeURIComponent(v.fileId)}/preview`}
-                    alt=""
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-                <p className="text-[10px] font-mono text-slate-400 truncate" title={v.paymentReference}>
-                  {v.paymentReference}
-                </p>
-                <p className="text-[10px] text-slate-500">
-                  {(v.capturedAt || "").slice(0, 19).replace("T", " ")}
-                </p>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
 
       {activeSection === 'expenses' && (
         <>

@@ -1,11 +1,44 @@
 import { NextResponse, NextRequest } from "next/server";
+import { auth } from "@clerk/nextjs/server";
+import { databases, DATABASE_ID, MENU_ITEMS_COLLECTION_ID } from "@/lib/appwrite.config";
 import { updateMenuItem, deleteMenuItem } from "@/lib/actions/menu.actions";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { userId, orgId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const resolvedParams = await params;
     const id = resolvedParams.id;
     const body = await req.json();
+    delete body.businessId;
+
+    if (!DATABASE_ID || !MENU_ITEMS_COLLECTION_ID) {
+      return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
+    }
+
+    let existing: { businessId?: string } | null = null;
+    try {
+      existing = (await databases.getDocument(
+        DATABASE_ID,
+        MENU_ITEMS_COLLECTION_ID,
+        id
+      )) as { businessId?: string };
+    } catch {
+      return NextResponse.json({ error: "Item not found" }, { status: 404 });
+    }
+
+    if (orgId) {
+      const docBid = existing.businessId != null ? String(existing.businessId) : "";
+      if (docBid !== "" && docBid !== orgId) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+      if (docBid === "") {
+        body.businessId = orgId;
+      }
+    }
 
     // Reject negative stock values
     if (typeof body.stock === 'number' && body.stock < 0) {
@@ -33,8 +66,28 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { userId, orgId } = await auth();
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const resolvedParams = await params;
   const id = resolvedParams.id;
+
+  if (DATABASE_ID && MENU_ITEMS_COLLECTION_ID && orgId) {
+    try {
+      const doc = (await databases.getDocument(DATABASE_ID, MENU_ITEMS_COLLECTION_ID, id)) as {
+        businessId?: string;
+      };
+      const bid = doc.businessId != null ? String(doc.businessId) : "";
+      if (bid !== "" && bid !== orgId) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    } catch {
+      return NextResponse.json({ error: "Item not found" }, { status: 404 });
+    }
+  }
+
   const { success, error } = await deleteMenuItem(id);
 
   if (!success) {

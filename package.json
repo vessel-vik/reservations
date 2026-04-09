@@ -14,8 +14,17 @@
     "setup-pos": "node scripts/setup-pos-database.js",
     "seed-pos": "node scripts/seed-database.js",
     "seed-menu": "node scripts/seed-menu.js",
+    "seed-categories": "node scripts/seed-categories.js",
+    "seed-catalog": "node scripts/seed-categories.js && node scripts/seed-menu.js",
     "seed-tables": "node scripts/seed-tables.js",
-    "init-pos": "npm run setup-pos && npm run seed-pos"
+    "init-pos": "npm run setup-pos && npm run seed-pos && npm run seed-catalog",
+    "setup-payments": "node scripts/setup-payment-collections.js",
+    "setup-staff-passkeys": "node scripts/setup-staff-passkeys.js",
+    "setup-central-pos": "npm run setup-staff-passkeys",
+    "backup-payments": "node scripts/backup-payments.js",
+    "migrate-print-ops": "node scripts/migrate-print-ops-wave-a.js",
+    "migrate-print-ops:dry": "node scripts/migrate-print-ops-wave-a.js --dry-run",
+    "smoke-print-ops": "node scripts/smoke-print-ops-wave-a.js"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.36.2",

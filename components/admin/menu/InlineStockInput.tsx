@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 import { getStockStatus } from '@/lib/stock-utils';
 import { toast } from 'sonner';
+import { fetchWithSession } from '@/lib/fetch-with-session';
 
 interface Props {
   itemId: string;
@@ -49,15 +50,16 @@ export function InlineStockInput({ itemId, stock, threshold = 5, onSaved }: Prop
     setError(null);
 
     try {
-      const res = await fetch(`/api/menu/items/${itemId}`, {
+      const res = await fetchWithSession(`/api/menu/items/${itemId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ stock: numValue })
       });
+      if (res.status === 401) throw new Error('Unauthorized');
       if (!res.ok) throw new Error('Failed to update stock');
       onSaved();
     } catch (e) {
-      toast.error('Failed to update stock');
+      toast.error(e instanceof Error && e.message === 'Unauthorized' ? 'Sign in to save changes' : 'Failed to update stock');
       setValue(stock.toString()); // revert
     } finally {
       setIsSaving(false);
@@ -99,7 +101,7 @@ export function InlineStockInput({ itemId, stock, threshold = 5, onSaved }: Prop
     <div
       onClick={() => setIsEditing(true)}
       className={`cursor-text px-2 py-1 rounded text-center text-sm font-mono border border-transparent hover:border-slate-700 hover:bg-slate-800/50 transition-colors
-        ${status === 'healthy' ? 'text-emerald-400' : status === 'low' ? 'text-amber-400' : 'text-red-400 font-semibold'}`
+        ${status === 'in_stock' ? 'text-emerald-400' : status === 'low' ? 'text-amber-400' : status === 'out_of_stock' ? 'text-red-400 font-semibold' : 'text-slate-500'}`
       }
     >
       {stock}

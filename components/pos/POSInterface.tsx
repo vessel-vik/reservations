@@ -1,12 +1,17 @@
 "use client";
 
-import { createTabOrderFromCart, updateOrder, computeKitchenDeltaForOrder } from "@/lib/actions/pos.actions";
+import {
+    createTabOrderFromCart,
+    updateOrder,
+    computeKitchenPrintChangesForOrder,
+    getOrder,
+} from "@/lib/actions/pos.actions";
 
 import { useState, useMemo, useEffect } from "react";
 import { Product, CartItem, Category, Order } from "@/types/pos.types";
 import { ProductCard } from "./ProductCard";
 import { isOutOfStock } from "@/lib/stock-utils";
-import { printOrderDocket, printKitchenDelta } from "@/lib/print.utils";
+import { printOrderDocket, printKitchenDelta, printKitchenAnomalyAdjustment } from "@/lib/print.utils";
 import { CartSidebar } from "./CartSidebar";
 import { MobileCart } from "./MobileCart";
 import { ServerDashboard } from "./ServerDashboard";
@@ -15,17 +20,43 @@ import { OpenOrdersModal } from "./OpenOrdersModal";
 import { ClosedOrdersModal } from "./ClosedOrdersModal";
 import { DocketPreviewModal } from "./DocketPreviewModal";
 import { OrderReceiptModal } from "./OrderReceiptModal";
-import { Search, Grid, LayoutDashboard, X, CreditCard, Receipt, AlertTriangle } from "lucide-react";
+import {
+    Search,
+    Grid,
+    LayoutDashboard,
+    X,
+    CreditCard,
+    Receipt,
+    AlertTriangle,
+    BellRing,
+    CheckCircle2,
+    Copy,
+    ArrowUpRight,
+} from "lucide-react";
 import { toast } from "sonner";
 import { usePOSStore } from "@/store/pos-store";
 import { ProductDetailsModal } from "./ProductDetailsModal";
 import { client } from "@/lib/appwrite-client";
+import { subscribeWithRetry } from "@/lib/realtime-subscribe";
+import {
+    menuDocumentToProduct,
+    menuItemVisibleOnPos,
+    parseMenuRealtimeEvents,
+} from "@/lib/pos-menu-product";
 import { Button } from "@/components/ui/button";
-import { BottleUnitScanBar } from "@/components/pos/BottleUnitScanBar";
 import { PayNowModal } from "@/components/pos/PayNowModal";
+import { CentralWaiterPinGate } from "@/components/pos/CentralWaiterPinGate";
+import {
+    clearActiveWaiterSession,
+    loadActiveWaiterSession,
+    saveActiveWaiterSession,
+    touchActiveWaiterSession,
+    type ActiveWaiterSession,
+} from "@/lib/pos-waiter-session";
 
 import { formatCurrency } from "@/lib/utils";
-import { useUser, UserButton } from "@clerk/nextjs";
+import { displayPaymentMethod } from "@/lib/payment-display";
+import { useUser, UserButton, useOrganization } from "@clerk/nextjs";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
@@ -34,7 +65,27 @@ interface POSInterfaceProps {
     initialCategories: Category[];
 }
 
+type RecentConfirmation = {
+    id: string;
+    amount: number;
+    reference: string;
+    methodLabel: string;
+    orderHint?: string;
+    createdAt: number;
+    source: "settle_tab" | "pay_now" | "realtime";
+};
+
+const CONFIRMATION_TTL_MS = 5 * 60 * 1000;
+const CONFIRMATION_MAX_ITEMS = 10;
+const WAITER_AUTOLOCK_MS = Math.max(
+    30_000,
+    Number(process.env.NEXT_PUBLIC_CENTRAL_POS_AUTOLOCK_MS || 180_000)
+);
+
 export default function POSInterface({ initialProducts, initialCategories }: POSInterfaceProps) {
+    const { organization, membership } = useOrganization();
+    const orgId = organization?.id ?? null;
+    const isOrgAdmin = membership?.role === "org:admin";
     const { user, isLoaded } = useUser();
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -76,11 +127,20 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
         subtotal: number;
         totalAmount: number;
         paymentStatus: string;
+        paymentMethods?: Array<{ method?: string; amount?: number; reference?: string }>;
     } | null>(null);
     const [receiptPaymentMethod, setReceiptPaymentMethod] = useState<string | undefined>(undefined);
     const [receiptPaymentRef, setReceiptPaymentRef] = useState<string | undefined>(undefined);
     const [outOfStockItem, setOutOfStockItem] = useState<Product | null>(null);
     const [payNowOpen, setPayNowOpen] = useState(false);
+    const [editConflict, setEditConflict] = useState<{ orderId: string; message: string } | null>(null);
+    const [editingCustomerNameDraft, setEditingCustomerNameDraft] = useState("");
+    const [recentConfirmations, setRecentConfirmations] = useState<RecentConfirmation[]>([]);
+    const [confirmationTrayOpen, setConfirmationTrayOpen] = useState(true);
+    const [closedOrdersSearchSeed, setClosedOrdersSearchSeed] = useState("");
+    const [activeWaiterSession, setActiveWaiterSession] = useState<ActiveWaiterSession | null>(null);
+    const centralPosModeEnabled =
+        String(process.env.NEXT_PUBLIC_CENTRAL_POS_MODE_ENABLED || "false").trim().toLowerCase() === "true";
 
     // O(1) category lookup optimization
     const categoryMap = useMemo(() => {
@@ -93,6 +153,88 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
         const arr = Array.isArray(cart) ? cart : [];
         return arr.reduce((s, i) => s + i.price * i.quantity, 0);
     }, [cart]);
+
+    const enqueueConfirmation = (incoming: {
+        amount: number;
+        reference?: string;
+        methodLabel?: string;
+        orderHint?: string;
+        source: RecentConfirmation["source"];
+    }) => {
+        const amount = Number(incoming.amount) || 0;
+        const reference = String(incoming.reference || "").trim();
+        if (amount <= 0 || !reference) return;
+        const methodLabel = String(incoming.methodLabel || "Payment");
+        const orderHint = String(incoming.orderHint || "").trim();
+        const now = Date.now();
+        const fingerprint = `${reference.toUpperCase()}::${Math.round(amount * 100)}`;
+
+        setRecentConfirmations((prev) => {
+            const fresh = prev.filter((x) => now - x.createdAt <= CONFIRMATION_TTL_MS);
+            const duplicate = fresh.some(
+                (x) =>
+                    `${x.reference.toUpperCase()}::${Math.round(x.amount * 100)}` === fingerprint &&
+                    now - x.createdAt < 90_000
+            );
+            if (duplicate) return fresh;
+            return [
+                {
+                    id: `${fingerprint}:${now}`,
+                    amount,
+                    reference,
+                    methodLabel,
+                    orderHint,
+                    createdAt: now,
+                    source: incoming.source,
+                },
+                ...fresh,
+            ].slice(0, CONFIRMATION_MAX_ITEMS);
+        });
+    };
+
+    useEffect(() => {
+        const timer = setInterval(() => {
+            const now = Date.now();
+            setRecentConfirmations((prev) =>
+                prev.filter((x) => now - x.createdAt <= CONFIRMATION_TTL_MS)
+            );
+        }, 15_000);
+        return () => clearInterval(timer);
+    }, []);
+
+    useEffect(() => {
+        if (!centralPosModeEnabled) return;
+        setActiveWaiterSession(loadActiveWaiterSession());
+    }, [centralPosModeEnabled]);
+
+    useEffect(() => {
+        if (!centralPosModeEnabled || !activeWaiterSession) return;
+        const markActive = () => {
+            const touched = touchActiveWaiterSession();
+            if (touched) setActiveWaiterSession(touched);
+        };
+        const onActivity = () => markActive();
+        window.addEventListener("pointerdown", onActivity);
+        window.addEventListener("keydown", onActivity);
+        const timer = setInterval(() => {
+            const current = loadActiveWaiterSession();
+            if (!current) {
+                setActiveWaiterSession(null);
+                return;
+            }
+            const idleMs = Date.now() - new Date(current.lastActiveAt).getTime();
+            if (idleMs >= WAITER_AUTOLOCK_MS) {
+                clearActiveWaiterSession();
+                setActiveWaiterSession(null);
+                toast.message("Central POS locked after inactivity. Enter waiter passkey to continue.");
+            }
+        }, 15_000);
+        return () => {
+            window.removeEventListener("pointerdown", onActivity);
+            window.removeEventListener("keydown", onActivity);
+            clearInterval(timer);
+        };
+    }, [centralPosModeEnabled, activeWaiterSession]);
 
     // Add "All Items" as UI-only filter
     const displayCategories = useMemo(() => [
@@ -113,50 +255,82 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
         setShowOutOfStock(false);
     }, [selectedCategory]);
 
+    // Keep menu in sync when navigating back to /pos or after server revalidation
+    useEffect(() => {
+        setProducts(initialProducts);
+    }, [initialProducts]);
+
     const handleCategoryChange = (categoryId: string) => {
         setSelectedCategory(categoryId);
         // Update URL without refresh
         router.push(`?category=${categoryId}`, { scroll: false });
     };
 
-    // Realtime Subscription
+    // Realtime: admin/CMS changes must apply without full page reload.
+    // Appwrite sends concrete event paths (e.g. ...documents.<id>.update), never literal "*".
     useEffect(() => {
         const databaseId = process.env.NEXT_PUBLIC_DATABASE_ID;
         const collectionId = process.env.NEXT_PUBLIC_MENU_ITEMS_COLLECTION_ID;
 
         if (!databaseId || !collectionId) return;
 
-        console.log("Subscribing to realtime updates...", databaseId, collectionId);
+        const unsubscribe = subscribeWithRetry(
+            () =>
+                client.subscribe(
+                    `databases.${databaseId}.collections.${collectionId}.documents`,
+                    (response) => {
+                        const { isCreate, isUpdate, isDelete } = parseMenuRealtimeEvents(response.events || []);
+                        if (!isCreate && !isUpdate && !isDelete) return;
 
-        const unsubscribe = client.subscribe(
-            `databases.${databaseId}.collections.${collectionId}.documents`,
-            (response) => {
-                if (response.events.includes("databases.*.collections.*.documents.*.update")) {
-                    const updatedDoc = response.payload as any;
+                        const raw = response.payload as Record<string, unknown> | null;
+                        if (!raw || typeof raw !== "object" || raw.$id == null) return;
 
-                    // Update product list
-                    setProducts((prev) => prev.map((p) =>
-                        p.$id === updatedDoc.$id
-                            ? { ...p, ...updatedDoc }
-                            : p
-                    ));
+                        const docId = String(raw.$id);
 
-                    // Keep cart item stock in sync so the quantity cap stays accurate
-                    usePOSStore.setState((state) => ({
-                        cart: state.cart.map((item) =>
-                            item.$id === updatedDoc.$id
-                                ? { ...item, stock: updatedDoc.stock, isAvailable: updatedDoc.isAvailable }
-                                : item
-                        ),
-                    }));
-                }
-            }
+                        if (isDelete) {
+                            setProducts((prev) => prev.filter((p) => p.$id !== docId));
+                            usePOSStore.setState((state) => ({
+                                cart: state.cart.filter((item) => item.$id !== docId),
+                            }));
+                            return;
+                        }
+
+                        const visible = menuItemVisibleOnPos(raw, orgId);
+                        const nextProduct = menuDocumentToProduct(raw);
+
+                        setProducts((prev) => {
+                            const idx = prev.findIndex((p) => p.$id === docId);
+                            if (!visible) {
+                                return prev.filter((p) => p.$id !== docId);
+                            }
+                            if (idx >= 0) {
+                                const copy = [...prev];
+                                copy[idx] = { ...copy[idx], ...nextProduct };
+                                return copy;
+                            }
+                            return [...prev, nextProduct];
+                        });
+
+                        usePOSStore.setState((state) => ({
+                            cart: state.cart.map((item) =>
+                                item.$id === docId
+                                    ? {
+                                          ...nextProduct,
+                                          quantity: item.quantity,
+                                          notes: item.notes,
+                                      }
+                                    : item
+                            ),
+                        }));
+                    }
+                ),
+            { maxAttempts: 5, initialDelayMs: 120 }
         );
 
         return () => {
             unsubscribe();
         };
-    }, []);
+    }, [orgId]);
 
     // Hydration fix for persist middleware
     useEffect(() => {
@@ -212,9 +386,22 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
         ).length;
     }, [sorted]);
 
+    const activeWaiterName = centralPosModeEnabled
+        ? activeWaiterSession?.waiterName || "POS System"
+        : user?.fullName || "POS System";
+    const activeWaiterId = centralPosModeEnabled
+        ? activeWaiterSession?.waiterUserId || "system"
+        : user?.id || "system";
+    const waiterGateOpen = centralPosModeEnabled && !activeWaiterSession;
+
     const handleAddToTab = async () => {
         if (editingOrder) {
             toast.error("Save or cancel the current order edit before creating a new tab.");
+            return;
+        }
+
+        if (waiterGateOpen) {
+            toast.error("Enter waiter passkey first.");
             return;
         }
 
@@ -223,8 +410,8 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
         try {
             const newOrder = await createTabOrderFromCart({
                 items: cart,
-                waiterName: user?.fullName || "POS System",
-                waiterId: user?.id || "system",
+                waiterName: activeWaiterName,
+                waiterId: activeWaiterId,
             });
 
             let parsedItems: unknown = newOrder.items;
@@ -272,18 +459,28 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
         }
 
         setEditingOrder(order);
+        setEditingCustomerNameDraft(String(order?.customerName || "Walk-in Customer"));
         setCart(parsedItems as CartItem[]);
         setIsOpenOrdersOpen(false);
         setIsClosedOrdersOpen(false);
         setIsSettleTabModalOpen(false);
 
-        toast.success("Order loaded — adjust quantities or items, then tap Update Order.");
+        toast.success("Order loaded — adjust quantities or items, then tap Update.");
     };
 
     const handleSaveOrderChanges = async () => {
         if (!editingOrder) return;
 
         try {
+            const hashKey = (value: unknown) => {
+                const src = JSON.stringify(value);
+                let h = 2166136261 >>> 0;
+                for (let i = 0; i < src.length; i++) {
+                    h ^= src.charCodeAt(i);
+                    h = Math.imul(h, 16777619);
+                }
+                return (h >>> 0).toString(16);
+            };
             const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
             const subtotal = total / (1 + 0.16);
             const taxAmount = subtotal * 0.16;
@@ -294,7 +491,13 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
                 name: c.name,
             }));
 
-            const { deltaItems, newSnapshotLines } = await computeKitchenDeltaForOrder(
+            const {
+                deltaItems,
+                anomalyItems,
+                newSnapshotLines,
+                baseSnapshotVersion,
+                nextSnapshotVersion,
+            } = await computeKitchenPrintChangesForOrder(
                 editingOrder.$id,
                 cartLines
             );
@@ -305,22 +508,55 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
                 return { ...d, price: cartItem?.price ?? 0 };
             });
 
-            // Queue delta print (fire-and-forget — order is saved regardless)
-            if (enrichedDelta.length > 0) {
-                void printKitchenDelta(editingOrder.$id, enrichedDelta);
-            }
-
             await updateOrder(editingOrder.$id, {
                 items: cart,
+                customerName: String(editingCustomerNameDraft || "").trim() || "Walk-in Customer",
                 subtotal: Math.round(subtotal * 100) / 100,
                 taxAmount: Math.round(taxAmount * 100) / 100,
                 totalAmount: total,
                 kitchenSnapshotLines: newSnapshotLines,
+                kitchenBaseSnapshotVersion: baseSnapshotVersion,
+                kitchenSnapshotVersion: nextSnapshotVersion,
             } as any);
+
+            // Queue print jobs only after the order/snapshot commit succeeds.
+            if (enrichedDelta.length > 0) {
+                const dedupeKey = `delta-${editingOrder.$id}-${baseSnapshotVersion}-${hashKey(enrichedDelta)}`;
+                void printKitchenDelta(editingOrder.$id, enrichedDelta, dedupeKey);
+            }
+            if (anomalyItems.length > 0) {
+                const previousItemsRaw =
+                    typeof editingOrder.items === "string"
+                        ? (() => {
+                              try {
+                                  return JSON.parse(editingOrder.items);
+                              } catch {
+                                  return [];
+                              }
+                          })()
+                        : editingOrder.items;
+                const previousItems = Array.isArray(previousItemsRaw) ? previousItemsRaw : [];
+                const nameById = new Map<string, string>();
+                previousItems.forEach((x: any) => {
+                    const id = String(x?.$id || "").trim();
+                    if (id) nameById.set(id, String(x?.name || "Item").slice(0, 80));
+                });
+                void printKitchenAnomalyAdjustment(
+                    editingOrder.$id,
+                    anomalyItems.map((a) => ({
+                        name: (a.itemId && nameById.get(a.itemId)) || a.name || "Item",
+                        quantity: a.quantity,
+                        note: a.note,
+                    })),
+                    "Customer requested to return item",
+                    `anomaly-${editingOrder.$id}-${baseSnapshotVersion}-${hashKey(anomalyItems)}`
+                );
+            }
 
             // clearCart AFTER updateOrder so enrichedDelta price lookup above is valid
             clearCart();
             setEditingOrder(null);
+            setEditingCustomerNameDraft("");
 
             // Show docket modal for additions
             if (enrichedDelta.length > 0) {
@@ -328,17 +564,57 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
                 setDocketModalType("addition");
                 setDocketModalDelta(enrichedDelta);
                 setIsDocketModalOpen(true);
+            } else if (anomalyItems.length > 0) {
+                toast.success("Order updated. Anomaly adjustment docket queued for admin review.");
             } else {
                 toast.success("Order updated successfully.");
             }
         } catch (error) {
             console.error("Failed to save order changes:", error);
+            const message = error instanceof Error ? error.message : "Unable to save order updates.";
+            if (message.toLowerCase().includes("another terminal")) {
+                setEditConflict({
+                    orderId: editingOrder.$id,
+                    message,
+                });
+                toast.warning("Order changed elsewhere. Reload latest data before saving again.");
+                return;
+            }
             toast.error("Unable to save order updates.");
+        }
+    };
+
+    const handleReloadLatestConflictOrder = async () => {
+        if (!editConflict?.orderId) return;
+        try {
+            const latest = await getOrder(editConflict.orderId);
+            if (!latest) {
+                toast.error("Order no longer available.");
+                setEditConflict(null);
+                setEditingOrder(null);
+                clearCart();
+                return;
+            }
+            const parsedItems = typeof latest.items === "string" ? JSON.parse(latest.items) : latest.items;
+            if (!Array.isArray(parsedItems) || parsedItems.length === 0) {
+                toast.error("Latest order has no items to edit.");
+                setEditConflict(null);
+                return;
+            }
+            setEditingOrder(latest);
+            setEditingCustomerNameDraft(String(latest?.customerName || "Walk-in Customer"));
+            setCart(parsedItems as CartItem[]);
+            setEditConflict(null);
+            toast.success("Latest order state loaded. Re-apply your edit and save.");
+        } catch (error) {
+            console.error("Failed to reload conflicted order:", error);
+            toast.error("Could not reload latest order.");
         }
     };
 
     const handleCancelOrderEdit = () => {
         setEditingOrder(null);
+        setEditingCustomerNameDraft("");
         clearCart();
         toast.success("Order edit canceled.");
     };
@@ -366,11 +642,24 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
 
     return (
         <div className="flex h-screen overflow-hidden bg-neutral-950">
+            <CentralWaiterPinGate
+                open={waiterGateOpen}
+                session={activeWaiterSession}
+                onVerified={(session) => {
+                    saveActiveWaiterSession(session);
+                    setActiveWaiterSession(session);
+                    toast.success(`Welcome, ${session.waiterName}.`);
+                }}
+                onLock={() => {
+                    clearActiveWaiterSession();
+                    setActiveWaiterSession(null);
+                }}
+            />
             {/* Main Content Area */}
             <div className="flex-1 flex flex-col min-w-0">
 
                 {/* Header — vertically stacked, centered on tablet; no logo chrome */}
-                <div className="bg-neutral-900 border-b border-white/10 px-4 pt-3 pb-3 safe-area-top">
+                <div className="bg-neutral-900 border-b border-white/10 px-4 pt-3 pb-3 safe-area-top pos-tablet-portrait-top-safe">
                     {/* Phone: hamburger + search + user inline */}
                     <div className="flex md:hidden items-center gap-3">
                         <button
@@ -408,7 +697,7 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
                     </div>
 
                     {/* Tablet+: single centered column — search full width, then actions */}
-                    <div className="hidden md:flex flex-col items-center w-full max-w-3xl mx-auto gap-3">
+                    <div className="hidden md:flex flex-col items-center w-full max-w-4xl xl:max-w-5xl mx-auto gap-4 px-1">
                         <div className="relative w-full">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-500" />
                             <input
@@ -416,7 +705,7 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
                                 placeholder="Search menu..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full bg-neutral-800 border border-white/5 rounded-xl py-3 pl-11 pr-14 text-base text-white placeholder:text-neutral-500 focus:ring-2 focus:ring-emerald-500/50 text-center md:text-left"
+                                className="w-full bg-neutral-800 border border-white/5 rounded-xl py-3.5 pl-11 pr-14 text-base md:text-[17px] text-white placeholder:text-neutral-500 focus:ring-2 focus:ring-emerald-500/50 text-center md:text-left"
                             />
                             {user?.id && (
                                 <div className="absolute right-2 top-1/2 -translate-y-1/2">
@@ -434,44 +723,51 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
                         </div>
 
                         {user?.id && (
-                            <div className="flex flex-wrap items-center justify-center gap-2 w-full">
+                            <div className="flex flex-wrap items-center justify-center gap-2.5 w-full">
                                 <Link
                                     href={`/pos/dashboard/${user.id}`}
-                                    className="flex items-center justify-center gap-2 bg-neutral-800 hover:bg-neutral-700 hover:scale-[1.03] active:scale-95 text-white px-5 py-3 min-h-[48px] rounded-xl text-sm font-semibold transition-transform duration-150"
+                                    className="flex items-center justify-center gap-2 bg-neutral-800 hover:bg-neutral-700 text-white px-5 py-3.5 min-h-[52px] rounded-xl text-sm md:text-[15px] font-semibold transition-colors duration-200 cursor-pointer"
                                 >
-                                    <LayoutDashboard className="w-4 h-4 shrink-0" />
+                                    <LayoutDashboard className="w-5 h-5 shrink-0" />
                                     Dashboard
                                 </Link>
                                 <button
                                     type="button"
                                     onClick={() => setIsOpenOrdersOpen(true)}
-                                    className="flex items-center justify-center gap-2 bg-neutral-800 hover:bg-neutral-700 hover:scale-[1.03] active:scale-95 text-white px-5 py-3 min-h-[48px] rounded-xl text-sm font-semibold transition-transform duration-150"
+                                    className="flex items-center justify-center gap-2 bg-neutral-800 hover:bg-neutral-700 text-white px-5 py-3.5 min-h-[52px] rounded-xl text-sm md:text-[15px] font-semibold transition-colors duration-200 cursor-pointer"
                                 >
-                                    <Grid className="w-4 h-4 shrink-0" />
+                                    <Grid className="w-5 h-5 shrink-0" />
                                     Open Orders
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => setIsClosedOrdersOpen(true)}
-                                    className="flex items-center justify-center gap-2 bg-sky-700 hover:bg-sky-600 hover:scale-[1.03] active:scale-95 text-white px-5 py-3 min-h-[48px] rounded-xl text-sm font-semibold transition-transform duration-150"
+                                    className="flex items-center justify-center gap-2 bg-sky-700 hover:bg-sky-600 text-white px-5 py-3.5 min-h-[52px] rounded-xl text-sm md:text-[15px] font-semibold transition-colors duration-200 cursor-pointer"
                                 >
-                                    <Receipt className="w-4 h-4 shrink-0" />
+                                    <Receipt className="w-5 h-5 shrink-0" />
                                     Closed Orders
                                 </button>
+                                {isOrgAdmin && (
+                                    <Link
+                                        href="/pos/receipts"
+                                        className="flex items-center justify-center gap-2 bg-neutral-800 hover:bg-neutral-700 text-white px-5 py-3.5 min-h-[52px] rounded-xl text-sm md:text-[15px] font-semibold transition-colors duration-200 cursor-pointer"
+                                    >
+                                        <Receipt className="w-5 h-5 shrink-0" />
+                                        Receipts
+                                    </Link>
+                                )}
                                 <button
                                     type="button"
                                     onClick={() => setIsSettleTabModalOpen(true)}
-                                    className="flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-600 hover:scale-[1.03] active:scale-95 text-white px-5 py-3 min-h-[48px] rounded-xl text-sm font-semibold transition-transform duration-150"
+                                    className="flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-600 text-white px-5 py-3.5 min-h-[52px] rounded-xl text-sm md:text-[15px] font-semibold transition-colors duration-200 cursor-pointer"
                                 >
-                                    <CreditCard className="w-4 h-4 shrink-0" />
+                                    <CreditCard className="w-5 h-5 shrink-0" />
                                     Settle Table
                                 </button>
                             </div>
                         )}
                     </div>
                 </div>
-
-                <BottleUnitScanBar activeCaptainOrderId={editingOrder?.$id ?? null} />
 
                 {/* Mobile Category Menu Drawer */}
                 <div
@@ -506,15 +802,16 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
                 </div>
 
                 {/* Desktop Category Tabs */}
-                <div className="hidden md:flex gap-1 px-4 py-2 overflow-x-auto scrollbar-hide border-b border-white/5 bg-neutral-900/50">
+                <div className="hidden md:flex gap-2 px-4 md:px-5 py-2.5 overflow-x-auto scrollbar-hide border-b border-white/5 bg-neutral-900/50">
                     {displayCategories.map(category => (
                         <button
                             key={category.slug}
+                            type="button"
                             onClick={() => handleCategoryChange(category.slug)}
-                            className={`shrink-0 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-150 ${
+                            className={`shrink-0 min-h-[48px] px-4 md:px-5 py-2.5 rounded-xl text-sm md:text-base font-semibold transition-colors duration-200 cursor-pointer ${
                                 selectedCategory === category.slug
-                                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                                    : 'text-neutral-400 hover:text-white hover:bg-white/5'
+                                    ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/35"
+                                    : "text-neutral-400 hover:text-white hover:bg-white/[0.07] border border-transparent"
                             }`}
                         >
                             {category.label}
@@ -542,7 +839,7 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
                 )}
 
                 {/* Products Grid - Optimized responsive layout */}
-                <div className="pos-main-content flex-1 overflow-y-auto px-3 md:px-4 py-4 pb-24 md:pb-4 scrollbar-hide">
+                <div className="pos-main-content flex-1 overflow-y-auto px-3 md:px-5 lg:px-6 py-4 md:py-5 pb-24 md:pb-4 scrollbar-hide">
                     {visibleProducts.length === 0 ? (
                         <div className="flex items-center justify-center h-full">
                             <div className="text-center space-y-3 max-w-xs">
@@ -598,14 +895,11 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
                     onUpdateQuantity={updateQuantity}
                     onAddToTab={handleAddToTab}
                     editingOrderId={editingOrder?.$id}
-                    editingCustomerName={editingOrder?.customerName ?? null}
+                    editingCustomerName={editingCustomerNameDraft || (editingOrder?.customerName ?? null)}
+                    editingCustomerNameDraft={editingCustomerNameDraft}
+                    onEditCustomerName={setEditingCustomerNameDraft}
                     onSaveOrderChanges={handleSaveOrderChanges}
                     onCancelEdit={handleCancelOrderEdit}
-                    onOpenPayNow={
-                        editingOrder?.$id
-                            ? () => setPayNowOpen(true)
-                            : undefined
-                    }
                 />
             </div>
 
@@ -615,12 +909,15 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
                 onUpdateQuantity={updateQuantity}
                 onAddToTab={handleAddToTab}
                 editingOrderId={editingOrder?.$id}
-                editingCustomerName={editingOrder?.customerName ?? null}
+                editingCustomerName={editingCustomerNameDraft || (editingOrder?.customerName ?? null)}
+                editingCustomerNameDraft={editingCustomerNameDraft}
+                onEditCustomerName={setEditingCustomerNameDraft}
                 onSaveOrderChanges={handleSaveOrderChanges}
                 onCancelEdit={handleCancelOrderEdit}
                 onOpenOrders={() => setIsOpenOrdersOpen(true)}
                 onSettle={() => setIsSettleTabModalOpen(true)}
                 onClosedOrders={() => setIsClosedOrdersOpen(true)}
+                settleModalOpen={isSettleTabModalOpen}
             />
 
             {/* Product Details Modal */}
@@ -679,11 +976,121 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
                 </div>
             )}
 
+            {/* Waiter confirmation tray (persistent for 5 minutes) */}
+            {recentConfirmations.length > 0 && (
+                <div className="fixed right-3 md:right-5 bottom-24 md:bottom-5 z-[70] w-[min(92vw,22rem)]">
+                    <div className="rounded-2xl border border-emerald-500/30 bg-neutral-900/95 shadow-2xl overflow-hidden">
+                        <button
+                            type="button"
+                            onClick={() => setConfirmationTrayOpen((v) => !v)}
+                            className="w-full flex items-center justify-between px-3.5 py-2.5 bg-emerald-500/10 hover:bg-emerald-500/15 text-emerald-200 transition-colors"
+                        >
+                            <span className="inline-flex items-center gap-2 text-sm font-semibold">
+                                <BellRing className="w-4 h-4" />
+                                Recent confirmations
+                            </span>
+                            <span className="text-xs tabular-nums">{recentConfirmations.length}</span>
+                        </button>
+                        {confirmationTrayOpen && (
+                            <div className="max-h-64 overflow-y-auto p-2.5 space-y-2">
+                                {recentConfirmations.map((entry) => (
+                                    <div
+                                        key={entry.id}
+                                        className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2"
+                                    >
+                                        <div className="flex items-start justify-between gap-2">
+                                            <p className="text-[12px] font-semibold text-white inline-flex items-center gap-1.5">
+                                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                                                {entry.methodLabel}
+                                            </p>
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setRecentConfirmations((prev) =>
+                                                        prev.filter((x) => x.id !== entry.id)
+                                                    )
+                                                }
+                                                className="text-neutral-500 hover:text-white"
+                                                aria-label="Dismiss confirmation"
+                                            >
+                                                <X className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
+                                        <p className="text-xs text-emerald-300 mt-1 tabular-nums">
+                                            {formatCurrency(entry.amount)}
+                                        </p>
+                                        <p className="text-[11px] text-neutral-300 mt-0.5 break-all">
+                                            Ref {entry.reference}
+                                        </p>
+                                        {entry.orderHint && (
+                                            <p className="text-[11px] text-neutral-400 mt-0.5">
+                                                Order {entry.orderHint}
+                                            </p>
+                                        )}
+                                        <div className="mt-1.5 flex items-center gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={async () => {
+                                                    try {
+                                                        await navigator.clipboard.writeText(entry.reference);
+                                                        toast.success("Payment reference copied");
+                                                    } catch {
+                                                        toast.error("Failed to copy reference");
+                                                    }
+                                                }}
+                                                className="inline-flex items-center gap-1 text-[11px] text-sky-300 hover:text-sky-200"
+                                            >
+                                                <Copy className="w-3 h-3" />
+                                                Copy ref
+                                            </button>
+                                            {entry.orderHint && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setClosedOrdersSearchSeed(entry.orderHint || "");
+                                                        setIsClosedOrdersOpen(true);
+                                                    }}
+                                                    className="inline-flex items-center gap-1 text-[11px] text-amber-300 hover:text-amber-200"
+                                                >
+                                                    <ArrowUpRight className="w-3 h-3" />
+                                                    Jump to order
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className="mt-2 h-1 rounded-full bg-white/10 overflow-hidden">
+                                            <div
+                                                className="h-full bg-emerald-400/80 transition-all"
+                                                style={{
+                                                    width: `${Math.max(
+                                                        0,
+                                                        Math.min(
+                                                            100,
+                                                            ((CONFIRMATION_TTL_MS - (Date.now() - entry.createdAt)) /
+                                                                CONFIRMATION_TTL_MS) *
+                                                                100
+                                                        )
+                                                    )}%`,
+                                                }}
+                                            />
+                                        </div>
+                                        <p className="text-[10px] text-neutral-500 mt-0.5">
+                                            {new Date(entry.createdAt).toLocaleTimeString("en-KE", {
+                                                timeStyle: "short",
+                                            })}
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
             {/* Settle Table Tab Modal */}
             <SettleTableTabModal
                 isOpen={isSettleTabModalOpen}
                 onClose={() => setIsSettleTabModalOpen(false)}
-                onSettlementSuccess={(consolidatedOrderId, totalAmount, method, ref) => {
+                onSettlementSuccess={(consolidatedOrderId, totalAmount, meta) => {
                     const subtotal = totalAmount / 1.16;
                     setReceiptOrder({
                         $id: consolidatedOrderId,
@@ -693,16 +1100,46 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
                         subtotal,
                         totalAmount,
                         paymentStatus: "paid",
+                        paymentMethods: meta.paymentMethods,
                     });
-                    setReceiptPaymentMethod(method);
-                    setReceiptPaymentRef(ref);
+                    setReceiptPaymentMethod(meta.primaryPaymentLabel);
+                    setReceiptPaymentRef(meta.paymentReference);
                     setIsSettleTabModalOpen(false);
+                    const primaryMethod = meta.primaryPaymentLabel || "Settlement";
+                    const primaryRef =
+                        meta.paymentReference ||
+                        (Array.isArray(meta.paymentMethods) ? meta.paymentMethods[0]?.reference : "") ||
+                        "";
+                    const primaryAmount =
+                        (Array.isArray(meta.paymentMethods)
+                            ? (meta.paymentMethods.reduce((s, m) => s + (Number(m.amount) || 0), 0) || totalAmount)
+                            : totalAmount) || totalAmount;
+                    enqueueConfirmation({
+                        amount: primaryAmount,
+                        reference: primaryRef,
+                        methodLabel: primaryMethod,
+                        orderHint: consolidatedOrderId,
+                        source: "settle_tab",
+                    });
+                }}
+                onBankRealtimeConfirmed={({ amount, reference, orderIds }) => {
+                    enqueueConfirmation({
+                        amount,
+                        reference,
+                        methodLabel: "Bank Paybill",
+                        orderHint: Array.isArray(orderIds) && orderIds.length > 0 ? orderIds[0] : "",
+                        source: "realtime",
+                    });
                 }}
             />
 
             <ClosedOrdersModal
                 isOpen={isClosedOrdersOpen}
-                onClose={() => setIsClosedOrdersOpen(false)}
+                onClose={() => {
+                    setIsClosedOrdersOpen(false);
+                    setClosedOrdersSearchSeed("");
+                }}
+                initialSearchQuery={closedOrdersSearchSeed}
             />
 
             {/* Open Orders Modal */}
@@ -715,11 +1152,13 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
                         orderNumber: order.orderNumber,
                         tableNumber: order.tableNumber,
                         customerName: order.customerName,
+                        waiterName: order.waiterName,
                         orderTime: order.orderTime,
                         items: Array.isArray(order.items) ? order.items as any[] : [],
                         subtotal: order.totalAmount / 1.16,
                         totalAmount: order.totalAmount,
                         paymentStatus: order.paymentStatus ?? "unpaid",
+                        paymentMethods: Array.isArray(order.paymentMethods) ? order.paymentMethods : undefined,
                     });
                     setReceiptPaymentMethod(undefined);
                     setReceiptPaymentRef(undefined);
@@ -762,14 +1201,82 @@ export default function POSInterface({ initialProducts, initialCategories }: POS
                     isOpen={payNowOpen}
                     onClose={() => setPayNowOpen(false)}
                     orderId={editingOrder.$id}
+                    orderNumber={editingOrder.orderNumber}
                     totalAmount={payNowTotal}
-                    onPaymentSuccess={() => {
+                    onPaymentSuccess={({ reference, method, paymentMethods }) => {
+                        const subtotal = payNowTotal / 1.16;
+                        const resolvedMethods =
+                            Array.isArray(paymentMethods) && paymentMethods.length > 0
+                                ? paymentMethods
+                                : [
+                                      {
+                                          method,
+                                          amount: payNowTotal,
+                                          reference,
+                                      },
+                                  ];
+                        const label =
+                            resolvedMethods.length > 1
+                                ? "Split payment"
+                                : displayPaymentMethod(resolvedMethods[0]?.method);
+                        setReceiptOrder({
+                            $id: editingOrder.$id,
+                            orderNumber: editingOrder.orderNumber,
+                            tableNumber: editingOrder.tableNumber,
+                            customerName: editingOrder.customerName,
+                            waiterName: editingOrder.waiterName,
+                            orderTime: new Date().toISOString(),
+                            items: Array.isArray(cart) ? (cart as any[]) : [],
+                            subtotal,
+                            totalAmount: payNowTotal,
+                            paymentStatus: "paid",
+                            paymentMethods: resolvedMethods,
+                        });
+                        setReceiptPaymentMethod(label);
+                        setReceiptPaymentRef(reference);
                         setPayNowOpen(false);
                         clearCart();
                         setEditingOrder(null);
-                        toast.success("Order paid");
+                        const amountForTray =
+                            Array.isArray(resolvedMethods) && resolvedMethods.length > 0
+                                ? resolvedMethods.reduce((s, m: any) => s + (Number(m.amount) || 0), 0) || payNowTotal
+                                : payNowTotal;
+                        enqueueConfirmation({
+                            amount: amountForTray,
+                            reference,
+                            methodLabel: label,
+                            orderHint: editingOrder.orderNumber || editingOrder.$id,
+                            source: "pay_now",
+                        });
+                        toast.success("Order paid and receipt queued");
                     }}
                 />
+            )}
+            {editConflict && (
+                <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 p-4">
+                    <div className="w-full max-w-md rounded-xl border border-amber-500/40 bg-neutral-900 p-4 text-white shadow-2xl">
+                        <h3 className="text-sm font-semibold text-amber-300">Order update conflict detected</h3>
+                        <p className="mt-2 text-sm text-neutral-300">{editConflict.message}</p>
+                        <p className="mt-2 text-xs text-neutral-400">
+                            Reload latest order data to preserve snapshot integrity and avoid duplicate print deltas.
+                        </p>
+                        <div className="mt-4 flex justify-end gap-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setEditConflict(null)}
+                            >
+                                Dismiss
+                            </Button>
+                            <Button
+                                type="button"
+                                onClick={() => void handleReloadLatestConflictOrder()}
+                            >
+                                Reload Latest
+                            </Button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

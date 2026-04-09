@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useRef } from 'react';
+import { fetchWithSession } from '@/lib/fetch-with-session';
 import { Upload, FileText, AlertTriangle, Check, X, Download, ArrowRight } from 'lucide-react';
 
 interface Category {
@@ -50,7 +51,7 @@ export default function MenuImport() {
   const validateJson = async (data: ImportData) => {
     setLoading(true);
     try {
-      const res = await fetch('/api/menu/import', {
+      const res = await fetchWithSession('/api/menu/import', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
@@ -107,7 +108,7 @@ export default function MenuImport() {
     setImportResults(null);
     
     try {
-      const res = await fetch('/api/menu/import', {
+      const res = await fetchWithSession('/api/menu/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(importData)

@@ -1,7 +1,7 @@
 import { getMenuItems, getCategories } from "@/lib/actions/pos.actions";
 import POSInterface from "@/components/pos/POSInterface";
 import { Product, Category } from "@/types/pos.types";
-import { resolveAppwriteFileViewUrl } from "@/lib/appwrite-storage-url";
+import { menuDocumentToProduct } from "@/lib/pos-menu-product";
 
 export default async function POSPage() {
     // Fetch data on the server (Appwrite may pause projects when idle)
@@ -25,24 +25,9 @@ export default async function POSPage() {
 
     // Transform Appwrite documents to our Product type if necessary
     // (Assuming structure matches well enough or strictly validated)
-    const formattedProducts: Product[] = (products || []).map((doc: any) => ({
-        $id: doc.$id,
-        name: doc.name,
-        description: doc.description,
-        price: doc.price,
-        category: doc.category,
-        imageUrl: resolveAppwriteFileViewUrl(doc.imageUrl),
-        isAvailable: doc.isAvailable,
-        preparationTime: doc.preparationTime,
-        popularity: doc.popularity,
-        ingredients: doc.ingredients || [],
-        allergens: doc.allergens || [],
-        calories: doc.calories,
-        // Defaulting these if missing
-        isVegetarian: doc.isVegetarian || false,
-        isVegan: doc.isVegan || false,
-        isGlutenFree: doc.isGlutenFree || false,
-    }));
+    const formattedProducts: Product[] = (products || []).map((doc: any) =>
+        menuDocumentToProduct(doc as Record<string, unknown>)
+    );
 
     return (
         <main className="h-screen w-full bg-black">

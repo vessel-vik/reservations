@@ -9,6 +9,8 @@ import { CheckCircle, Loader2 } from "lucide-react";
 import QRCode from "qrcode";
 import { PrinterSetup } from "@/components/pos/PrinterSetup";
 import { useUser } from "@clerk/nextjs";
+import { buildPaybillReceiptLines } from "@/lib/receipt-paybill";
+import { formatPaymentMethodEntry } from "@/lib/payment-display";
 
 export default function ReceiptPage({ params }: { params: Promise<{ orderId: string }> }) {
     const { orderId } = use(params);
@@ -207,6 +209,41 @@ export default function ReceiptPage({ params }: { params: Promise<{ orderId: str
                             {paymentLabel === "UNPAID" ? "UNPAID - TO BE SETTLED" : paymentLabel}
                         </div>
                     )}
+                </div>
+
+                {isPaid &&
+                    Array.isArray(order.paymentMethods) &&
+                    order.paymentMethods.length > 0 && (
+                        <div className="mb-6 text-xs border-t border-dashed border-gray-300 pt-4">
+                            <p className="font-bold text-center text-gray-800 mb-2 uppercase tracking-wide">
+                                Payment
+                            </p>
+                            <ul className="space-y-1 text-gray-700">
+                                {order.paymentMethods.map(
+                                    (
+                                        m: { method?: string; amount?: number; reference?: string },
+                                        i: number
+                                    ) => (
+                                        <li key={i} className="space-y-0.5">
+                                            <div className="flex justify-between gap-2">
+                                                <span>{formatPaymentMethodEntry(m)}</span>
+                                            </div>
+                                            {m.reference && (
+                                                <div className="text-[10px] text-gray-500 break-all">
+                                                    Ref: {m.reference}
+                                                </div>
+                                            )}
+                                        </li>
+                                    )
+                                )}
+                            </ul>
+                        </div>
+                    )}
+
+                <div className="mb-6 border-t border-dashed border-gray-300 pt-4 font-mono text-[10px] text-gray-700 leading-relaxed">
+                    {buildPaybillReceiptLines(order.orderNumber).map((line, i) => (
+                        <p key={i}>{line || "\u00a0"}</p>
+                    ))}
                 </div>
 
                 {/* QR Code */}

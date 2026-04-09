@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Order } from "@/types/pos.types";
 import { formatCurrency } from "@/lib/utils";
+import { formatPaymentMethodEntry } from "@/lib/payment-display";
 import { Receipt, Search, Filter } from "lucide-react";
 import Link from "next/link";
 
@@ -82,6 +83,7 @@ export function OrdersTable({ orders }: OrdersTableProps) {
                                 <th className="text-left text-xs font-semibold text-neutral-400 uppercase tracking-wider py-3 px-4">Date</th>
                                 <th className="text-left text-xs font-semibold text-neutral-400 uppercase tracking-wider py-3 px-4">Table</th>
                                 <th className="text-left text-xs font-semibold text-neutral-400 uppercase tracking-wider py-3 px-4">Amount</th>
+                                <th className="text-left text-xs font-semibold text-neutral-400 uppercase tracking-wider py-3 px-4">Payment</th>
                                 <th className="text-left text-xs font-semibold text-neutral-400 uppercase tracking-wider py-3 px-4">Status</th>
                                 <th className="text-right text-xs font-semibold text-neutral-400 uppercase tracking-wider py-3 px-4">Action</th>
                             </tr>
@@ -113,6 +115,27 @@ export function OrdersTable({ orders }: OrdersTableProps) {
                                         <span className="text-sm font-bold text-emerald-400">
                                             {formatCurrency(order.totalAmount)}
                                         </span>
+                                    </td>
+                                    <td className="py-4 px-4 max-w-[280px]">
+                                        {Array.isArray(order.paymentMethods) && order.paymentMethods.length > 0 ? (
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {order.paymentMethods.map((m: any, i: number) => (
+                                                    <span
+                                                        key={`${order.$id}-method-${i}`}
+                                                        className="text-xs rounded-full border border-white/10 bg-white/5 px-2 py-1 text-neutral-300"
+                                                        title={m?.reference ? `Ref: ${m.reference}` : undefined}
+                                                    >
+                                                        {formatPaymentMethodEntry({
+                                                            method: m?.method,
+                                                            amount: m?.amount,
+                                                            reference: m?.reference,
+                                                        })}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <span className="text-xs text-neutral-500">—</span>
+                                        )}
                                     </td>
                                     <td className="py-4 px-4">
                                         <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${statusColors[order.status as keyof typeof statusColors] || statusColors.pending}`}>

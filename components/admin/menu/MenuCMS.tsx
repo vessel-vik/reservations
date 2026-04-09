@@ -3,26 +3,30 @@
 import { useEffect, useState, useCallback } from "react";
 import { getMenuItems, getCategories } from "@/lib/actions/menu.actions";
 import { getModifierGroups } from "@/lib/actions/modifier.actions";
-import { getStockStatus, STOCK_STATUS_COLORS } from "@/lib/stock-utils";
+import { getStockStatus } from "@/lib/stock-utils";
 import { MenuItemDrawer } from "./MenuItemDrawer";
 import { StockAdjustmentModal } from "./StockAdjustmentModal";
 import { LowStockAlertStrip } from "./LowStockAlertStrip";
-import { MenuSectionNav } from "./MenuSectionNav";
+import { MenuSectionNav, type ItemsViewMode } from "./MenuSectionNav";
 import { MenuItemsSection } from "./MenuItemsSection";
 import { CategoriesSection } from "./CategoriesSection";
 import { ModifiersSection } from "./ModifiersSection";
 import { ModifierGroupDrawer } from "./ModifierGroupDrawer";
+import { MenuImportDialog } from "./MenuImportDialog";
+import { BottleUnitScanBar } from "@/components/pos/BottleUnitScanBar";
 
 type MenuSection = 'items' | 'categories' | 'modifiers';
 
 export function MenuCMS() {
   const [activeSection, setActiveSection] = useState<MenuSection>('items');
+  const [itemsViewMode, setItemsViewMode] = useState<ItemsViewMode>('cards');
   const [items, setItems] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [modifierGroups, setModifierGroups] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState<string | undefined>(undefined);
+  const [importOpen, setImportOpen] = useState(false);
 
   // Drawer state
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -30,6 +34,9 @@ export function MenuCMS() {
   
   const [modDrawerOpen, setModDrawerOpen] = useState(false);
   const [selectedModGroup, setSelectedModGroup] = useState<any | null>(null);
+
+  const [stockModalItem, setStockModalItem] = useState<any | null>(null);
+  const [categoryAddTick, setCategoryAddTick] = useState(0);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -62,6 +69,8 @@ export function MenuCMS() {
 
   return (
     <div className="space-y-6">
+      <BottleUnitScanBar inventoryContext activeCaptainOrderId={null} />
+
       <LowStockAlertStrip items={lowStockItems} />
 
       <MenuSectionNav
@@ -72,10 +81,15 @@ export function MenuCMS() {
         categories={categories}
         filterCategory={filterCategory}
         onFilterCategory={setFilterCategory}
+        itemsViewMode={itemsViewMode}
+        onItemsViewModeChange={setItemsViewMode}
+        onOpenBulkImport={() => setImportOpen(true)}
         onAddItem={() => {
           if (activeSection === 'items') {
             setSelectedItem(null);
             setDrawerOpen(true);
+          } else if (activeSection === 'categories') {
+            setCategoryAddTick((t) => t + 1);
           } else if (activeSection === 'modifiers') {
             setSelectedModGroup(null);
             setModDrawerOpen(true);
@@ -88,8 +102,10 @@ export function MenuCMS() {
           items={filteredItems}
           categories={categories}
           loading={loading}
+          viewMode={itemsViewMode}
           onEdit={(item: any) => { setSelectedItem(item); setDrawerOpen(true); }}
           onRefresh={fetchData}
+          onAdjustStock={(item) => setStockModalItem(item)}
         />
       )}
 
@@ -97,6 +113,7 @@ export function MenuCMS() {
         <CategoriesSection
           categories={categories}
           onRefresh={fetchData}
+          triggerAddTick={categoryAddTick}
         />
       )}
 
@@ -109,6 +126,7 @@ export function MenuCMS() {
       )}
 
       <MenuItemDrawer
+        key={selectedItem?.$id ?? 'new'}
         open={drawerOpen}
         item={selectedItem}
         categories={categories}
@@ -123,6 +141,15 @@ export function MenuCMS() {
         onClose={() => setModDrawerOpen(false)}
         onSaved={fetchData}
       />
+
+      <StockAdjustmentModal
+        open={!!stockModalItem}
+        item={stockModalItem}
+        onClose={() => setStockModalItem(null)}
+        onSaved={fetchData}
+      />
+
+      <MenuImportDialog open={importOpen} onClose={() => { setImportOpen(false); fetchData(); }} />
     </div>
   );
 }

@@ -16,6 +16,23 @@ vi.mock('@/lib/actions/menu.actions', () => ({
   decrementItemStocks: vi.fn().mockResolvedValue({ success: true, failureCount: 0 }),
 }));
 
+vi.mock('@/lib/auth.utils', () => ({
+  getAuthContext: vi.fn().mockResolvedValue({
+    businessId: 'test-business',
+    userId: 'user-1',
+    orgId: 'org-1',
+  }),
+  validateBusinessContext: vi.fn(),
+  requireOrgAdmin: vi.fn(),
+}));
+
+vi.mock('@/lib/kitchen-print-snapshot', () => ({
+  linesFromCartItems: vi.fn().mockReturnValue([]),
+  mergeKitchenSnapshotIntoSpecialInstructions: (si: string) => si,
+  computeKitchenDelta: vi.fn(),
+  parseLastKitchenSnapshot: vi.fn(),
+}));
+
 import { createOrder } from '@/lib/actions/pos.actions';
 import { decrementItemStocks } from '@/lib/actions/menu.actions';
 

@@ -4,7 +4,9 @@ const client = new Client();
 
 // Check if required env vars are set
 const endpoint = process.env.NEXT_PUBLIC_ENDPOINT;
-const projectId = process.env.PROJECT_ID;
+/** Browser bundle only embeds NEXT_PUBLIC_* — fall back for server builds */
+const projectId =
+  process.env.NEXT_PUBLIC_PROJECT_ID || process.env.PROJECT_ID;
 
 if (!endpoint || !projectId) {
   console.warn('⚠️ Appwrite configuration missing - some features may not work');
