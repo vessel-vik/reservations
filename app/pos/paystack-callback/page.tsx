@@ -10,6 +10,7 @@ import { Loader2, CheckCircle, XCircle, Printer } from "lucide-react";
 const STORAGE_KEY = "paystack_pending_settlement";
 
 interface PendingSettlement {
+    flow?: "tab_multi" | "single";
     orderIds: string[];
     amount: number;
     reference: string;

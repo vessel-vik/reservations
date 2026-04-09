@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { getStockStatus, STOCK_STATUS_COLORS, STOCK_STATUS_LABELS } from '@/lib/stock-utils';
 import { Edit2, Package, ToggleLeft, ToggleRight, Loader2, Image as ImageIcon } from 'lucide-react';
+import { fetchWithSession } from '@/lib/fetch-with-session';
 
 interface Props {
   items: any[];
@@ -21,7 +22,7 @@ export function MenuItemsTable({ items, categories, loading, onEdit, onAdjustSto
   const handleToggle = async (item: any) => {
     setTogglingId(item.$id);
     try {
-      await fetch(`/api/menu/items/${item.$id}`, {
+      await fetchWithSession(`/api/menu/items/${item.$id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isAvailable: !item.isAvailable }),

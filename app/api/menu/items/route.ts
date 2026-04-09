@@ -1,4 +1,5 @@
 import { NextResponse, NextRequest } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import { getMenuItems, createMenuItem } from "@/lib/actions/menu.actions";
 
 export async function GET(req: NextRequest) {
@@ -19,7 +20,13 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const { userId, orgId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await req.json();
+    delete body.businessId;
 
     if (!body.name || typeof body.name !== 'string' || body.name.trim() === '') {
       return NextResponse.json({ error: 'name is required' }, { status: 400 });
@@ -29,6 +36,10 @@ export async function POST(req: NextRequest) {
     }
     if (!body.categoryId) {
       return NextResponse.json({ error: 'categoryId is required' }, { status: 400 });
+    }
+
+    if (orgId) {
+      body.businessId = orgId;
     }
 
     const { success, item, error } = await createMenuItem(body);

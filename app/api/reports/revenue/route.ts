@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const { success, data, totalRevenue, error } = await getRevenueByPeriod(days);
+    const { success, data, totalRevenue } = await getRevenueByPeriod(days);
 
     if (!success) {
       return NextResponse.json({ error: 'Failed to fetch revenue data' }, { status: 500 });

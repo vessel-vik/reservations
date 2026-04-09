@@ -3,6 +3,18 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MenuItemDrawer } from '@/components/admin/menu/MenuItemDrawer';
 
+vi.mock('@clerk/nextjs', () => ({
+  useUser: () => ({
+    user: {
+      id: 'test-user',
+      fullName: 'Test Admin',
+      primaryEmailAddress: { emailAddress: 'admin@test.dev' },
+      username: 'admin',
+    },
+    isLoaded: true,
+  }),
+}));
+
 // Mock dependencies
 global.fetch = vi.fn();
 vi.mock('@/lib/appwrite-client', () => ({ client: {} }));

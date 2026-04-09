@@ -28,6 +28,11 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@clerk/nextjs', () => ({
   useUser: () => ({ user: null, isLoaded: true }),
+  useOrganization: () => ({
+    organization: null,
+    membership: { role: 'org:admin' as const },
+    isLoaded: true,
+  }),
   UserButton: () => null,
 }));
 
@@ -51,6 +56,8 @@ vi.mock('@/lib/appwrite-client', () => ({
 
 vi.mock('@/lib/actions/pos.actions', () => ({
   createOrder: vi.fn(),
+  getOpenOrdersSummary: vi.fn().mockResolvedValue({ orders: [] }),
+  voidOrderValidated: vi.fn().mockResolvedValue({ success: true }),
 }));
 
 vi.mock('next/dynamic', () => ({

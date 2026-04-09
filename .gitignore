@@ -28,29 +28,5 @@ yarn-error.log*
 
 # local env files
 .env*.local
-
-# vercel
-.vercel
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-
-# Sentry Config File
-.env.sentry-build-plugin
-
-# Sentry Config File
-.env.sentry-build-plugin
-
-# Sentry Config File
-.env.sentry-build-plugin
-
-# Sentry Config File
-.env.sentry-build-plugin
-
 # clerk configuration (can include secrets)
 /.clerk/
-.env.production
-
-# Visual brainstorming sessions
-.superpowers/

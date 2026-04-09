@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Edit2, Trash2, ListChecks, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
+import { fetchWithSession } from '@/lib/fetch-with-session';
 
 interface Props {
   group: any;
@@ -18,7 +19,7 @@ export function ModifierGroupCard({ group, onEdit, onRefresh }: Props) {
     if (!confirm('Delete this modifier group? This removes it from all attached menu items.')) return;
     setIsDeleting(true);
     try {
-      const res = await fetch(`/api/menu/modifiers/${group.$id}`, { method: 'DELETE' });
+      const res = await fetchWithSession(`/api/menu/modifiers/${group.$id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error();
       toast.success('Group deleted');
       onRefresh();

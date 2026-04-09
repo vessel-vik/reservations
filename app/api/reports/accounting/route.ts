@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { databases, DATABASE_ID, ORDERS_COLLECTION_ID, EXPENSES_COLLECTION_ID } from '@/lib/appwrite.config';
-import { Query } from 'appwrite';
+import { Query } from 'node-appwrite';
 import { parseStringify } from '@/lib/utils';
+import { getAuthContext, validateBusinessContext } from '@/lib/auth.utils';
+
+const PAYMENT_LEDGER_COLLECTION_ID = process.env.PAYMENT_LEDGER_COLLECTION_ID;
 
 export async function GET(request: NextRequest) {
   try {
+    const { businessId } = await getAuthContext();
+    validateBusinessContext(businessId);
+
     const searchParams = request.nextUrl.searchParams;
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
@@ -27,12 +33,14 @@ export async function GET(request: NextRequest) {
     }
 
     const ordersQueries: any[] = [
+      Query.equal('businessId', businessId),
       // Only filter by paymentStatus=paid to include all paid orders
       Query.equal('paymentStatus', 'paid'),
       Query.limit(500)
     ];
     
     const expensesQueries: any[] = [
+      Query.equal('businessId', businessId),
       Query.equal('paymentStatus', 'paid'),
       Query.limit(500)
     ];
@@ -61,10 +69,11 @@ export async function GET(request: NextRequest) {
 
     // Fetch expenses only if collection is configured
     let expensesResult;
-    if (hasExpensesCollection) {
+    const expensesCollectionId = EXPENSES_COLLECTION_ID;
+    if (hasExpensesCollection && expensesCollectionId) {
       expensesResult = await databases.listDocuments(
         DATABASE_ID, 
-        EXPENSES_COLLECTION_ID, 
+        expensesCollectionId, 
         expensesQueries
       );
     }
@@ -92,9 +101,8 @@ export async function GET(request: NextRequest) {
       expenses = parseStringify(expensesResult.documents);
     }
     
-    // Calculate totals - check all possible field names
-    // Also handle legacy orders that only stored VAT-inclusive totals
-    const totalIncome = orders.reduce((sum: number, order: any) => {
+    // Legacy order-derived revenue fallback (used when no ledger rows exist)
+    const totalIncomeFromOrders = orders.reduce((sum: number, order: any) => {
       const total = order.total || order.totalAmount || order.grandTotal || 0;
       return sum + total;
     }, 0);
@@ -115,6 +123,46 @@ export async function GET(request: NextRequest) {
       return sum;
     }, 0);
     
+    let ledgerIncome = 0;
+    let ledgerOrderCount = 0;
+    const paymentMethodTotals: Record<string, number> = {};
+    if (PAYMENT_LEDGER_COLLECTION_ID) {
+      const ledgerQueries: any[] = [
+        Query.equal("businessId", businessId),
+        Query.equal("status", "confirmed"),
+        Query.limit(5000),
+      ];
+      if (startDate && endDate) {
+        const startDateTime = new Date(startDate).toISOString();
+        const endDateTime = new Date(endDate + 'T23:59:59.999').toISOString();
+        ledgerQueries.push(Query.greaterThanEqual("settledAt", startDateTime));
+        ledgerQueries.push(Query.lessThanEqual("settledAt", endDateTime));
+      }
+      ledgerQueries.push(Query.orderDesc("$createdAt"));
+
+      try {
+        const ledgerResult = await databases.listDocuments(
+          DATABASE_ID,
+          PAYMENT_LEDGER_COLLECTION_ID,
+          ledgerQueries
+        );
+        const ledgerRows = parseStringify(ledgerResult.documents);
+        const uniqueOrderIds = new Set<string>();
+        ledgerIncome = ledgerRows.reduce((sum: number, row: any) => {
+          const amount = Number(row.amount) || 0;
+          const method = String(row.method || "unknown").toLowerCase();
+          paymentMethodTotals[method] = (paymentMethodTotals[method] || 0) + amount;
+          if (row.orderId) uniqueOrderIds.add(String(row.orderId));
+          return sum + amount;
+        }, 0);
+        ledgerOrderCount = uniqueOrderIds.size;
+      } catch (ledgerErr) {
+        console.warn("[Accounting API] Ledger query failed, falling back to orders:", ledgerErr);
+      }
+    }
+
+    const totalIncome = ledgerIncome > 0 ? ledgerIncome : totalIncomeFromOrders;
+
     const totalExpenses = expenses.reduce((sum: number, exp: any) => {
       return sum + (exp.totalAmount || exp.amount || 0);
     }, 0);
@@ -144,7 +192,9 @@ export async function GET(request: NextRequest) {
         inputVat,
         netVat,
         profitMargin,
-        orderCount: orders.length,
+        orderCount: ledgerOrderCount > 0 ? ledgerOrderCount : orders.length,
+        revenueSource: ledgerIncome > 0 ? "payment_ledger" : "orders",
+        paymentMethodTotals,
         expenseCount: expenses.length
       },
       expenseByCategory,

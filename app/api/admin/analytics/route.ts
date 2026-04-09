@@ -20,10 +20,10 @@ export async function GET() {
     }
 
     console.log("✅ Admin API: Analytics fetched successfully:", {
-      todayOrders: analytics.today.orders,
-      todayRevenue: analytics.today.revenue,
-      peakTime: analytics.peakHours.time,
-      topProductsCount: analytics.topProducts.length
+      todayOrders: analytics.today?.orders ?? 0,
+      todayRevenue: analytics.today?.revenue ?? 0,
+      peakTime: analytics.peakHours?.time ?? null,
+      topProductsCount: analytics.topProducts?.length ?? 0
     });
 
     return NextResponse.json(analytics);

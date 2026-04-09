@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, Plus, Trash2, GripVertical } from 'lucide-react';
 import { toast } from 'sonner';
+import { fetchWithSession } from '@/lib/fetch-with-session';
 
 interface Props {
   open: boolean;
@@ -97,7 +98,7 @@ export function ModifierGroupDrawer({ open, group, onClose, onSaved }: Props) {
 
     try {
       const url = isEdit ? `/api/menu/modifiers/${group.$id}` : '/api/menu/modifiers';
-      const res = await fetch(url, {
+      const res = await fetchWithSession(url, {
         method: isEdit ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

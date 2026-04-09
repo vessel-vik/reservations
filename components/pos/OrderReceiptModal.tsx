@@ -10,6 +10,8 @@ import {
 import { formatCurrency } from "@/lib/utils";
 import { Printer } from "lucide-react";
 import { printReceipt } from "@/lib/print.utils";
+import { displayPaymentMethod, formatPaymentMethodEntry } from "@/lib/payment-display";
+import { buildPaybillReceiptLines } from "@/lib/receipt-paybill";
 
 interface ReceiptOrder {
     $id: string;
@@ -22,6 +24,7 @@ interface ReceiptOrder {
     subtotal: number;
     totalAmount: number;
     paymentStatus: string;
+    paymentMethods?: Array<{ method?: string; amount?: number; reference?: string }>;
 }
 
 interface OrderReceiptModalProps {
@@ -80,9 +83,29 @@ export function OrderReceiptModal({
         ? `Table: ${order.tableNumber}`
         : "Table: Bar";
 
+    const refForPaybill = order.orderNumber || order.$id.slice(-12).toUpperCase();
+    const paybillLines = buildPaybillReceiptLines(refForPaybill);
+
+    const resolvedMethods =
+        order.paymentMethods?.length
+            ? order.paymentMethods
+            : paymentMethod
+              ? [
+                    {
+                        method: paymentMethod,
+                        amount: order.totalAmount,
+                        reference: paymentReference,
+                    },
+                ]
+              : [];
+
     const paymentLabel = (() => {
-        if (!paymentMethod) return isPaid ? "PAID" : "UNPAID";
-        return `PAID — ${paymentMethod.toUpperCase()}`;
+        if (!isPaid) return "UNPAID";
+        if (resolvedMethods.length > 1) return "PAID — Split payment";
+        if (resolvedMethods.length === 1) {
+            return `PAID — ${displayPaymentMethod(resolvedMethods[0]?.method)}`;
+        }
+        return paymentMethod ? `PAID — ${displayPaymentMethod(paymentMethod)}` : "PAID";
     })();
 
     // Auto-queue print job when modal opens
@@ -191,12 +214,53 @@ export function OrderReceiptModal({
                         )}
                     </div>
 
-                    {/* Payment reference (if provided) */}
-                    {paymentReference && (
+                    {isPaid && resolvedMethods.length > 0 && (
+                        <div className="text-[9px] text-neutral-600 space-y-0.5 mb-2">
+                            <div className="font-bold text-neutral-800 text-center uppercase tracking-wide">
+                                Payment breakdown
+                            </div>
+                            {resolvedMethods.map((m, i) => (
+                                <div key={i} className="space-y-0.5">
+                                    <div className="flex justify-between gap-2">
+                                        <span className="truncate">
+                                            {formatPaymentMethodEntry({
+                                                method: m.method,
+                                                amount: m.amount,
+                                            })}
+                                        </span>
+                                    </div>
+                                    {m.reference && (
+                                        <div className="text-[8px] text-neutral-500 break-all">
+                                            Ref: {m.reference}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {!isPaid && paymentReference && (
                         <div className="text-[9px] text-neutral-500 text-center">
                             Ref: {paymentReference}
                         </div>
                     )}
+
+                    <Dashes />
+
+                    <div className="text-[8px] text-neutral-700 space-y-0.5 leading-snug">
+                        {paybillLines.map((line, i) => (
+                            <div
+                                key={i}
+                                className={
+                                    line.startsWith("─") || line === ""
+                                        ? "text-neutral-400 text-center"
+                                        : ""
+                                }
+                            >
+                                {line || "\u00a0"}
+                            </div>
+                        ))}
+                    </div>
 
                     <Dashes />
 

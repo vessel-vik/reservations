@@ -22,7 +22,16 @@ describe('printOrderDocket', () => {
 
         const result = await printOrderDocket('order-123');
 
-        expect(mockQueue).toHaveBeenCalledWith('captain_docket', 'orderId:order-123');
+        expect(mockQueue).toHaveBeenCalledTimes(1);
+        const [jobType, content, meta] = mockQueue.mock.calls[0];
+        expect(jobType).toBe('captain_docket');
+        const payload = JSON.parse(String(content));
+        expect(payload.orderId).toBe('order-123');
+        expect(typeof payload.correlationKey).toBe('string');
+        expect(meta).toEqual(expect.objectContaining({
+            printMode: 'queued',
+            requeueReason: 'initial_docket',
+        }));
         expect(result).toEqual({ success: true });
         expect(ThermalPrinterClient.loadConfig).not.toHaveBeenCalled();
     });
@@ -45,11 +54,35 @@ describe('printKitchenDelta', () => {
         const delta = [{ name: 'Savanna', quantity: 1, price: 350 }];
         const result = await printKitchenDelta('order-123', delta);
 
-        expect(mockQueue).toHaveBeenCalledWith(
-            'kitchen_delta',
-            JSON.stringify({ orderId: 'order-123', deltaItems: delta })
-        );
+        expect(mockQueue).toHaveBeenCalledTimes(1);
+        const [jobType, content, meta] = mockQueue.mock.calls[0];
+        expect(jobType).toBe('kitchen_delta');
+        const payload = JSON.parse(String(content));
+        expect(payload.orderId).toBe('order-123');
+        expect(payload.deltaItems).toEqual(delta);
+        expect(typeof payload.correlationKey).toBe('string');
+        expect(meta).toEqual(expect.objectContaining({
+            printMode: 'queued',
+            requeueReason: 'order_update_docket',
+        }));
         expect(result).toEqual({ success: true });
+    });
+
+    it('includes dedupeKey when provided', async () => {
+        const mockQueue = vi.fn().mockResolvedValue(undefined);
+        (window as any).queuePrintJob = mockQueue;
+        const delta = [{ name: 'Savanna', quantity: 1, price: 350 }];
+        await printKitchenDelta('order-123', delta, 'delta-key-1');
+        const [, content, meta] = mockQueue.mock.calls[0];
+        const payload = JSON.parse(String(content));
+        expect(payload).toEqual(expect.objectContaining({
+            orderId: 'order-123',
+            deltaItems: delta,
+            correlationKey: 'delta-key-1',
+        }));
+        expect(meta).toEqual(expect.objectContaining({
+            correlationKey: 'delta-key-1',
+        }));
     });
 
     it('returns success without queuing when deltaItems is empty', async () => {

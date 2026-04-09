@@ -5,14 +5,24 @@ import { ID, Query } from "node-appwrite";
 import { parseStringify } from "@/lib/utils";
 import { Order, type CartItem, type OpenOrder, type OpenOrdersSummary } from "@/types/pos.types";
 import { decrementItemStocks } from '@/lib/actions/menu.actions';
-import { getAuthContext, validateBusinessContext } from '@/lib/auth.utils';
+import { getAuthContext, validateBusinessContext, requireOrgAdmin } from '@/lib/auth.utils';
+import { VoidOrderSchema, type VoidOrderCategory } from "@/lib/schemas/void-order";
 import {
     computeKitchenDelta,
+    computeKitchenPrintChanges,
+    KITCHEN_SNAPSHOT_MIN_VERSION,
     linesFromCartItems,
     mergeKitchenSnapshotIntoSpecialInstructions,
     parseLastKitchenSnapshot,
+    parseLastKitchenSnapshotMeta,
+    type KitchenAnomalyItem,
     type KitchenLine,
 } from "@/lib/kitchen-print-snapshot";
+import { computeOrderAgeMinutes } from "@/lib/order-time";
+import { printCategoryFromJobType, recordPrintAudit } from "@/lib/print-audit";
+
+/** Appwrite listDocuments max is 5000 per request (Pro). */
+const POS_ORDER_PAGE_MAX = Math.min(Number(process.env.POS_ORDERS_LIST_MAX || 4000), 5000);
 
 export const getCategories = async () => {
     try {
@@ -94,23 +104,108 @@ function printJobsCollectionId(): string | undefined {
     return process.env.PRINT_JOBS_COLLECTION_ID || process.env.NEXT_PUBLIC_PRINT_JOBS_COLLECTION_ID;
 }
 
+function paymentLedgerCollectionId(): string | undefined {
+    return process.env.PAYMENT_LEDGER_COLLECTION_ID;
+}
+
+type PaymentLedgerWrite = {
+    businessId: string;
+    orderId: string;
+    settlementGroupId?: string;
+    method: string;
+    amount: number;
+    reference?: string;
+    terminalId?: string;
+    status: "confirmed" | "failed";
+    source: "shadow" | "worker";
+    settledAt: string;
+};
+
+async function writePaymentLedgerShadow(rows: PaymentLedgerWrite[]): Promise<void> {
+    const coll = paymentLedgerCollectionId();
+    if (!coll || !DATABASE_ID || !Array.isArray(rows) || rows.length === 0) return;
+
+    for (const row of rows) {
+        try {
+            await databases.createDocument(DATABASE_ID, coll, ID.unique(), {
+                businessId: row.businessId,
+                orderId: row.orderId,
+                settlementGroupId: row.settlementGroupId || "",
+                method: String(row.method || "cash").toLowerCase().trim(),
+                amount: roundMoney(Number(row.amount) || 0),
+                reference: String(row.reference || "").slice(0, 220),
+                terminalId: String(row.terminalId || "").slice(0, 120),
+                source: row.source,
+                status: row.status,
+                settledAt: row.settledAt,
+                createdAt: new Date().toISOString(),
+            });
+        } catch (err) {
+            // Best-effort shadow write: settlement success must not fail on ledger insert.
+            console.warn("writePaymentLedgerShadow failed:", err);
+        }
+    }
+}
+
 async function queuePrintJobInternal(
     businessId: string,
     orderId: string,
-    jobType: "captain_docket" | "docket" = "captain_docket"
+    jobType: "captain_docket" | "docket" = "captain_docket",
+    actor?: { userId?: string; role?: string },
+    waiter?: { waiterId?: string; waiterName?: string }
 ) {
     const coll = printJobsCollectionId();
     if (!coll || !DATABASE_ID) {
         return;
     }
     try {
-        await databases.createDocument(DATABASE_ID, coll, ID.unique(), {
+        const nowIso = new Date().toISOString();
+        const payload = {
             status: "pending",
             jobType,
+            category: printCategoryFromJobType(jobType),
             content: `orderId:${orderId}`,
-            timestamp: new Date().toISOString(),
+            orderId,
+            dedupeKey: "",
+            timestamp: nowIso,
+            queuedAt: nowIso,
+            printedAt: "",
+            attemptCount: 0,
+            waiterId: String(waiter?.waiterId || "").slice(0, 64),
+            waiterNameSnapshot: String(waiter?.waiterName || "").slice(0, 255),
+            requeueReason: "initial_docket",
             targetTerminal: "default",
+            createdByUserId: String(actor?.userId || "").slice(0, 64),
+            createdByRole: String(actor?.role || "").slice(0, 40),
             businessId,
+        };
+        let created: any;
+        try {
+            created = await databases.createDocument(DATABASE_ID, coll, ID.unique(), payload);
+        } catch {
+            // Backward compatibility for environments without the new optional attributes.
+            created = await databases.createDocument(DATABASE_ID, coll, ID.unique(), {
+                status: payload.status,
+                jobType: payload.jobType,
+                content: payload.content,
+                timestamp: payload.timestamp,
+                targetTerminal: payload.targetTerminal,
+                businessId: payload.businessId,
+            });
+        }
+        await recordPrintAudit({
+            businessId,
+            printJobId: created.$id,
+            jobType,
+            status: "queued",
+            orderId,
+            summary: `Queued ${jobType} for order ${orderId}`,
+            content: `orderId:${orderId}`,
+            actorUserId: actor?.userId,
+            actorRole: actor?.role,
+            waiterId: waiter?.waiterId,
+            terminalId: "default",
+            requeueReason: "initial_docket",
         });
     } catch (e) {
         console.error("queuePrintJobInternal failed:", e);
@@ -336,7 +431,8 @@ export const createOrder = async (order: Omit<Order, "$id" | "$createdAt" | "$up
         if (kitchenLines.length > 0) {
             orderData.specialInstructions = mergeKitchenSnapshotIntoSpecialInstructions(
                 String(orderData.specialInstructions || ""),
-                kitchenLines
+                kitchenLines,
+                KITCHEN_SNAPSHOT_MIN_VERSION
             );
         }
 
@@ -431,7 +527,7 @@ export type CreateTabOrderInput = {
  * and a pending PRINT_JOBS row for PrintBridge / thermal docket.
  */
 export async function createTabOrderFromCart(input: CreateTabOrderInput) {
-    const { businessId } = await getAuthContext();
+    const { businessId, role, userId } = await getAuthContext();
     validateBusinessContext(businessId);
 
     const items = Array.isArray(input.items) ? input.items : [];
@@ -476,7 +572,13 @@ export async function createTabOrderFromCart(input: CreateTabOrderInput) {
     };
 
     const newOrder = await createOrder(orderData as any);
-    await queuePrintJobInternal(businessId, newOrder.$id as string, "captain_docket");
+    await queuePrintJobInternal(businessId, newOrder.$id as string, "captain_docket", {
+        userId,
+        role,
+    }, {
+        waiterId: input.waiterId,
+        waiterName: input.waiterName,
+    });
     return newOrder;
 }
 
@@ -491,7 +593,7 @@ export const getOrders = async () => {
             [
                 Query.equal("businessId", businessId), // CRITICAL: Multi-tenant isolation
                 Query.orderDesc("$createdAt"),
-                Query.limit(100)
+                Query.limit(POS_ORDER_PAGE_MAX)
             ]
         );
 
@@ -499,6 +601,79 @@ export const getOrders = async () => {
     } catch (error) {
         console.error("Error fetching orders:", error);
         return [];
+    }
+};
+
+/** Unpaid orders only — use for POS API `status=open` (avoids missing rows vs a mixed recent list). */
+export const getUnpaidOrdersForBusiness = async (limit = POS_ORDER_PAGE_MAX) => {
+    try {
+        const { businessId } = await getAuthContext();
+        validateBusinessContext(businessId);
+
+        const result = await databases.listDocuments(DATABASE_ID!, ORDERS_COLLECTION_ID!, [
+            Query.equal("businessId", businessId),
+            Query.equal("paymentStatus", "unpaid"),
+            Query.orderDesc("$createdAt"),
+            Query.limit(Math.min(limit, 5000)),
+        ]);
+
+        return parseStringify(result.documents);
+    } catch (error) {
+        console.error("Error fetching unpaid orders:", error);
+        return [];
+    }
+};
+
+/** Paid / settled for audit modals — avoids loading only the last N mixed documents. */
+export const getClosedOrdersForAudit = async (limit = POS_ORDER_PAGE_MAX) => {
+    try {
+        const { businessId } = await getAuthContext();
+        validateBusinessContext(businessId);
+
+        const result = await databases.listDocuments(DATABASE_ID!, ORDERS_COLLECTION_ID!, [
+            Query.equal("businessId", businessId),
+            Query.equal("paymentStatus", ["paid", "settled"]),
+            Query.orderDesc("$createdAt"),
+            Query.limit(Math.min(limit, 5000)),
+        ]);
+
+        return parseStringify(result.documents);
+    } catch (error) {
+        console.error("Error fetching closed orders (OR):", error);
+        try {
+            const { businessId } = await getAuthContext();
+            validateBusinessContext(businessId);
+            const cap = Math.min(limit, 5000);
+            const [paid, settled] = await Promise.all([
+                databases.listDocuments(DATABASE_ID!, ORDERS_COLLECTION_ID!, [
+                    Query.equal("businessId", businessId),
+                    Query.equal("paymentStatus", "paid"),
+                    Query.orderDesc("$createdAt"),
+                    Query.limit(cap),
+                ]),
+                databases.listDocuments(DATABASE_ID!, ORDERS_COLLECTION_ID!, [
+                    Query.equal("businessId", businessId),
+                    Query.equal("paymentStatus", "settled"),
+                    Query.orderDesc("$createdAt"),
+                    Query.limit(cap),
+                ]),
+            ]);
+            const merged = [...paid.documents, ...settled.documents];
+            const seen = new Set<string>();
+            const uniq = merged.filter((d: { $id: string }) => {
+                if (seen.has(d.$id)) return false;
+                seen.add(d.$id);
+                return true;
+            });
+            uniq.sort(
+                (a: { $createdAt: string }, b: { $createdAt: string }) =>
+                    new Date(b.$createdAt).getTime() - new Date(a.$createdAt).getTime()
+            );
+            return parseStringify(uniq.slice(0, cap));
+        } catch (e2) {
+            console.error("Error fetching closed orders (fallback):", e2);
+            return [];
+        }
     }
 };
 
@@ -514,13 +689,15 @@ export const getOrdersByTable = async (tableNumber: number, onlyUnpaid = true) =
         const queries: any[] = [
             Query.equal("businessId", businessId), // CRITICAL: Multi-tenant isolation
             Query.equal("tableNumber", tableNumber),
-            Query.orderDesc("$createdAt")
+            Query.orderDesc("$createdAt"),
         ];
 
         if (onlyUnpaid) {
             // Use paymentStatus to identify unpaid orders; adjust as needed based on schema
             queries.push(Query.equal("paymentStatus", "unpaid"));
         }
+
+        queries.push(Query.limit(POS_ORDER_PAGE_MAX));
 
         const result = await databases.listDocuments(
             DATABASE_ID,
@@ -704,20 +881,142 @@ export const settleTableTabForDate = async ({
     }
 };
 
+/** One line of a split settlement (cash / PDQ / M-Pesa Paybill). Sum must equal order total. */
+export type PaymentSplitInput = {
+    method: string;
+    amount: number;
+    reference?: string;
+    terminalId?: string;
+};
+
+type SettlementAuthContextOverride = {
+    businessId: string;
+    userId?: string;
+    role?: string;
+};
+
+const SPLIT_SUM_EPSILON = 0.05;
+
+function roundMoney(n: number): number {
+    return Math.round(n * 100) / 100;
+}
+
+/**
+ * Normalize optional split rows or fall back to a single method + reference.
+ * Throws if split amounts do not match `totalAmount`.
+ */
+function buildSettledSplits(
+    totalAmount: number,
+    paymentMethod: string,
+    paymentReference: string | undefined,
+    paymentSplits: PaymentSplitInput[] | undefined,
+    terminalId?: string
+): {
+    splits: Array<{ method: string; amount: number; reference: string; settledAt: string; terminalId?: string }>;
+    combinedRef: string;
+} {
+    const settledAt = new Date().toISOString();
+    const target = roundMoney(totalAmount);
+    if (paymentSplits && paymentSplits.length > 0) {
+        const sum = paymentSplits.reduce((s, x) => s + roundMoney(Number(x.amount) || 0), 0);
+        if (Math.abs(roundMoney(sum) - target) > SPLIT_SUM_EPSILON) {
+            throw new Error(
+                `Payment split (KSh ${roundMoney(sum).toFixed(2)}) must equal total (KSh ${target.toFixed(2)}).`
+            );
+        }
+        const splits = paymentSplits.map((x, idx) => {
+            const m = String(x.method || "cash").toLowerCase().trim();
+            const ref =
+                x.reference?.trim() ||
+                (m === "cash"
+                    ? `CASH-${idx + 1}-${Date.now()}`
+                    : `${m.toUpperCase()}-${idx + 1}-${Date.now()}`);
+            return {
+                method: m,
+                amount: roundMoney(Number(x.amount) || 0),
+                reference: ref,
+                settledAt,
+                terminalId: x.terminalId || terminalId,
+            };
+        });
+        return { splits, combinedRef: splits.map((s) => s.reference).join("|") };
+    }
+    const ref = paymentReference || `manual-${paymentMethod}-${Date.now()}`;
+    return {
+        splits: [
+            {
+                method: String(paymentMethod || "cash").toLowerCase().trim(),
+                amount: target,
+                reference: ref,
+                settledAt,
+                terminalId,
+            },
+        ],
+        combinedRef: ref,
+    };
+}
+
+/** Allocate consolidated split lines to each child order by share of grand total (for admin / audit). */
+function allocateSplitsToChildOrders(
+    splits: Array<{ method: string; amount: number; reference: string; settledAt: string; terminalId?: string }>,
+    unpaidOrders: { $id: string; totalAmount: number }[],
+    grandTotal: number
+): Map<string, Array<{ method: string; amount: number; reference: string; settledAt: string; terminalId?: string }>> {
+    const map = new Map<
+        string,
+        Array<{ method: string; amount: number; reference: string; settledAt: string }>
+    >();
+    if (grandTotal <= 0) {
+        for (const o of unpaidOrders) map.set(o.$id, []);
+        return map;
+    }
+    for (const order of unpaidOrders) {
+        const f = (order.totalAmount || 0) / grandTotal;
+        const lines = splits.map((sp) => ({
+            method: sp.method,
+            reference: sp.reference,
+            settledAt: sp.settledAt,
+            terminalId: sp.terminalId,
+            amount: roundMoney(sp.amount * f),
+        }));
+        const lineSum = lines.reduce((s, l) => s + l.amount, 0);
+        const target = roundMoney(order.totalAmount || 0);
+        const drift = roundMoney(target - lineSum);
+        if (lines.length && Math.abs(drift) >= 0.005) {
+            const last = lines[lines.length - 1]!;
+            lines[lines.length - 1] = {
+                ...last,
+                amount: roundMoney(last.amount + drift),
+            };
+        }
+        map.set(order.$id, lines);
+    }
+    return map;
+}
+
 export const settleSelectedOrders = async ({
     orderIds,
     paymentMethod = "cash",
     paymentReference,
+    paymentSplits,
+    terminalId,
+    authContextOverride,
 }: {
     orderIds: string[];
     paymentMethod?: string;
     paymentReference?: string;
+    paymentSplits?: PaymentSplitInput[];
+    terminalId?: string;
+    authContextOverride?: SettlementAuthContextOverride;
 }) => {
     if (!DATABASE_ID || !ORDERS_COLLECTION_ID) {
         throw new Error("Database configuration is missing");
     }
 
-    const { businessId } = await getAuthContext();
+    const authContext = authContextOverride || (await getAuthContext());
+    const businessId = String(authContext.businessId || "").trim();
+    const userId = String(authContext.userId || "system");
+    const role = String(authContext.role || "system");
     validateBusinessContext(businessId);
 
     if (!Array.isArray(orderIds) || orderIds.length === 0) {
@@ -787,26 +1086,52 @@ export const settleSelectedOrders = async ({
     }
 
     const totalAmount = unpaidOrders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
-    const paymentRef = paymentReference || `manual-${paymentMethod}-${Date.now()}`;
 
     if (unpaidOrders.length === 1) {
         const order = unpaidOrders[0];
+        const orderTotal = roundMoney(order.totalAmount || 0);
+        let splits: ReturnType<typeof buildSettledSplits>["splits"];
+        let combinedRef: string;
+        try {
+            ({ splits, combinedRef } = buildSettledSplits(
+                orderTotal,
+                paymentMethod,
+                paymentReference,
+                paymentSplits,
+                terminalId
+            ));
+        } catch (err) {
+            const message = err instanceof Error ? err.message : "Invalid payment split";
+            return {
+                success: false as const,
+                message,
+                updatedCount: 0,
+                totalAmount: orderTotal,
+                consolidatedOrderId: null,
+            };
+        }
         const existingMethods: any[] = Array.isArray(order.paymentMethods) ? order.paymentMethods : [];
-        const updatedMethods = [
-            ...existingMethods,
-            {
-                method: paymentMethod,
-                amount: order.totalAmount,
-                reference: paymentRef,
-                settledAt: new Date().toISOString(),
-            },
-        ];
+        const updatedMethods = [...existingMethods, ...splits];
 
         await updateOrderDocumentSafe(order.$id, {
             paymentStatus: "paid",
             status: "paid",
             paymentMethods: updatedMethods,
         });
+        await writePaymentLedgerShadow(
+            splits.map((s) => ({
+                businessId,
+                orderId: String(order.$id),
+                settlementGroupId: String(order.$id),
+                method: s.method,
+                amount: s.amount,
+                reference: s.reference,
+                terminalId: s.terminalId,
+                source: "shadow" as const,
+                status: "confirmed" as const,
+                settledAt: s.settledAt,
+            }))
+        );
 
         return {
             success: true as const,
@@ -814,8 +1139,9 @@ export const settleSelectedOrders = async ({
             updatedCount: 1,
             totalAmount,
             consolidatedOrderId: order.$id,
-            paymentReference: paymentRef,
-            paymentMethod,
+            paymentReference: combinedRef,
+            paymentMethod: splits.length === 1 ? splits[0]!.method : "mixed",
+            paymentMethods: splits,
         };
     }
 
@@ -848,6 +1174,28 @@ export const settleSelectedOrders = async ({
 
     const firstOrder: any = unpaidOrders[0];
 
+    let splits: ReturnType<typeof buildSettledSplits>["splits"];
+    let combinedRef: string;
+    try {
+        ({ splits, combinedRef } = buildSettledSplits(
+            roundMoney(totalAmount),
+            paymentMethod,
+            paymentReference,
+            paymentSplits,
+            terminalId
+        ));
+    } catch (err) {
+        const message = err instanceof Error ? err.message : "Invalid payment split";
+        return {
+            success: false as const,
+            message,
+            updatedCount: 0,
+            totalAmount: roundMoney(totalAmount),
+            consolidatedOrderId: null,
+        };
+    }
+    const perChildSplits = allocateSplitsToChildOrders(splits, unpaidOrders, roundMoney(totalAmount));
+
     const consolidatedOrderData: Omit<Order, "$id" | "$createdAt" | "$updatedAt"> = {
         orderNumber: consolidatedOrderNumber,
         type: firstOrder.type || "dine_in",
@@ -870,34 +1218,24 @@ export const settleSelectedOrders = async ({
         specialInstructions: `GROUP SETTLEMENT - Table ${firstOrder.tableNumber} - ${unpaidOrders.length} orders`,
         settlementType: "table_tab_master",
         settledOrderIds: unpaidOrders.map((o: any) => o.$id),
-        paymentMethods: [
-            {
-                method: paymentMethod,
-                amount: totalAmount,
-                reference: paymentRef,
-                settledAt: new Date().toISOString(),
-            },
-        ],
+        paymentMethods: splits,
     };
 
     const consolidatedOrder = await createOrder(consolidatedOrderData);
 
     // Chunked updates — same batch size to stay within Appwrite rate limits
-    const settledAt = new Date().toISOString();
     const results: PromiseSettledResult<any>[] = [];
     for (let i = 0; i < unpaidOrders.length; i += BATCH_SIZE) {
         const chunk = unpaidOrders.slice(i, i + BATCH_SIZE);
         const chunkResults = await Promise.allSettled(
             chunk.map((order) => {
                 const existingMethods: any[] = Array.isArray(order.paymentMethods) ? order.paymentMethods : [];
+                const childLines = perChildSplits.get(order.$id) || [];
                 return updateOrderDocumentSafe(order.$id, {
                     paymentStatus: "settled",
                     status: "paid",
                     settlementParentOrderId: consolidatedOrder.$id,
-                    paymentMethods: [
-                        ...existingMethods,
-                        { method: paymentMethod, amount: order.totalAmount, reference: paymentRef, settledAt },
-                    ],
+                    paymentMethods: [...existingMethods, ...childLines],
                 });
             })
         );
@@ -905,14 +1243,35 @@ export const settleSelectedOrders = async ({
     }
     const updatedCount = results.filter((r) => r.status === "fulfilled" && r.value !== null).length;
 
+    const ledgerRows: PaymentLedgerWrite[] = [];
+    for (const order of unpaidOrders) {
+        const childLines = perChildSplits.get(order.$id) || [];
+        for (const line of childLines) {
+            ledgerRows.push({
+                businessId,
+                orderId: String(order.$id),
+                settlementGroupId: String(consolidatedOrder.$id),
+                method: line.method,
+                amount: line.amount,
+                reference: line.reference,
+                terminalId: line.terminalId,
+                source: "shadow",
+                status: "confirmed",
+                settledAt: line.settledAt,
+            });
+        }
+    }
+    await writePaymentLedgerShadow(ledgerRows);
+
     return {
         success: true as const,
         message: "Selected orders settled successfully",
         updatedCount,
         totalAmount,
         consolidatedOrderId: consolidatedOrder.$id as string,
-        paymentReference: paymentRef,
-        paymentMethod,
+        paymentReference: combinedRef,
+        paymentMethod: splits.length === 1 ? splits[0]!.method : "mixed",
+        paymentMethods: splits,
     };
 };
 
@@ -936,7 +1295,7 @@ export const settleTableTabAndCreateOrder = async ({
         throw new Error("Database configuration is missing");
     }
 
-    const { businessId } = await getAuthContext();
+    const { businessId, userId, role } = await getAuthContext();
     validateBusinessContext(businessId);
 
     // Get the latest snapshot of unpaid orders for this table+date
@@ -1084,16 +1443,18 @@ export const getOpenOrdersSummary = async (
         throw new Error("Database configuration is missing");
     }
 
-    const { businessId } = await getAuthContext();
+    const { businessId, userId, role } = await getAuthContext();
     validateBusinessContext(businessId);
 
     const queries = [
         Query.equal("businessId", businessId),
         Query.equal("paymentStatus", "unpaid"),
         Query.orderAsc("orderTime"),
-        Query.limit(250),
+        Query.limit(POS_ORDER_PAGE_MAX),
     ];
-    if (opts?.waiterId) {
+    if (role === "org:member") {
+        queries.push(Query.equal("waiterId", userId));
+    } else if (opts?.waiterId) {
         queries.push(Query.equal("waiterId", opts.waiterId));
     }
 
@@ -1101,7 +1462,7 @@ export const getOpenOrdersSummary = async (
 
     const now = Date.now();
     const orders: OpenOrder[] = response.documents.map((doc: any) => {
-        const ageMinutes = Math.floor((now - new Date(doc.orderTime).getTime()) / 60_000);
+        const ageMinutes = computeOrderAgeMinutes(doc, now);
         let items = doc.items;
         if (typeof items === "string") {
             try { items = JSON.parse(items); } catch { items = []; }
@@ -1230,23 +1591,60 @@ export const computeKitchenDeltaForOrder = async (
     return { deltaItems, newSnapshotLines: newSnapshot };
 };
 
+/**
+ * Detailed print diff for update-order flow:
+ * - kitchen deltas (quantity up / new lines) for Update Orders tab
+ * - anomalies (quantity down / removed lines) for Anomaly tab
+ */
+export const computeKitchenPrintChangesForOrder = async (
+    orderId: string,
+    proposedItems: { $id: string; quantity: number; name: string }[]
+) => {
+    const order = await getOrder(orderId);
+    if (!order) {
+        return {
+            deltaItems: [] as { name: string; quantity: number }[],
+            anomalyItems: [] as KitchenAnomalyItem[],
+            newSnapshotLines: [] as KitchenLine[],
+        };
+    }
+    const snapMeta = parseLastKitchenSnapshotMeta(String(order.specialInstructions || ""));
+    const { deltaItems, anomalyItems, newSnapshot } = computeKitchenPrintChanges(
+        snapMeta.lines,
+        proposedItems
+    );
+    const baseSnapshotVersion = snapMeta.snapshotVersion || KITCHEN_SNAPSHOT_MIN_VERSION;
+    return {
+        deltaItems,
+        anomalyItems,
+        newSnapshotLines: newSnapshot,
+        baseSnapshotVersion,
+        nextSnapshotVersion: baseSnapshotVersion + 1,
+    };
+};
+
 export const getOrder = async (orderId: string): Promise<Order | null> => {
     try {
-        // Search by orderNumber property since that's what we might be using, 
-        // OR search by document ID. The plan implied fetching by ID.
-        // Let's assume orderId passed to this function is the Document ID for now to be safe,
-        // or we can try to look up by orderNumber attribute if that's what the URL param is.
-        // The ReceiptPage uses params.orderId. 
-        
+        const { businessId } = await getAuthContext();
+        validateBusinessContext(businessId);
         const order = await databases.getDocument(
             DATABASE_ID!,
             ORDERS_COLLECTION_ID!,
             orderId
         );
+        if (String((order as any).businessId || "") !== businessId) {
+            return null;
+        }
 
         return {
             ...parseStringify(order),
-            items: (order as any).items ? JSON.parse((order as any).items) : [],
+            items: (() => {
+                try {
+                    return (order as any).items ? JSON.parse((order as any).items) : [];
+                } catch {
+                    return [];
+                }
+            })(),
         } as Order;
     } catch (error) {
         console.error("Error fetching order:", error);
@@ -1259,6 +1657,8 @@ export const updateOrder = async (orderId: string, data: Partial<Order>) => {
         if (!DATABASE_ID || !ORDERS_COLLECTION_ID) {
             throw new Error("Database configuration is missing");
         }
+        const { businessId } = await getAuthContext();
+        validateBusinessContext(businessId);
 
         const updateData: Record<string, unknown> = { ...data };
         if (data.items) {
@@ -1266,7 +1666,11 @@ export const updateOrder = async (orderId: string, data: Partial<Order>) => {
         }
 
         const kitchenSnapshotLines = (updateData as any).kitchenSnapshotLines as KitchenLine[] | undefined;
+        const kitchenSnapshotVersion = (updateData as any).kitchenSnapshotVersion as number | undefined;
+        const kitchenBaseSnapshotVersion = (updateData as any).kitchenBaseSnapshotVersion as number | undefined;
         delete (updateData as any).kitchenSnapshotLines;
+        delete (updateData as any).kitchenSnapshotVersion;
+        delete (updateData as any).kitchenBaseSnapshotVersion;
 
         // Never send TypeScript-only / unsettled helper fields Appwrite does not know.
         delete updateData.paymentMethods;
@@ -1282,19 +1686,31 @@ export const updateOrder = async (orderId: string, data: Partial<Order>) => {
 
         if (kitchenSnapshotLines !== undefined) {
             const existing = await databases.getDocument(DATABASE_ID, ORDERS_COLLECTION_ID, orderId);
+            if (String((existing as any).businessId || "") !== businessId) {
+                throw new Error("Order not found or access denied");
+            }
+            if (kitchenBaseSnapshotVersion !== undefined) {
+                const currentSnapshot = parseLastKitchenSnapshotMeta(String((existing as any).specialInstructions || ""));
+                if (currentSnapshot.snapshotVersion !== kitchenBaseSnapshotVersion) {
+                    throw new Error(
+                        "Order changed on another terminal. Please reopen the order and apply changes again."
+                    );
+                }
+            }
             const prevSi = String((existing as any).specialInstructions || "");
             (updateData as any).specialInstructions = mergeKitchenSnapshotIntoSpecialInstructions(
                 prevSi,
-                kitchenSnapshotLines
+                kitchenSnapshotLines,
+                kitchenSnapshotVersion ?? KITCHEN_SNAPSHOT_MIN_VERSION
             );
+        } else {
+            const existing = await databases.getDocument(DATABASE_ID, ORDERS_COLLECTION_ID, orderId);
+            if (String((existing as any).businessId || "") !== businessId) {
+                throw new Error("Order not found or access denied");
+            }
         }
 
-        const result = await databases.updateDocument(
-            DATABASE_ID,
-            ORDERS_COLLECTION_ID,
-            orderId,
-            updateData as any
-        );
+        const result = await updateOrderDocumentSafe(orderId, updateData as any);
 
         return parseStringify(result);
     } catch (error) {
@@ -1307,11 +1723,17 @@ export const updateOrder = async (orderId: string, data: Partial<Order>) => {
 
 const TABLES_COLLECTION_ID = "tables";
 
-export const softDeleteOrder = async (orderId: string, deletionReason: string = "Order deleted by staff") => {
+export const softDeleteOrder = async (
+    orderId: string,
+    deletionReason: string = "Order deleted by staff",
+    voidCategory?: VoidOrderCategory
+) => {
     try {
         if (!DATABASE_ID || !ORDERS_COLLECTION_ID || !DELETED_ORDERS_LOG_COLLECTION_ID) {
             throw new Error("Database configuration is missing");
         }
+
+        await requireOrgAdmin();
 
         const { businessId, userId } = await getAuthContext();
         validateBusinessContext(businessId);
@@ -1327,12 +1749,15 @@ export const softDeleteOrder = async (orderId: string, deletionReason: string = 
 
         const now = new Date().toISOString();
 
-        // Mark order as soft deleted
+        const cat = voidCategory ?? "OTHER";
+        const taggedReason = `[${cat}] ${deletionReason}`;
+
+        // Mark order as soft deleted (category embedded for Appwrite schemas without a dedicated attribute)
         await databases.updateDocument(DATABASE_ID, ORDERS_COLLECTION_ID, orderId, {
             isDeleted: true,
             deletedAt: now,
             deletedBy: userId,
-            deletionReason: deletionReason,
+            deletionReason: taggedReason,
         });
 
         // Create audit log entry
@@ -1341,7 +1766,7 @@ export const softDeleteOrder = async (orderId: string, deletionReason: string = 
             orderNumber: parsedOrder.orderNumber,
             deletedBy: userId,
             deletedAt: now,
-            deletionReason: deletionReason,
+            deletionReason: taggedReason,
             businessId: businessId,
             orderSnapshot: parsedOrder, // Complete order snapshot
         });
@@ -1373,6 +1798,17 @@ export const softDeleteOrder = async (orderId: string, deletionReason: string = 
         throw new Error("Failed to delete order");
     }
 };
+
+/** Validates payload with {@link VoidOrderSchema}, requires org:admin, soft-deletes the order. */
+export async function voidOrderValidated(input: unknown) {
+    const parsed = VoidOrderSchema.safeParse(input);
+    if (!parsed.success) {
+        const first = parsed.error.issues[0];
+        throw new Error(first?.message ?? "Invalid void order request");
+    }
+    await softDeleteOrder(parsed.data.orderId, parsed.data.reason, parsed.data.voidCategory);
+    return { success: true as const };
+}
 
 // Legacy hard delete function - kept for backward compatibility but should not be used
 export const deleteOrder = async (orderId: string) => {

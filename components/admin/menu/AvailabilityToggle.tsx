@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { ToggleRight, ToggleLeft, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { fetchWithSession } from '@/lib/fetch-with-session';
 
 interface Props {
   itemId: string;
@@ -30,15 +31,16 @@ export function AvailabilityToggle({ itemId, isAvailable, stock, onSaved }: Prop
     setIsSaving(true);
     
     try {
-      const res = await fetch(`/api/menu/items/${itemId}`, {
+      const res = await fetchWithSession(`/api/menu/items/${itemId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isAvailable: newState })
       });
+      if (res.status === 401) throw new Error('Unauthorized');
       if (!res.ok) throw new Error('Failed to update availability');
       onSaved();
     } catch (e) {
-      toast.error('Failed to update availability');
+      toast.error(e instanceof Error && e.message === 'Unauthorized' ? 'Sign in to save changes' : 'Failed to update availability');
       setInternalState(!newState); // revert
     } finally {
       setIsSaving(false);

@@ -1,7 +1,7 @@
 "use client";
 
 import { CartItem } from "@/types/pos.types";
-import { Minus, Plus, CreditCard, Check, X } from "lucide-react";
+import { Minus, Plus, CreditCard, UtensilsCrossed } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
 interface CartSidebarProps {
@@ -10,6 +10,8 @@ interface CartSidebarProps {
     onAddToTab: () => void;
     editingOrderId?: string | null;
     editingCustomerName?: string | null;
+    editingCustomerNameDraft?: string;
+    onEditCustomerName?: (nextTitle: string) => void;
     onSaveOrderChanges?: () => void;
     onCancelEdit?: () => void;
 }
@@ -20,6 +22,8 @@ export const CartSidebar = ({
     onAddToTab,
     editingOrderId,
     editingCustomerName,
+    editingCustomerNameDraft,
+    onEditCustomerName,
     onSaveOrderChanges,
     onCancelEdit,
 }: CartSidebarProps) => {
@@ -31,31 +35,40 @@ export const CartSidebar = ({
     const total = subtotalBeforeVat;
 
     return (
-        <div className="flex h-full flex-col bg-[#0a0a0a] border-l border-white/10 w-[240px] lg:w-[400px]">
+        <div className="flex h-full flex-col bg-[#0a0a0a] border-l border-white/10 w-[260px] md:w-[292px] lg:w-[400px] shrink-0">
             <div className="px-3 py-3 lg:px-6 lg:py-5 border-b border-white/10">
-                <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-bold text-white">Current Order</h2>
-                    <span className="bg-emerald-500/20 text-emerald-400 text-xs font-bold px-2.5 py-1 rounded-full border border-emerald-500/30 tabular-nums">
+                <div className="flex items-center justify-between gap-2">
+                    <h2 className="text-lg md:text-xl font-bold text-white tracking-tight">Current Order</h2>
+                    <span className="bg-emerald-500/20 text-emerald-400 text-xs md:text-sm font-bold px-2.5 py-1 rounded-full border border-emerald-500/30 tabular-nums shrink-0">
                         {cartArray.reduce((s, i) => s + i.quantity, 0)} items
                     </span>
                 </div>
             </div>
 
             {editingOrderId && (
-                <div className="mx-4 mt-3 flex items-center justify-between gap-2 rounded-lg bg-emerald-950/50 border border-emerald-500/25 px-3 py-2.5">
-                    <p className="text-sm text-emerald-200/90 truncate">
-                        Editing:{" "}
-                        <span className="font-medium text-emerald-100">
-                            {editingCustomerName?.trim() || "Walk-in Customer"}
-                        </span>
-                    </p>
-                    <button
-                        type="button"
-                        onClick={onCancelEdit}
-                        className="shrink-0 text-xs font-semibold text-rose-400 hover:text-rose-300 transition-colors"
-                    >
-                        Drop / New
-                    </button>
+                <div className="mx-4 mt-3 rounded-lg bg-emerald-950/50 border border-emerald-500/25 px-3 py-2.5 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm text-emerald-200/90 truncate">
+                            Editing:{" "}
+                            <span className="font-medium text-emerald-100">
+                                {editingCustomerName?.trim() || "Walk-in Customer"}
+                            </span>
+                        </p>
+                        <button
+                            type="button"
+                            onClick={onCancelEdit}
+                            className="shrink-0 text-xs font-semibold text-rose-400 hover:text-rose-300 transition-colors"
+                        >
+                            Drop / New
+                        </button>
+                    </div>
+                    <input
+                        type="text"
+                        value={editingCustomerNameDraft ?? ""}
+                        onChange={(e) => onEditCustomerName?.(e.target.value)}
+                        placeholder="Order title (e.g. Jane - Patio)"
+                        className="w-full rounded-lg bg-black/30 border border-emerald-500/25 px-3 py-2 text-sm text-emerald-100 placeholder:text-emerald-300/50 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+                    />
                 </div>
             )}
 
@@ -81,38 +94,44 @@ export const CartSidebar = ({
                                     className="hidden lg:block w-10 h-10 rounded-lg object-cover shrink-0 mt-0.5"
                                 />
                             ) : (
-                                <div className="hidden lg:flex w-10 h-10 rounded-lg bg-white/5 items-center justify-center shrink-0 mt-0.5 text-base">
-                                    🍽️
+                                <div className="hidden md:flex w-11 h-11 rounded-xl bg-white/5 items-center justify-center shrink-0 mt-0.5 text-emerald-500/80">
+                                    <UtensilsCrossed className="w-5 h-5" strokeWidth={2} aria-hidden />
                                 </div>
                             )}
 
                             <div className="flex-1 min-w-0 py-0.5">
                                 <div className="flex justify-between items-start gap-2">
-                                    <h4 className="font-medium text-neutral-100 truncate text-sm max-w-[120px] lg:max-w-none">{item.name}</h4>
-                                    <span className="font-bold text-emerald-400 whitespace-nowrap text-sm tabular-nums">
+                                    <h4 className="font-semibold text-neutral-100 truncate text-sm md:text-[15px] max-w-[120px] lg:max-w-none leading-snug">
+                                        {item.name}
+                                    </h4>
+                                    <span className="font-bold text-emerald-400 whitespace-nowrap text-sm md:text-[15px] tabular-nums">
                                         {formatCurrency(item.price * item.quantity)}
                                     </span>
                                 </div>
                                 <div className="flex items-center gap-3 mt-1.5">
-                                    <div className="flex items-center gap-1 bg-black/35 rounded-lg px-1 py-0.5">
+                                    <div className="flex items-center gap-0.5 bg-black/35 rounded-xl px-0.5 py-0.5">
                                         <button
                                             type="button"
                                             onClick={() => onUpdateQuantity(item.$id, -1)}
-                                            className="p-1 hover:text-rose-400 transition-colors text-neutral-400"
+                                            className="min-h-9 min-w-9 flex items-center justify-center rounded-lg hover:text-rose-400 hover:bg-white/5 transition-colors text-neutral-400 cursor-pointer"
+                                            aria-label="Decrease quantity"
                                         >
-                                            <Minus size={12} />
+                                            <Minus className="w-4 h-4 md:w-[18px] md:h-[18px]" strokeWidth={2.25} />
                                         </button>
-                                        <span className="text-xs font-bold text-white w-4 text-center">{item.quantity}</span>
+                                        <span className="text-sm font-bold text-white min-w-[1.5rem] text-center tabular-nums">
+                                            {item.quantity}
+                                        </span>
                                         <button
                                             type="button"
                                             onClick={() => onUpdateQuantity(item.$id, 1)}
                                             disabled={item.stock !== undefined && item.quantity >= item.stock}
-                                            className="p-1 hover:text-emerald-400 transition-colors text-neutral-400 disabled:opacity-30 disabled:cursor-not-allowed"
+                                            className="min-h-9 min-w-9 flex items-center justify-center rounded-lg hover:text-emerald-400 hover:bg-white/5 transition-colors text-neutral-400 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                                            aria-label="Increase quantity"
                                         >
-                                            <Plus size={12} />
+                                            <Plus className="w-4 h-4 md:w-[18px] md:h-[18px]" strokeWidth={2.25} />
                                         </button>
                                     </div>
-                                    <span className="text-xs text-neutral-500">{formatCurrency(item.price)} each</span>
+                                    <span className="text-xs md:text-sm text-neutral-400">{formatCurrency(item.price)} each</span>
                                 </div>
                             </div>
                         </div>
@@ -144,17 +163,15 @@ export const CartSidebar = ({
                                 type="button"
                                 onClick={onSaveOrderChanges}
                                 disabled={cart.length === 0}
-                                className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-neutral-700 disabled:cursor-not-allowed text-white text-sm lg:text-lg font-bold py-2.5 lg:py-3 rounded-lg shadow-lg shadow-emerald-900/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                                className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-neutral-700 disabled:cursor-not-allowed text-white text-sm lg:text-lg font-bold py-2.5 lg:py-3 rounded-lg shadow-lg shadow-emerald-900/20 transition-all active:scale-[0.98] flex items-center justify-center"
                             >
-                                <Check className="w-4 h-4 lg:w-5 lg:h-5" />
-                                Update Order
+                                Update
                             </button>
                             <button
                                 type="button"
                                 onClick={onCancelEdit}
-                                className="w-full bg-neutral-800 hover:bg-neutral-700 text-white text-sm lg:text-lg font-semibold py-2.5 lg:py-3 rounded-lg border border-white/10 transition-all flex items-center justify-center gap-2"
+                                className="w-full bg-neutral-800 hover:bg-neutral-700 text-white text-sm lg:text-lg font-semibold py-2.5 lg:py-3 rounded-lg border border-white/10 transition-all flex items-center justify-center"
                             >
-                                <X className="w-4 h-4 lg:w-5 lg:h-5" />
                                 Cancel
                             </button>
                         </div>

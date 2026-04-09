@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
     Dialog,
     DialogContent,
@@ -10,7 +10,21 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatCurrency } from "@/lib/utils";
-import { ShoppingBag, AlertCircle, Search } from "lucide-react";
+import { formatPaymentMethodEntry } from "@/lib/payment-display";
+import { extractBankPaybillConfirmation } from "@/lib/payment-realtime";
+import { ShoppingBag, AlertCircle, Search, ListTree } from "lucide-react";
+import { client } from "@/lib/appwrite-client";
+import { subscribeWithRetry } from "@/lib/realtime-subscribe";
+
+const RT_DATABASE_ID = process.env.NEXT_PUBLIC_DATABASE_ID!;
+const RT_ORDERS_COLLECTION_ID = process.env.NEXT_PUBLIC_ORDERS_COLLECTION_ID!;
+
+function safeOrderDateTime(iso?: string | null): string {
+  if (iso == null || iso === "") return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString();
+}
 
 interface ClosedOrderItem {
     $id: string;
@@ -31,23 +45,58 @@ interface Order {
     paymentStatus?: string;
     paymentMethods?: any[];
     items?: ClosedOrderItem[] | string;
+    $updatedAt?: string;
 }
 
 interface ClosedOrdersModalProps {
     isOpen: boolean;
     onClose: () => void;
+    initialSearchQuery?: string;
 }
 
-export function ClosedOrdersModal({ isOpen, onClose }: ClosedOrdersModalProps) {
+type PaymentTimelineEvent = {
+    at: string;
+    type: "callback_received" | "reconcile_checked" | "settled" | "receipt_generated";
+    title: string;
+    detail: string;
+    sourceId?: string;
+};
+
+export function ClosedOrdersModal({ isOpen, onClose, initialSearchQuery }: ClosedOrdersModalProps) {
     const [orders, setOrders] = useState<Order[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [message, setMessage] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
     const [paymentFilter, setPaymentFilter] = useState<string>("all");
+    const [timelineOrder, setTimelineOrder] = useState<Order | null>(null);
+    const [timelineEvents, setTimelineEvents] = useState<PaymentTimelineEvent[]>([]);
+    const [timelineLoading, setTimelineLoading] = useState(false);
+    const [timelineError, setTimelineError] = useState<string | null>(null);
+    const refreshDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const fetchClosedOrders = useCallback(async () => {
+        try {
+            setIsLoading(true);
+            setError(null);
+            setMessage(null);
+            const response = await fetch(`/api/pos/orders?status=closed`);
+            if (!response.ok) {
+                throw new Error("Failed to load closed orders");
+            }
+            const data = await response.json();
+            setOrders(data.orders || []);
+        } catch (err) {
+            console.error("Error fetching closed orders:", err);
+            setError(err instanceof Error ? err.message : "Unable to load closed orders");
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
 
     useEffect(() => {
         if (isOpen) {
+            setSearchQuery(String(initialSearchQuery || ""));
             void fetchClosedOrders();
         } else {
             setOrders([]);
@@ -56,7 +105,29 @@ export function ClosedOrdersModal({ isOpen, onClose }: ClosedOrdersModalProps) {
             setSearchQuery("");
             setPaymentFilter("all");
         }
-    }, [isOpen]);
+    }, [isOpen, fetchClosedOrders, initialSearchQuery]);
+
+    // Realtime: new paid/settled orders refresh the audit list
+    useEffect(() => {
+        if (!isOpen || !RT_DATABASE_ID || !RT_ORDERS_COLLECTION_ID) return;
+
+        const channel = `databases.${RT_DATABASE_ID}.collections.${RT_ORDERS_COLLECTION_ID}.documents`;
+        const unsubscribe = subscribeWithRetry(
+            () =>
+                client.subscribe(channel, () => {
+                    if (refreshDebounceRef.current) clearTimeout(refreshDebounceRef.current);
+                    refreshDebounceRef.current = setTimeout(() => {
+                        void fetchClosedOrders();
+                    }, 450);
+                }),
+            { maxAttempts: 5, initialDelayMs: 120 }
+        );
+
+        return () => {
+            unsubscribe();
+            if (refreshDebounceRef.current) clearTimeout(refreshDebounceRef.current);
+        };
+    }, [isOpen, fetchClosedOrders]);
 
     const filteredOrders = orders.filter((order) => {
         const matchesSearch =
@@ -85,31 +156,39 @@ export function ClosedOrdersModal({ isOpen, onClose }: ClosedOrdersModalProps) {
         return Array.isArray(order.items) ? order.items : [];
     };
 
-    const fetchClosedOrders = async () => {
+    const paymentLabel = (method: any) =>
+        formatPaymentMethodEntry({
+            method: method?.method ?? method?.type ?? method?.channel,
+            amount: typeof method?.amount === "number" ? method.amount : undefined,
+            reference: method?.reference,
+        });
+
+    const openTimeline = async (order: Order) => {
+        setTimelineOrder(order);
+        setTimelineEvents([]);
+        setTimelineError(null);
+        setTimelineLoading(true);
         try {
-            setIsLoading(true);
-            setError(null);
-            setMessage(null);
-            const response = await fetch(`/api/pos/orders?status=closed`);
+            const response = await fetch(`/api/payments/timeline?orderId=${encodeURIComponent(order.$id)}`, {
+                method: "GET",
+                credentials: "same-origin",
+            });
+            const data = await response.json().catch(() => ({}));
             if (!response.ok) {
-                throw new Error("Failed to load closed orders");
+                throw new Error(data?.error || "Failed to load payment timeline");
             }
-            const data = await response.json();
-            setOrders(data.orders || []);
+            setTimelineEvents(Array.isArray(data?.events) ? data.events : []);
         } catch (err) {
-            console.error("Error fetching closed orders:", err);
-            setError(err instanceof Error ? err.message : "Unable to load closed orders");
+            setTimelineError(err instanceof Error ? err.message : "Failed to load payment timeline");
         } finally {
-            setIsLoading(false);
+            setTimelineLoading(false);
         }
     };
 
-    const paymentLabel = (method: any) =>
-        method?.method || method?.type || method?.channel || "Payment";
-
     return (
+        <>
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="bg-neutral-950 border-white/10 text-white max-w-4xl max-h-[85vh] flex flex-col">
+            <DialogContent className="bg-neutral-950 border-white/10 text-white max-w-6xl max-h-[85vh] flex flex-col">
                 <DialogHeader className="shrink-0">
                     <DialogTitle className="flex items-center gap-2">
                         <ShoppingBag className="w-5 h-5 text-sky-400" />
@@ -201,6 +280,11 @@ export function ClosedOrdersModal({ isOpen, onClose }: ClosedOrdersModalProps) {
                                         order.paymentStatus === "settled"
                                             ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
                                             : "bg-emerald-500/15 text-emerald-300 border-emerald-500/30";
+                                    const bankConfirmation = extractBankPaybillConfirmation({
+                                        paymentStatus: order.paymentStatus,
+                                        paymentMethods: order.paymentMethods,
+                                        $updatedAt: order.$updatedAt || order.orderTime,
+                                    });
 
                                     return (
                                         <div
@@ -223,33 +307,39 @@ export function ClosedOrdersModal({ isOpen, onClose }: ClosedOrdersModalProps) {
                                                         {paymentBadge}
                                                     </span>
                                                 </div>
-                                                <div className="flex items-center justify-between text-sm text-neutral-500">
+                                                <div className="flex items-center justify-between text-sm text-neutral-500 gap-2">
                                                     <span>Table {order.tableNumber ?? "—"}</span>
-                                                    <span>{new Date(order.orderTime).toLocaleTimeString()}</span>
+                                                    <span className="shrink-0 tabular-nums">
+                                                        {safeOrderDateTime(order.orderTime)}
+                                                    </span>
                                                 </div>
+                                                {bankConfirmation && (
+                                                    <div className="mt-2 rounded-md border border-emerald-500/35 bg-emerald-500/10 px-2.5 py-1.5 text-[11px] text-emerald-200">
+                                                        Bank confirmed · {formatCurrency(bankConfirmation.amount)} · {bankConfirmation.reference}
+                                                    </div>
+                                                )}
                                             </div>
 
                                             <div className="p-4">
-                                                <div className="space-y-2 mb-3">
-                                                    {items.slice(0, 2).map((item, idx) => (
-                                                        <div
-                                                            key={`${order.$id}-item-${idx}-${item.$id}-${item.name}`}
-                                                            className="flex justify-between items-center text-sm"
-                                                        >
-                                                            <span className="text-neutral-300 truncate">
-                                                                {item.quantity}× {item.name}
-                                                            </span>
-                                                            <span className="text-emerald-400 font-medium shrink-0">
-                                                                {formatCurrency(
-                                                                    (item.price ?? 0) * (item.quantity ?? 1)
-                                                                )}
-                                                            </span>
-                                                        </div>
-                                                    ))}
-                                                    {items.length > 2 && (
-                                                        <p className="text-xs text-neutral-500">
-                                                            +{items.length - 2} more items
-                                                        </p>
+                                                <div className="mb-3 max-h-40 overflow-y-auto overscroll-contain rounded-lg border border-white/5 bg-black/20 px-2 py-2 space-y-1.5">
+                                                    {items.length === 0 ? (
+                                                        <p className="text-xs text-neutral-500">No line items</p>
+                                                    ) : (
+                                                        items.map((item, idx) => (
+                                                            <div
+                                                                key={`${order.$id}-item-${idx}-${item.$id ?? idx}-${item.name}`}
+                                                                className="flex justify-between items-start gap-2 text-sm min-w-0"
+                                                            >
+                                                                <span className="text-neutral-300 break-words min-w-0 flex-1 leading-snug">
+                                                                    {item.quantity}× {item.name}
+                                                                </span>
+                                                                <span className="text-emerald-400 font-medium shrink-0 tabular-nums">
+                                                                    {formatCurrency(
+                                                                        (item.price ?? 0) * (item.quantity ?? 1)
+                                                                    )}
+                                                                </span>
+                                                            </div>
+                                                        ))
                                                     )}
                                                 </div>
 
@@ -259,12 +349,27 @@ export function ClosedOrdersModal({ isOpen, onClose }: ClosedOrdersModalProps) {
                                                             <span
                                                                 key={`${order.$id}-pm-${index}`}
                                                                 className="text-xs rounded-full bg-white/5 text-neutral-400 px-2 py-0.5"
+                                                                title={method?.reference ? `Ref: ${method.reference}` : undefined}
                                                             >
                                                                 {paymentLabel(method)}
+                                                                {method?.reference ? ` · ${String(method.reference).slice(0, 14)}` : ""}
                                                             </span>
                                                         ))}
                                                     </div>
                                                 )}
+
+                                                <div className="mb-3">
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() => void openTimeline(order)}
+                                                        className="h-8 border-white/15 text-neutral-300 hover:bg-white/5"
+                                                    >
+                                                        <ListTree className="w-4 h-4 mr-1.5" />
+                                                        Payment timeline
+                                                    </Button>
+                                                </div>
 
                                                 <p className="text-center text-2xl font-bold text-emerald-400">
                                                     {formatCurrency(order.totalAmount)}
@@ -297,5 +402,52 @@ export function ClosedOrdersModal({ isOpen, onClose }: ClosedOrdersModalProps) {
                 )}
             </DialogContent>
         </Dialog>
+
+        <Dialog open={!!timelineOrder} onOpenChange={(open) => !open && setTimelineOrder(null)}>
+            <DialogContent className="bg-neutral-950 border-white/10 text-white max-w-2xl max-h-[80vh]">
+                <DialogHeader className="shrink-0">
+                    <DialogTitle>
+                        Payment Timeline {timelineOrder ? `#${timelineOrder.orderNumber}` : ""}
+                    </DialogTitle>
+                    <p className="text-sm text-neutral-400">
+                        Callback {"->"} reconcile {"->"} settle {"->"} receipt events for dispute resolution.
+                    </p>
+                </DialogHeader>
+
+                <div className="overflow-y-auto min-h-0 max-h-[56vh] pr-1">
+                    {timelineLoading ? (
+                        <p className="text-sm text-neutral-400 py-6">Loading timeline...</p>
+                    ) : timelineError ? (
+                        <p className="text-sm text-rose-300 py-6">{timelineError}</p>
+                    ) : timelineEvents.length === 0 ? (
+                        <p className="text-sm text-neutral-500 py-6">No timeline events found for this order.</p>
+                    ) : (
+                        <div className="space-y-3">
+                            {timelineEvents.map((event, idx) => (
+                                <div
+                                    key={`${event.type}-${event.at}-${event.sourceId || idx}`}
+                                    className="rounded-xl border border-white/10 bg-white/[0.03] p-3"
+                                >
+                                    <div className="flex items-center justify-between gap-2">
+                                        <p className="text-sm font-semibold text-white">{event.title}</p>
+                                        <span className="text-[11px] text-neutral-500 shrink-0">
+                                            {safeOrderDateTime(event.at)}
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-neutral-300 mt-1">{event.detail}</p>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <div className="flex justify-end pt-2 border-t border-white/10">
+                    <Button variant="outline" onClick={() => setTimelineOrder(null)}>
+                        Close
+                    </Button>
+                </div>
+            </DialogContent>
+        </Dialog>
+        </>
     );
 }

@@ -168,17 +168,17 @@ describe('getOpenOrdersSummary', () => {
         }));
         vi.resetModules();
 
-        vi.mock('@/lib/auth.utils', () => ({
+        vi.doMock('@/lib/auth.utils', () => ({
             getAuthContext: vi.fn().mockResolvedValue({ businessId: 'biz-1', userId: 'user-1' }),
             validateBusinessContext: vi.fn(),
         }));
-        vi.mock('@/lib/kitchen-print-snapshot', () => ({
+        vi.doMock('@/lib/kitchen-print-snapshot', () => ({
             computeKitchenDelta: vi.fn().mockReturnValue([]),
             linesFromCartItems: vi.fn().mockReturnValue([]),
             mergeKitchenSnapshotIntoSpecialInstructions: vi.fn().mockReturnValue(''),
             parseLastKitchenSnapshot: vi.fn().mockReturnValue([]),
         }));
-        vi.mock('@/lib/actions/menu.actions', () => ({
+        vi.doMock('@/lib/actions/menu.actions', () => ({
             decrementItemStocks: vi.fn().mockResolvedValue({ success: true, failureCount: 0 }),
         }));
 

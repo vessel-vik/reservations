@@ -1,6 +1,6 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 
-const isProtectedRoute = createRouteMatcher(['/pos(.*)']);
+const isProtectedRoute = createRouteMatcher(['/pos(.*)', '/admin(.*)']);
 
 export default clerkMiddleware(async (auth, req) => {
   // Skip authentication for .well-known files (needed for domain verification)

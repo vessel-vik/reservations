@@ -5,6 +5,7 @@ import { AlertCircle, RotateCcw, Clock, User, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
+import { fetchWithSession } from "@/lib/fetch-with-session";
 
 interface MenuItemVersion {
     $id: string;
@@ -35,7 +36,7 @@ export function VersionHistoryPanel({ itemId, onRevert, isLoading }: VersionHist
     const fetchVersionHistory = async () => {
         try {
             setLoading(true);
-            const response = await fetch(`/api/menu/items/${itemId}/versions`);
+            const response = await fetchWithSession(`/api/menu/items/${itemId}/versions`);
 
             if (!response.ok) {
                 throw new Error("Failed to fetch version history");
@@ -55,7 +56,6 @@ export function VersionHistoryPanel({ itemId, onRevert, isLoading }: VersionHist
         try {
             const snapshot = JSON.parse(version.snapshot);
             onRevert(snapshot);
-            toast.success(`Reverted to version ${version.versionNumber}`);
         } catch (error) {
             console.error("Error parsing version snapshot:", error);
             toast.error("Failed to revert version");

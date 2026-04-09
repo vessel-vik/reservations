@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
+import { fetchWithSession } from '@/lib/fetch-with-session';
 
 interface Props {
   open: boolean;
@@ -18,11 +19,17 @@ export function StockAdjustmentModal({ open, item, onClose, onSaved }: Props) {
   const [newStock, setNewStock] = useState<number>(item?.stock ?? 0);
   const [saving, setSaving] = useState(false);
 
+  useEffect(() => {
+    if (open && item) {
+      setNewStock(item.stock ?? 0);
+    }
+  }, [open, item?.$id, item?.stock]);
+
   const handleSave = async () => {
     if (!item) return;
     setSaving(true);
     try {
-      await fetch(`/api/menu/items/${item.$id}`, {
+      await fetchWithSession(`/api/menu/items/${item.$id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ stock: newStock }),

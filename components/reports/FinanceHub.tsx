@@ -97,6 +97,7 @@ export function FinanceHub() {
       budgetsJson.forEach((b: any) => budgetsMap[b.category] = b.monthlyLimit);
 
       setComparisons(compareBudgetToActual(budgetsMap, actuals));
+
     } catch (e) {
       console.error(e);
     } finally {

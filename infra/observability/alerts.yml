@@ -1,0 +1,48 @@
+groups:
+  - name: settlement-worker-alerts
+    rules:
+      - alert: SettlementQueueBacklogHigh
+        expr: settlement_queue_depth > 20
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Settlement queue backlog is high"
+          description: "Queue depth has stayed above 20 for more than 5 minutes."
+
+      - alert: SettlementDeadLetterDetected
+        expr: increase(settlement_jobs_dead_letter_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Dead-letter settlement jobs detected"
+          description: "One or more jobs moved to dead-letter in the last 5 minutes."
+
+      - alert: SettlementWorkerFailuresSpike
+        expr: increase(settlement_jobs_failed_total[10m]) > 5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Settlement worker failures spiking"
+          description: "More than 5 worker failures in 10 minutes."
+
+      - alert: JengaDriftTicketsDetected
+        expr: jenga_unresolved_drift_count > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Jenga drift tickets detected"
+          description: "At least one unresolved drift ticket exists for more than 5 minutes."
+
+      - alert: JengaUnresolvedOverSla
+        expr: jenga_unresolved_over_sla_count > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Jenga unresolved tickets exceeded SLA"
+          description: "One or more Jenga unresolved tickets are older than the configured SLA."
+

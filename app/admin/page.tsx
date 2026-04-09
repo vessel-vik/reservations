@@ -15,7 +15,8 @@ import {
   DollarSign,
   Receipt,
   Calculator,
-  Upload
+  Package,
+  Printer
 } from "lucide-react";
 import Link from "next/link";
 
@@ -31,8 +32,10 @@ import { useLivePOSMetrics } from "@/lib/hooks/useLivePOSMetrics";
 import SalesReport from "@/components/reports/SalesReport";
 import { FinanceHub } from "@/components/reports/FinanceHub";
 import { MenuCMS } from "@/components/admin/menu/MenuCMS";
+import { PrintOpsCenter } from "@/components/admin/PrintOpsCenter";
+import { JengaOpsCenter } from "@/components/admin/JengaOpsCenter";
 
-type TabType = 'dashboard' | 'sales' | 'finance' | 'menu';
+type TabType = 'dashboard' | 'sales' | 'finance' | 'menu' | 'printOps';
 
 const AdminPage = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -77,11 +80,11 @@ const AdminPage = () => {
         const combined = {
           ...reservationAnalytics,
           // POS-specific metrics
-          todaysOrders: posAnalytics.success ? posAnalytics.today.orders : 0,
-          todaysOrderRevenue: posAnalytics.success ? posAnalytics.today.revenue : 0,
-          avgOrderValue: posAnalytics.success ? posAnalytics.today.avgOrderValue : 0,
-          peakOrderTime: posAnalytics.success ? posAnalytics.peakHours.time : '7:30 PM',
-          peakOrderBookings: posAnalytics.success ? posAnalytics.peakHours.orders : 0,
+          todaysOrders: posAnalytics.success ? (posAnalytics.today?.orders ?? 0) : 0,
+          todaysOrderRevenue: posAnalytics.success ? (posAnalytics.today?.revenue ?? 0) : 0,
+          avgOrderValue: posAnalytics.success ? (posAnalytics.today?.avgOrderValue ?? 0) : 0,
+          peakOrderTime: posAnalytics.success ? (posAnalytics.peakHours?.time ?? '7:30 PM') : '7:30 PM',
+          peakOrderBookings: posAnalytics.success ? (posAnalytics.peakHours?.orders ?? 0) : 0,
           topProducts: posAnalytics.success ? posAnalytics.topProducts : [],
           serverPerformance: posAnalytics.success ? posAnalytics.servers : []
         };
@@ -122,6 +125,9 @@ const AdminPage = () => {
         break;
       case '4':
         setActiveTab('menu');
+        break;
+      case '5':
+        setActiveTab('printOps');
         break;
       // Ctrl+R to refresh data
       case 'r':
@@ -225,7 +231,8 @@ const AdminPage = () => {
                 { id: 'dashboard', label: 'Dashboard', icon: Activity, key: '1' },
                 { id: 'sales', label: 'Sales', icon: Receipt, key: '2' },
                 { id: 'finance', label: 'Finance Hub', icon: DollarSign, key: '3' },
-                { id: 'menu', label: 'Menu & Stock', icon: Upload, key: '4' },
+                { id: 'menu', label: 'Menu & Stock', icon: Package, key: '4' },
+                { id: 'printOps', label: 'Print Ops', icon: Printer, key: '5' },
               ] as const).map(({ id, label, icon: Icon, key }) => (
                 <button
                   key={id}
@@ -476,6 +483,14 @@ const AdminPage = () => {
           {/* Menu & Stock CMS Tab */}
           {activeTab === 'menu' && (
             <MenuCMS />
+          )}
+
+          {/* Print Operations / Audit Trail Tab */}
+          {activeTab === 'printOps' && (
+            <div className="space-y-4">
+              <PrintOpsCenter />
+              <JengaOpsCenter />
+            </div>
           )}
         </main>
       </div>

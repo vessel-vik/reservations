@@ -326,28 +326,6 @@
     }
 }
 
-/* Portrait tablet — 3 columns, full content width */
-@media (min-width: 768px) and (orientation: portrait) {
-  .product-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-  /* Push content above the bottom tab bar */
-  .pos-main-content {
-    padding-bottom: 72px;
-  }
-  .tablet-portrait-only {
-    display: flex !important;
-  }
-  /*
-   * Shrink the right-side cart sidebar by exactly the fixed nav bar height (76px).
-   * This ensures the "Add to Tab" button is never hidden behind the overlay.
-   * h-full on the CartSidebar resolves to (parent height − padding) = 100vh − 76px.
-   */
-  .pos-cart-sidebar-wrapper {
-    padding-bottom: 76px;
-  }
-}
-
 /* Landscape tablet — 4 columns (sidebar takes 240px, leaves ~560px+) */
 @media (min-width: 768px) and (orientation: landscape) and (max-width: 1023px) {
   .product-grid {
@@ -356,25 +334,62 @@
   }
 }
 
-/* Tablet range (768–1023px) — compact card content */
+/* Tablet range (768–1023px) — readable card content without feeling cramped */
 @media (min-width: 768px) and (max-width: 1023px) {
+  .product-grid {
+    gap: 1.125rem;
+  }
   .product-card-content {
-    padding: 0.625rem;
-    gap: 0.25rem;
+    padding: 0.875rem;
+    gap: 0.35rem;
   }
   .product-card-name {
-    font-size: 0.8125rem;
-    min-height: 2.1rem;
+    font-size: 0.9375rem;
+    min-height: 2.4375rem;
+    line-height: 1.25;
   }
   .product-card-description {
-    font-size: 0.6875rem;
-    min-height: 1.9rem;
-    -webkit-line-clamp: 1;
+    font-size: 0.75rem;
+    min-height: 2rem;
+    -webkit-line-clamp: 2;
   }
   .product-card-price {
-    font-size: 1rem;
+    font-size: 1.125rem;
   }
   .product-card-image {
     aspect-ratio: 4 / 3;
+  }
+}
+
+/* Portrait tablet — 3 columns, full content width + POS utilities */
+@media (min-width: 768px) and (orientation: portrait) {
+  .product-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .pos-tablet-portrait-top-safe {
+    padding-top: max(0.5rem, env(safe-area-inset-top));
+  }
+  /* Push content above the bottom tab bar (~120px + safe area) */
+  .pos-main-content {
+    padding-bottom: 120px;
+  }
+  .tablet-portrait-only {
+    display: flex !important;
+  }
+  /*
+   * Shrink the right-side cart sidebar by the fixed nav bar height.
+   */
+  .pos-cart-sidebar-wrapper {
+    padding-bottom: 120px;
+  }
+}
+
+/* Portrait tablet (768–1023px) — slightly roomier grid and card padding */
+@media (min-width: 768px) and (max-width: 1023px) and (orientation: portrait) {
+  .product-grid {
+    gap: 1.25rem;
+  }
+  .product-card-content {
+    padding: 0.9375rem;
   }
 }

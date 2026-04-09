@@ -170,10 +170,21 @@ async function createCollection(collectionId, name, attributes, permissions = []
     console.log(`Done with ${name}\n`);
 }
 
+async function createIndex(collectionId, key, attributes) {
+    try {
+        await databases.createIndex(DATABASE_ID, collectionId, key, 'key', attributes);
+        console.log(`  # index ${collectionId}.${key}`);
+    } catch (error) {
+        if (!String(error?.message || '').includes('already exists')) {
+            console.log(`  ❌ Failed to create index ${collectionId}.${key}:`, error.message);
+        }
+    }
+}
+
 async function setupDatabase() {
     console.log('Database ID:', DATABASE_ID);
-    console.log('Endpoint:', process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT);
-    console.log('Project:', process.env.NEXT_PUBLIC_APPWRITE_PROJECT);
+    console.log('Endpoint:', process.env.NEXT_PUBLIC_ENDPOINT);
+    console.log('Project:', process.env.PROJECT_ID || process.env.NEXT_PUBLIC_PROJECT_ID);
     console.log('---\n');
 
     // 7. Categories Collection (New)
@@ -317,12 +328,121 @@ async function setupDatabase() {
         { key: 'allergies', type: 'string', size: 100, required: false, array: true }
     ]);
 
+    await createCollection('cash_verifications', 'Cash Verifications', [
+        { key: 'businessId', type: 'string', size: 64, required: true },
+        { key: 'paymentReference', type: 'string', size: 120, required: true },
+        { key: 'fileId', type: 'string', size: 64, required: true },
+        { key: 'deviceInstallId', type: 'string', size: 80, required: false },
+        { key: 'capturedAt', type: 'string', size: 40, required: true },
+        { key: 'clerkUserId', type: 'string', size: 64, required: false },
+        { key: 'userAgent', type: 'string', size: 500, required: false },
+        { key: 'geoJson', type: 'string', size: 500, required: false },
+        { key: 'orderIdsJson', type: 'string', size: 4000, required: false },
+    ]);
+
+    await createCollection('individual_units', 'Individual Units', [
+        { key: 'businessId', type: 'string', size: 64, required: true },
+        { key: 'unitUid', type: 'string', size: 120, required: true },
+        { key: 'menuItemId', type: 'string', size: 64, required: true },
+        { key: 'state', type: 'string', size: 24, required: true },
+        { key: 'scannedInAt', type: 'string', size: 40, required: false },
+        { key: 'scannedOutAt', type: 'string', size: 40, required: false },
+        { key: 'lastOrderId', type: 'string', size: 64, required: false },
+        { key: 'lastScannedBy', type: 'string', size: 64, required: false },
+        { key: 'embeddingLabel', type: 'string', size: 500, required: false },
+    ]);
+
+    await createCollection('menu_item_versions', 'Menu Item Versions', [
+        { key: 'itemId', type: 'string', size: 64, required: true },
+        { key: 'versionNumber', type: 'integer', required: true, min: 1, max: 100000 },
+        { key: 'snapshot', type: 'string', size: 12000, required: true },
+        { key: 'timestamp', type: 'string', size: 40, required: true },
+        { key: 'publishedBy', type: 'string', size: 255, required: true },
+        { key: 'publisherId', type: 'string', size: 64, required: false },
+    ]);
+
+    await createCollection('print_jobs', 'Print Jobs', [
+        { key: 'businessId', type: 'string', size: 64, required: true },
+        { key: 'status', type: 'string', size: 24, required: true },
+        { key: 'jobType', type: 'string', size: 40, required: true },
+        { key: 'category', type: 'string', size: 24, required: false },
+        { key: 'content', type: 'string', size: 5000, required: true },
+        { key: 'orderId', type: 'string', size: 64, required: false },
+        { key: 'dedupeKey', type: 'string', size: 120, required: false },
+        { key: 'waiterId', type: 'string', size: 64, required: false },
+        { key: 'waiterNameSnapshot', type: 'string', size: 255, required: false },
+        { key: 'requeueReason', type: 'string', size: 80, required: false },
+        { key: 'createdByUserId', type: 'string', size: 64, required: false },
+        { key: 'createdByRole', type: 'string', size: 40, required: false },
+        { key: 'timestamp', type: 'string', size: 40, required: true },
+        { key: 'queuedAt', type: 'string', size: 40, required: false },
+        { key: 'printedAt', type: 'string', size: 40, required: false },
+        { key: 'attemptCount', type: 'integer', required: false, min: 0, max: 1000 },
+        { key: 'targetTerminal', type: 'string', size: 80, required: false },
+        { key: 'errorMessage', type: 'string', size: 500, required: false },
+    ]);
+
+    await createCollection('print_audit_entries', 'Print Audit Entries', [
+        { key: 'businessId', type: 'string', size: 64, required: true },
+        { key: 'printJobId', type: 'string', size: 64, required: true },
+        { key: 'orderId', type: 'string', size: 64, required: false },
+        { key: 'jobType', type: 'string', size: 40, required: true },
+        { key: 'category', type: 'string', size: 24, required: true },
+        { key: 'status', type: 'string', size: 24, required: true },
+        { key: 'summary', type: 'string', size: 500, required: false },
+        { key: 'errorMessage', type: 'string', size: 500, required: false },
+        { key: 'timestamp', type: 'string', size: 40, required: true },
+        { key: 'contentSample', type: 'string', size: 1800, required: false },
+        { key: 'dedupeKey', type: 'string', size: 120, required: false },
+        { key: 'actorUserId', type: 'string', size: 64, required: false },
+        { key: 'actorRole', type: 'string', size: 40, required: false },
+        { key: 'waiterId', type: 'string', size: 64, required: false },
+        { key: 'terminalId', type: 'string', size: 120, required: false },
+        { key: 'requeueReason', type: 'string', size: 80, required: false },
+    ]);
+    await createCollection('print_terminal_controls', 'Print Terminal Controls', [
+        { key: 'businessId', type: 'string', size: 64, required: true },
+        { key: 'terminalId', type: 'string', size: 120, required: true },
+        { key: 'state', type: 'string', size: 20, required: true },
+        { key: 'fallbackTerminal', type: 'string', size: 120, required: false },
+        { key: 'updatedAt', type: 'string', size: 40, required: true },
+        { key: 'updatedByUserId', type: 'string', size: 64, required: false },
+    ]);
+    await createCollection('print_ops_incidents', 'Print Ops Incidents', [
+        { key: 'businessId', type: 'string', size: 64, required: true },
+        { key: 'terminalId', type: 'string', size: 120, required: true },
+        { key: 'action', type: 'string', size: 60, required: true },
+        { key: 'severity', type: 'string', size: 20, required: true },
+        { key: 'message', type: 'string', size: 500, required: true },
+        { key: 'metadata', type: 'string', size: 2000, required: false },
+        { key: 'timestamp', type: 'string', size: 40, required: true },
+        { key: 'actorUserId', type: 'string', size: 64, required: false },
+        { key: 'actorRole', type: 'string', size: 40, required: false },
+    ]);
+    await createIndex('print_jobs', 'jobs_biz_cat_stat_created', ['businessId', 'category', 'status', '$createdAt']);
+    await createIndex('print_jobs', 'jobs_biz_order_created', ['businessId', 'orderId', '$createdAt']);
+    await createIndex('print_jobs', 'jobs_biz_waiter_created', ['businessId', 'waiterId', '$createdAt']);
+    await createIndex('print_audit_entries', 'audit_biz_order_ts', ['businessId', 'orderId', 'timestamp']);
+    await createIndex('print_audit_entries', 'audit_biz_job_ts', ['businessId', 'printJobId', 'timestamp']);
+    await createIndex('print_terminal_controls', 'ctrl_biz_terminal', ['businessId', 'terminalId']);
+    await createIndex('print_ops_incidents', 'inc_biz_term_time', ['businessId', 'terminalId', 'timestamp']);
+
     console.log('🎉 Database setup completed!\n');
     console.log('Next steps:');
-    console.log('1. Run: npm run seed-menu');
-    console.log('2. Run: npm run seed-staff');  
-    console.log('3. Run: npm run seed-tables');
-    console.log('4. Test the POS system\n');
+    console.log('1. Add to .env.local: CASH_VERIFICATIONS_COLLECTION_ID=cash_verifications');
+    console.log('   + NEXT_PUBLIC_CASH_VERIFICATIONS_COLLECTION_ID=cash_verifications (admin realtime toasts)');
+    console.log('2. Add to .env.local: INDIVIDUAL_UNITS_COLLECTION_ID=individual_units');
+    console.log('3. Add to .env.local: MENU_VERSIONS_COLLECTION_ID=menu_item_versions');
+    console.log('   + NEXT_PUBLIC_MENU_ITEM_VERSIONS_COLLECTION_ID=menu_item_versions (version history API)');
+    console.log('4. Add to .env.local: PRINT_JOBS_COLLECTION_ID=print_jobs');
+    console.log('   + NEXT_PUBLIC_PRINT_JOBS_COLLECTION_ID=print_jobs (PrintBridge realtime + admin tabs)');
+    console.log('5. Add to .env.local: PRINT_AUDIT_ENTRIES_COLLECTION_ID=print_audit_entries');
+    console.log('6. Add to .env.local: PRINT_TERMINAL_CONTROLS_COLLECTION_ID=print_terminal_controls');
+    console.log('7. Add to .env.local: PRINT_OPS_INCIDENTS_COLLECTION_ID=print_ops_incidents');
+    console.log('8. Run: npm run seed-menu');
+    console.log('9. Run: npm run seed-staff');  
+    console.log('10. Run: npm run seed-tables');
+    console.log('11. Test the POS system\n');
 }
 
 setupDatabase().catch(console.error);

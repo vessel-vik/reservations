@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
+vi.mock('@clerk/nextjs/server', () => ({
+  auth: vi.fn(() =>
+    Promise.resolve({ userId: 'user_test', orgId: 'org_test', sessionId: 'sess_test' })
+  ),
+}));
+
 // Menu Items API
 import { GET as GET_ITEMS, POST as POST_ITEM } from '../../app/api/menu/items/route';
 import { PATCH as PATCH_ITEM, DELETE as DELETE_ITEM } from '../../app/api/menu/items/[id]/route';
@@ -16,6 +22,8 @@ vi.mock('@/lib/actions/menu.actions', () => ({
 
 vi.mock('@/lib/appwrite.config', () => ({
   storage: { createFile: vi.fn() },
+  DATABASE_ID: 'db1',
+  MENU_ITEMS_COLLECTION_ID: 'menu_coll',
   databases: { updateDocument: vi.fn(), getDocument: vi.fn(), deleteDocument: vi.fn() },
 }));
 vi.mock('node-appwrite', async (importOriginal) => {
@@ -24,7 +32,7 @@ vi.mock('node-appwrite', async (importOriginal) => {
 });
 
 import * as menuActions from '@/lib/actions/menu.actions';
-import { storage } from '@/lib/appwrite.config';
+import { storage, databases } from '@/lib/appwrite.config';
 
 process.env.MENU_IMAGES_BUCKET_ID = 'img-bucket';
 process.env.NEXT_PUBLIC_ENDPOINT = 'https://cloud.appwrite.io/v1';
@@ -33,7 +41,13 @@ process.env.NEXT_PUBLIC_PROJECT_ID = 'test-proj';
 describe('API: /api/menu/items', () => {
   const mockUrl = 'http://localhost/api/menu/items';
 
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(databases.getDocument).mockResolvedValue({
+      $id: 'item1',
+      businessId: 'org_test',
+    } as any);
+  });
 
   describe('GET /api/menu/items', () => {
     it('returns 200 with array of items', async () => {
@@ -75,6 +89,9 @@ describe('API: /api/menu/items', () => {
 
       expect(res.status).toBe(201);
       expect(json.item).toMatchObject(newItem);
+      expect(menuActions.createMenuItem).toHaveBeenCalledWith(
+        expect.objectContaining({ ...newItem, businessId: 'org_test' })
+      );
     });
 
     it('returns 400 when name is missing', async () => {
@@ -121,7 +138,7 @@ describe('API: /api/menu/items', () => {
     });
 
     it('returns 404 when item does not exist', async () => {
-      vi.mocked(menuActions.updateMenuItem).mockResolvedValue({ success: false, error: 'Document not found' });
+      vi.mocked(databases.getDocument).mockRejectedValueOnce(new Error('not found'));
 
       const req = new NextRequest(`${mockUrl}/nonexistent`, {
         method: 'PATCH',

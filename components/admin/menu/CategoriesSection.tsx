@@ -10,9 +10,11 @@ import { Input } from '@/components/ui/input';
 interface Props {
   categories: any[];
   onRefresh: () => void;
+  /** Increment from parent (e.g. toolbar "New Category") to open the add row */
+  triggerAddTick?: number;
 }
 
-export function CategoriesSection({ categories, onRefresh }: Props) {
+export function CategoriesSection({ categories, onRefresh, triggerAddTick = 0 }: Props) {
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState('');
   const [saving, setSaving] = useState(false);
@@ -21,6 +23,10 @@ export function CategoriesSection({ categories, onRefresh }: Props) {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
 
   useEffect(() => { setLocalCategories(categories); }, [categories]);
+
+  useEffect(() => {
+    if (triggerAddTick > 0) setAdding(true);
+  }, [triggerAddTick]);
 
   const handleDragStart = (i: number) => setDragIndex(i);
 
