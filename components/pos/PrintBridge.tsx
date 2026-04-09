@@ -269,7 +269,7 @@ export function PrintBridge() {
                 case "kitchen_docket": {
                     // Legacy jobType — kept for backwards compat. Bug fix: was fetching bytes but never printing.
                     const parsed = parseJobPayload(job.content);
-                    const orderId = parsed.orderId || job.content.match(/orderId:([\w-]+)/)?.[1]
+                    const orderId = (parsed.orderId || job.content.match(/orderId:([\w-]+)/)?.[1])
                         ?? job.content.match(/table:(\d+)/)?.[1]
                         ?? job.content.trim();
                     const res = await fetch('/api/print/thermal', {

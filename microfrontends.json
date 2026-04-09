@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/microfrontends.json",
   "applications": {
     "reservations-pos-core": {
-      "packageName": "ScanNServe",
+      "packageName": "reservations",
       "development": {
         "local": 3000,
         "fallback": "https://reservations-pos-core.vercel.app"
